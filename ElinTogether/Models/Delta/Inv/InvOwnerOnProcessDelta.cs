@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using ElinTogether.Helper;
 using ElinTogether.Net;
+using ElinTogether.Patches;
 using MessagePack;
 using UnityEngine;
 
@@ -249,7 +250,13 @@ public class InvOwnerOnProcessDelta : ElinDelta
 
         // InvOwnerRefuel._OnProcess
         var fuel = thing.Split(num);
-        trait.Refuel(fuel);
+        var previousPeer = PersonalMsgSayPatch.RefuelPeer;
+        PersonalMsgSayPatch.RefuelPeer = OriginPeer;
+        try {
+            trait.Refuel(fuel);
+        } finally {
+            PersonalMsgSayPatch.RefuelPeer = previousPeer;
+        }
     }
 
     private void ApplyRecycle(ElinNetHost host, TraitRecycle recycle, Thing thing)
