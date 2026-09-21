@@ -200,10 +200,6 @@ internal partial class ElinNetHost
         branch.RefreshEfficiency();
         chara.RefreshWorkElements();
 
-        if (chara.homeZone == branch.owner) {
-            chara.homeZone = null;
-        }
-
         EmpLog.Debug("Detached remote chara {Uid} from home branch {BranchUid}",
             chara.uid, branch.owner.uid);
     }

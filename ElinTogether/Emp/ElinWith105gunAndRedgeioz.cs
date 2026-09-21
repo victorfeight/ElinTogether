@@ -39,6 +39,9 @@ internal sealed class EmpMod : BaseUnityPlugin
 
         CommandRegistry.assemblies.Add(Assembly);
 
+        // This repair must survive the session component being destroyed while a save loads.
+        RemoteCharaLifecyclePatch.Apply();
+
 #if DEBUG
         SharedHarmony.PatchAll(Assembly);
 #endif
