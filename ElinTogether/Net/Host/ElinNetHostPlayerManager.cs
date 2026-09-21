@@ -75,6 +75,7 @@ internal partial class ElinNetHost
         ActiveRemoteCharas[peer.Id] = chara;
 
         chara.MakeAlly();
+        DetachRemoteFromHomeBranch(chara);
         chara.MoveZone(pc.currentZone);
         chara.SetBool("remote_chara", true);
         GiveAxeToRemotePlayer(chara);
@@ -185,6 +186,26 @@ internal partial class ElinNetHost
             }
             chara.SetBool("remote_axe_given", true);
         }
+    }
+
+    internal static void DetachRemoteFromHomeBranch(Chara chara)
+    {
+        if (EClass.Home.FindBranch(chara) is not { } branch) {
+            return;
+        }
+
+        branch.members.Remove(chara);
+        EClass.pc.faction.charaElements.OnRemoveMember(chara);
+        branch.policies.Validate();
+        branch.RefreshEfficiency();
+        chara.RefreshWorkElements();
+
+        if (chara.homeZone == branch.owner) {
+            chara.homeZone = null;
+        }
+
+        EmpLog.Debug("Detached remote chara {Uid} from home branch {BranchUid}",
+            chara.uid, branch.owner.uid);
     }
 
     [ElinPostLoad]
