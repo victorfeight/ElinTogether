@@ -10,6 +10,22 @@ internal static class PersonalMsgSayPatch
 {
     internal static int? RefuelPeer { get; set; }
     internal static bool RemoteToggleReplay { get; set; }
+    internal static Chara? FirstTimeCraftReceiver { get; set; }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(Msg), nameof(Msg.Say), typeof(string), typeof(string), typeof(string), typeof(string), typeof(string))]
+    internal static void OnFirstTimeCraftMessage(string idLang, string ref1, string? ref2, string? ref3, string? ref4)
+    {
+        if (idLang != "firstTimeCraft" || FirstTimeCraftReceiver is not { } receiver ||
+            NetSession.Instance.Connection is not ElinNetHost host) {
+            return;
+        }
+
+        var peerIndex = host.ActiveRemoteCharas.FirstOrDefault(pair => pair.Value == receiver).Key;
+        if (peerIndex > 0) {
+            SendToPeer(host, peerIndex, Msg.GetRawText(idLang, ref1, ref2, ref3, ref4));
+        }
+    }
 
     [HarmonyPrefix]
     [HarmonyPatch(typeof(Msg), nameof(Msg.Say), typeof(string), typeof(Card), typeof(string), typeof(string), typeof(string))]
@@ -31,14 +47,7 @@ internal static class PersonalMsgSayPatch
         }
 
         var text = Msg.GetRawText(idLang, c1, ref1, ref2, ref3);
-        var color = Msg.currentColor;
-        if (!host.SendDeltaTo(peerIndex, new MsgSayDelta {
-                Text = text,
-                R = color.r,
-                G = color.g,
-                B = color.b,
-                A = color.a,
-            })) {
+        if (!SendToPeer(host, peerIndex, text)) {
             return true;
         }
 
@@ -46,6 +55,18 @@ internal static class PersonalMsgSayPatch
         Msg.SetColor();
         Msg.alwaysVisible = false;
         return false;
+    }
+
+    private static bool SendToPeer(ElinNetHost host, int peerIndex, string text)
+    {
+        var color = Msg.currentColor;
+        return host.SendDeltaTo(peerIndex, new MsgSayDelta {
+                Text = text,
+                R = color.r,
+                G = color.g,
+                B = color.b,
+                A = color.a,
+            });
     }
 
     [HarmonyPrefix]
