@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>TpHugeShippingContainer</AssemblyName>
+    <RootNamespace>TpHugeShippingContainer</RootNamespace>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <ElinGamePath Condition="'$(ElinGamePath)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Elin</ElinGamePath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="0Harmony"><HintPath>$(ElinGamePath)\BepInEx\core\0Harmony.dll</HintPath></Reference>
+    <Reference Include="BepInEx.Core"><HintPath>$(ElinGamePath)\BepInEx\core\BepInEx.Core.dll</HintPath></Reference>
+    <Reference Include="BepInEx.Unity"><HintPath>$(ElinGamePath)\BepInEx\core\BepInEx.Unity.dll</HintPath></Reference>
+    <Reference Include="Elin"><HintPath>$(ElinGamePath)\Elin_Data\Managed\Elin.dll</HintPath></Reference>
+    <Reference Include="Plugins.BaseCore"><HintPath>$(ElinGamePath)\Elin_Data\Managed\Plugins.BaseCore.dll</HintPath></Reference>
+    <Reference Include="Plugins.UI"><HintPath>$(ElinGamePath)\Elin_Data\Managed\Plugins.UI.dll</HintPath></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(ElinGamePath)\Elin_Data\Managed\UnityEngine.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(ElinGamePath)\Elin_Data\Managed\UnityEngine.CoreModule.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

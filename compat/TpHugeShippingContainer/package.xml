@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Meta>
+  <title>TpHugeShippingContainer (stable fix)</title>
+  <id>tp_huge_shipping_container</id>
+  <author>TP@黒猫亭; stable compatibility fix by victorfeight</author>
+  <loadPriority>100</loadPriority>
+  <description>Restores the 16x10 shipping container on Elin stable 23.338.2, including existing placed shipping chests.</description>
+  <tags>QoL,Balance,Item</tags>
+  <version>0.23.338.2-fixed.1</version>
+</Meta>
