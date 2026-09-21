@@ -80,7 +80,16 @@ public class ActMappingValidator : ISourceValidator
                     return [];
                 }
             })
-            .Where(actType.IsAssignableFrom)
+            .Where(t => {
+                try {
+                    return actType.IsAssignableFrom(t);
+                } catch (Exception ex) when (ex is TypeLoadException or System.IO.FileNotFoundException or System.IO.FileLoadException) {
+                    // Optional dependencies can make a loaded mod type uninspectable.
+                    // It cannot be mapped safely; keep scanning the other action types.
+                    EmpLog.Warning("Skipping action type {TypeName}: {Error}", t.FullName, ex.Message);
+                    return false;
+                }
+            })
             .OrderBy(GetInheritanceDepth)
             .ThenBy(t => t.FullName, StringComparer.Ordinal);
 
