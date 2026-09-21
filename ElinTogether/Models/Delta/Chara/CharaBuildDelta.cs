@@ -1,3 +1,4 @@
+using ElinTogether.Helper;
 using ElinTogether.Net;
 using MessagePack;
 
@@ -51,7 +52,14 @@ public class CharaBuildDelta : ElinDelta
         };
 
         if (taskBuild.useHeld && chara.held != held) {
-            chara.HoldCard(held);
+            // Remote held visuals are already driven by CharaSwitchHeldDelta. Calling
+            // HoldCard here recreates the card renderer while its prior actor can still
+            // be present in Scene.syncList, leaving a visible ghost after placement.
+            if (chara.IsRemotePlayer && held.GetRootCard() == chara) {
+                chara.held = held;
+            } else {
+                chara.HoldCard(held);
+            }
         }
 
         taskBuild.recipe._dir = Dir;
