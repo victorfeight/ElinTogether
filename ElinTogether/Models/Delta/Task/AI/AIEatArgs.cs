@@ -11,10 +11,12 @@ public class AIEatArgs : TaskArgsBase
     [Key(1)]
     public required bool Cook { get; init; }
 
-    public static AIEatArgs Create(AI_Eat ai)
+    public static AIEatArgs Create(AI_Eat ai, Chara owner)
     {
         return new() {
-            Target = ai.target,
+            // Held-item self actions leave target null and let AI_Eat resolve it
+            // on its first tick. Resolve it before crossing the network instead.
+            Target = ai.target ?? owner.held,
             Cook = ai.cook,
         };
     }
