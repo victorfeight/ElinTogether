@@ -78,10 +78,17 @@ internal static class CharaProgressCompleteEvent
             return;
         }
 
-        if (__instance is TaskBuild) {
+        if (__instance is TaskBuild taskBuild) {
             if (NetSession.Instance.Connection is ElinNetHost buildHost) {
                 foreach (var delta in captured) {
-                    buildHost.Delta.AddRemote(delta);
+                    // The client must replay the build while the held card is still in its inventory.
+                    // A zone-add for the target before CharaBuildDelta makes that replay fail.
+                    if (taskBuild.owner.IsRemotePlayer && delta is ZoneAddCardDelta added &&
+                        added.Card.Uid == taskBuild.target?.uid) {
+                        buildHost.Delta.DeferRemote(delta);
+                    } else {
+                        buildHost.Delta.AddRemote(delta);
+                    }
                 }
             }
 

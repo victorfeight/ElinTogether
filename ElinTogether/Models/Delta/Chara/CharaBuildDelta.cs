@@ -59,7 +59,10 @@ public class CharaBuildDelta : ElinDelta
 
         if (net.IsHost) {
             TargetUid = (taskBuild.target?.uid).GetValueOrDefault();
-            net.Delta.AddRemote(this);
+            // The client must replay the build against its pre-build held stack.
+            // Host-side count changes are queued during OnProgressComplete, so
+            // relay the build before those counts are refreshed into the batch.
+            net.Delta.AddRemoteImmediate(this);
         } else if (TargetUid > 0 && taskBuild.target is { isDestroyed: false } target && target.uid != TargetUid) {
             if (CardCache.Find(TargetUid) is { } orphan && orphan != target) {
                 CardCache.DelayDestroy(orphan);
