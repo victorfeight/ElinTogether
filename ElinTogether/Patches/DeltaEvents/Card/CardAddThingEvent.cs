@@ -103,6 +103,11 @@ internal static class CardAddThingEvent
             return false;
         }
 
+        if (connection.IsHost && RemoteCraft.ProductReceiver is { } receiver) {
+            EmpLog.Debug("Remote craft AddThing queued product {ProductUid} ({ProductId}) num {ProductNum}, parent {ParentUid}, receiver {ReceiverUid}, try stack {TryStack}",
+                t.uid, t.id, t.Num, __instance.uid, receiver.uid, tryStack);
+        }
+
         connection.Delta.AddRemote(new CardAddThingDelta {
             Thing = t,
             Parent = __instance,

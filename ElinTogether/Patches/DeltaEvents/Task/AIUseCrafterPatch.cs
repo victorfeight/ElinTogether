@@ -131,7 +131,11 @@ internal static class AIUseCrafterPatch
             return true;
         }
 
+        EmpLog.Debug("Remote craft AddCard redirect product {ProductUid} ({ProductId}) num {ProductNum}, receiver {ReceiverUid}",
+            c.uid, c.id, c.Num, receiver.uid);
         __result = receiver.AddCard(c);
+        EmpLog.Debug("Remote craft AddCard result product {ProductUid} destroyed {ProductDestroyed}, result {ResultUid} num {ResultNum}, result root {ResultRootUid}",
+            c.uid, c.isDestroyed, __result.uid, __result.Num, __result.GetRootCard()?.uid ?? -1);
         return false;
     }
 
@@ -143,8 +147,12 @@ internal static class AIUseCrafterPatch
             return true;
         }
 
+        EmpLog.Debug("Remote craft HoldCard redirect product {ProductUid} ({ProductId}) num {ProductNum}, product root {ProductRootUid}, receiver {ReceiverUid}",
+            t.uid, t.id, t.Num, t.GetRootCard()?.uid ?? -1, receiver.uid);
         if (t.GetRootCard() != receiver) {
-            receiver.AddCard(t);
+            var stored = receiver.AddCard(t);
+            EmpLog.Debug("Remote craft HoldCard result product {ProductUid} destroyed {ProductDestroyed}, stored {StoredUid} num {StoredNum}, stored root {StoredRootUid}",
+                t.uid, t.isDestroyed, stored.uid, stored.Num, stored.GetRootCard()?.uid ?? -1);
         }
 
         return false;
@@ -294,7 +302,13 @@ internal static class AIUseCrafterPatch
                         RemoteCraft.ProductReceiver = act.owner;
                         try {
                             for (var i = 0; i < act.num; i++) {
-                                recipe.Craft(blessed, i == 0, act.ings, crafter);
+                                var held = EClass.pc.held;
+                                EmpLog.Debug("Remote craft output begin recipe {RecipeId}, receiver {ReceiverUid}, host held {HeldUid} ({HeldId}) num {HeldNum}",
+                                    recipe.id, act.owner.uid, held?.uid ?? -1, held?.id ?? "", held?.Num ?? 0);
+                                var product = recipe.Craft(blessed, i == 0, act.ings, crafter);
+                                EmpLog.Debug("Remote craft output end recipe {RecipeId}, product {ProductUid} ({ProductId}) num {ProductNum}, destroyed {ProductDestroyed}, root {ProductRootUid}",
+                                    recipe.id, product?.uid ?? -1, product?.id ?? "", product?.Num ?? 0,
+                                    product?.isDestroyed ?? true, product?.GetRootCard()?.uid ?? -1);
                             }
                         } finally {
                             RemoteCraft.ProductReceiver = null;
