@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using ElinTogether.Helper;
 using ElinTogether.Net;
@@ -20,6 +21,10 @@ public class CharaActPerformDelta : ElinDelta
         [ABILITY.ActItem] = ACT.Item,
     };
     private static bool _staticMapped;
+    private static readonly HashSet<Guid> CompletedZaps = [];
+
+    [ElinPreLoad]
+    private static void ResetZaps(GameIOContext context) => CompletedZaps.Clear();
 
     [Key(0)]
     public required int ActId { get; init; }
@@ -33,21 +38,34 @@ public class CharaActPerformDelta : ElinDelta
     [Key(3)]
     public required Position? Pos { get; init; }
 
+    // A zap is an item-bound action, not reconstructible from its ability ID alone.
+    [Key(4)] public RemoteCard? Wand { get; init; }
+    [Key(5)] public Guid ZapId { get; init; }
+    [Key(6)] public int ZoneUid { get; init; }
+
     public static CharaActPerformDelta Create(Act act)
     {
         ApplyBuiltInMapping();
 
         return new() {
-            ActId = act.id,
+            ActId = act is ActZap ? ABILITY.ActZap : act.id,
             Owner = Act.CC,
             TargetCard = Act.TC,
             Pos = Act.TP,
+            Wand = (act as ActZap)?.trait?.owner,
+            ZapId = act is ActZap ? Guid.NewGuid() : Guid.Empty,
+            ZoneUid = EClass._zone.uid,
         };
     }
 
     protected override void OnApply(ElinNetBase net)
     {
         ApplyBuiltInMapping();
+
+        if (ActId == ABILITY.ActZap) {
+            ApplyZap(net);
+            return;
+        }
 
         // we do not apply to ourselves
         if (Owner.Find() is not Chara { IsPC: false } chara) {
@@ -68,6 +86,34 @@ public class CharaActPerformDelta : ElinDelta
         }
 
         act.Perform(chara, target, pos);
+    }
+
+    private void ApplyZap(ElinNetBase net)
+    {
+        // Local effects are predicted by the acting client; other clients receive
+        // authoritative results, not another cast (which would create fake summons).
+        if (net is not ElinNetHost host) return;
+        if (!host.ActiveRemoteCharas.TryGetValue(OriginPeer, out var caster) ||
+            caster.uid != Owner.Uid || caster.isDead || !caster.IsInActiveMap ||
+            ZoneUid != EClass._zone.uid || Pos is not { IsInActiveMapBounds: true } ||
+            Wand?.Find() is not Thing { isDestroyed: false, trait: TraitRod rod } wand ||
+            wand.GetRootCard() != caster || ZapId == Guid.Empty) {
+            EmpLog.Warning("Zap rejected peer {Peer}, caster {Caster}, wand {Wand}, zone {Zone}",
+                OriginPeer, Owner.Uid, Wand?.Uid, ZoneUid);
+            return;
+        }
+        if (!CompletedZaps.Add(ZapId)) return;
+
+        var charges = wand.c_charges;
+        var before = EClass._map.charas.Count;
+        // This is a fresh host simulation. Let existing generation, placement,
+        // charge and condition hooks publish its results through the normal stream.
+        // In particular ZoneAddCardEvent must not suppress newly summoned actors.
+        using var simulation = Simulate();
+        var result = new ActZap { id = ABILITY.ActZap, trait = rod }.Perform(caster, null, Pos);
+        EmpLog.Information("Zap applied {ZapId}: caster {Caster}, wand {Wand}, effect {Effect}/{Kind}, aim {X},{Z}, charges {Before}->{After}, charas {OldCount}->{NewCount}, result {Result}",
+            ZapId, caster.uid, wand.uid, rod.IdEffect, rod.N1, Pos.X, Pos.Z,
+            charges, wand.c_charges, before, EClass._map.charas.Count, result);
     }
 
     private static void ApplyBuiltInMapping()

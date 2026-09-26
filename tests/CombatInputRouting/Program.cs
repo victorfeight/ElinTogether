@@ -81,3 +81,9 @@ pc.cooldown=false;
 using (var run = new QueuedCombatAct("failed",()=>false).Run().GetEnumerator()) {
  Check(run.MoveNext() && run.Current==AIAct.Status.Fail,"execution failure is not reported as AI success");
 }
+var rodItem = new Thing { root=pc };
+var rodAct = new ActZap { trait = new TraitRod { owner=rodItem } };
+var rodDecision = CombatInputBuffer.CreateAct(rodAct,pc,target,new Point());
+Check(rodDecision.CanStart(), "queued zap validates the captured rod before spending a turn");
+rodItem.root = new Chara();
+Check(!rodDecision.CanStart(), "queued zap rejects a rod transferred before dispatch");

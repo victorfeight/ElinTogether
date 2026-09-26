@@ -37,8 +37,9 @@ internal static class CharaActPerformEvent
             return;
         }
 
-        // perform throw via ActThrowEvent
-        if (__instance is ActThrow and not ActRanged) {
+        // Item-bound zaps capture their context before vanilla mutates Act.TC/TP.
+        // Throws have their own existing event as well.
+        if (__instance is ActZap || __instance is ActThrow and not ActRanged) {
             return;
         }
 

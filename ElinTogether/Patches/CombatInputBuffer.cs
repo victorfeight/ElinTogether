@@ -63,9 +63,11 @@ internal static class CombatInputBuffer
         var ranged = actor.ranged;
         var throwAct = act as ActThrow;
         var thrown = throwAct?.target;
+        var wand = (act as ActZap)?.trait?.owner;
         bool WithEquipment(bool execute)
         {
             if (!TargetExists(target)) return false;
+            if (act is ActZap && (wand is null || wand.isDestroyed || wand.GetRootCard() != actor)) return false;
             if (act is ActRanged && (ranged is null || ranged.isDestroyed ||
                 !ranged.CanAutoFire(actor, target))) return false;
             if (act is ActThrow and not ActRanged && (thrown is null || thrown.isDestroyed ||
