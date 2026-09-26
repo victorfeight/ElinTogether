@@ -37,6 +37,8 @@ public class ElinDeltaManager
     private readonly List<BatchSnapshot> _snapshots = [];
 
     public bool HasPendingOut => _outBuffer.Count > 0 || _outBufferDeferred.Count > 0;
+    internal bool HasDeferredOut => _outBufferDeferred.Count > 0;
+
     public bool HasPendingIn => _inBuffer.Count > 0 || _inBufferDeferred.Count > 0;
     public bool IsIdle => !HasPendingOut && !HasPendingIn;
 

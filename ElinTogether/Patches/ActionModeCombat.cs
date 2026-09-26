@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
@@ -22,7 +23,8 @@ public class ActionModeCombat
     }
 
     // failsafe
-    private const float ExecutingTimeout = 30f;
+    private const float ExecutingTimeout = 5f;
+    private const float AnimationTimeout = 3f;
     private const float VisibilityRefreshInterval = 0.5f;
 
     private static readonly CombatTimeline _timeline = new();
@@ -38,6 +40,14 @@ public class ActionModeCombat
     private static bool _advanceProcessed;
     private static bool _finishingManualStep;
     private static float _executingTimer;
+    private static float _animationWait;
+    private static int _dispatchUid = -1;
+    private static int _revision;
+    private static CombatPhaseDelta? _lastPhaseSnapshot;
+    private static EGui? _combatStatus;
+    private static string _statusText = "";
+    private static float _phaseStarted;
+    private static bool LocalDispatched => LocalDue && _dispatchUid == EClass.pc.uid;
     private static float _visibilityTimer;
     private static int _lastPlayerCount;
     private static bool _pcActedThisRound;
@@ -71,7 +81,7 @@ public class ActionModeCombat
 
     // Player ticks are dispatched exactly once by the scheduler, never by wall time.
     internal static bool BlockLocalTick(Chara chara) => Activated && chara.IsPC &&
-        (!_executeLocalTick || Phase != CombatPhase.Executing || !LocalDue || _reportedComplete);
+        (!_executeLocalTick || Phase != CombatPhase.Executing || !LocalDispatched || _reportedComplete);
 
     private static void CompleteLocalRound(float cost)
     {
@@ -96,7 +106,7 @@ public class ActionModeCombat
 
     internal static void OnRoundComplete(int uid, int round, float cost)
     {
-        if (Phase != CombatPhase.Executing || !_timeline.Complete(uid, round, cost)) {
+        if (Phase != CombatPhase.Executing || uid != _dispatchUid || !_timeline.Complete(uid, round, cost)) {
             EmpLog.Debug("Combat completion ignored uid {Uid}, report round {ReportRound}, current {RoundId}, phase {Phase}",
                 uid, round, RoundId, Phase);
             return;
@@ -113,6 +123,11 @@ public class ActionModeCombat
             ChangePhaseLocal(CombatPhase.Inactive);
             _timeline.Reset();
             RoundId = 0;
+            _revision = 0;
+            _lastPhaseSnapshot = null;
+            _dispatchUid = -1;
+            _combatStatus?.Kill();
+            _combatStatus = null;
             _due.Clear();
             _deadlines.Clear();
             EnemyVisibility.Clear();
@@ -181,17 +196,39 @@ public class ActionModeCombat
             _applyPendingQueued = false;
             ApplyPendingDecision(net);
         }
-        if (Phase == CombatPhase.Executing && LocalDue && !_reportedComplete) {
-            // Do not overlap movement animations. Keep both the decision and debt.
-            if (EClass.pc.renderer is CharaRenderer { IsMoving: true }) return;
+        if (Phase == CombatPhase.Executing && LocalDispatched && !_reportedComplete) {
+            // The logical move is already committed. A stuck visual interpolation must
+            // not hold the shared clock forever; finish it through vanilla's snap API.
+            if (EClass.pc.renderer is CharaRenderer { IsMoving: true } renderer) {
+                _animationWait += Time.unscaledDeltaTime;
+                if (_animationWait < AnimationTimeout) return;
+                TraceTurn("recover-animation", $"wait={_animationWait}");
+                renderer.SetFirst(true, EClass.pc.pos.PositionCenter());
+            }
+            _animationWait = 0f;
             _applyPendingQueued = false;
             _executeLocalTick = true;
+            var turnsBefore = EClass.player.stats.turns;
             try {
                 ApplyPendingDecision(net);
+                if (!EClass.pc.WillConsumeTurn() && EClass.pc.ai is QueuedCombatAct queued && !queued.CanStart()) {
+                    TraceTurn("invalid-decision", queued.GetText());
+                    ClearLocalGoal();
+                    Msg.SayGod("That action is no longer available. Choose another action.");
+                    CompleteLocalRound(0f);
+                    return;
+                }
                 if (!EClass.pc.isDead && !(_reportedComplete || EClass.pc.HasNoGoal && !EClass.pc.WillConsumeTurn())) {
                     EClass.pc.Tick();
                 }
                 if (!_reportedComplete) CompleteLocalRound(0f);
+            } catch (Exception ex) {
+                // Never retry effects or condition ticks that might already have run.
+                var consumed = EClass.player.stats.turns != turnsBefore;
+                EmpLog.Warning(ex, "Combat dispatch failed at epoch {Epoch}, consumed {Consumed}", RoundId, consumed);
+                CompleteLocalRound(consumed ? EClass.pc.actTime : 0f);
+                ClearLocalGoal();
+                Msg.SayGod("Your action stopped because of an error. Choose another action.");
             } finally {
                 _executeLocalTick = false;
             }
@@ -211,6 +248,13 @@ public class ActionModeCombat
                 net.Delta.AddRemote(new CombatReadyDelta { Ready = ready, RoundId = RoundId });
             }
         }
+    }
+
+    private static void ClearLocalGoal()
+    {
+        _finishingManualStep = true;
+        try { EClass.pc.SetNoGoal(); }
+        finally { _finishingManualStep = false; }
     }
 
     private static void ApplyPendingDecision(ElinNetBase net)
@@ -243,14 +287,21 @@ public class ActionModeCombat
     }
 
     internal static void ChangePhaseLocal(CombatPhase phase, int round = -1, int[]? due = null,
-        double clock = 0, Dictionary<int, double>? deadlines = null)
+        double clock = 0, Dictionary<int, double>? deadlines = null, int dispatchUid = -1, int revision = -1)
     {
-        if (round >= 0 && round < RoundId) return;
-        if (Phase == phase && (round < 0 || round == RoundId)) {
-            // A host retry must resend the acknowledgement, NEVER replay the action.
+        if (round >= 0 && round < RoundId || revision >= 0 && revision < _revision) return;
+        if (revision >= 0 && revision == _revision) {
+            // Duplicate snapshot is a probe. Report current state, never replay a tick.
             if (phase == CombatPhase.Executing && _reportedComplete && LocalDue) SendCompletion();
+            if (phase == CombatPhase.Deciding) _lastReportedReady = null;
+            TraceTurn("snapshot-retry", $"dispatch={_dispatchUid};complete={_reportedComplete};moving={EClass.pc.renderer.IsMoving}");
             return;
         }
+        if (round < 0 && Phase == phase) return;
+        var newWindow = round != RoundId || Phase != phase;
+        var previousDispatch = _dispatchUid;
+        if (revision >= 0) _revision = revision;
+        _dispatchUid = dispatchUid;
         var prev = Phase;
         if (round < 0) clock = _clock;
         if (round >= 0) RoundId = round;
@@ -259,10 +310,12 @@ public class ActionModeCombat
         _clock = clock;
         Phase = phase;
         _executingTimer = 0f;
-        _lastReportedReady = null;
+        if (newWindow) _lastReportedReady = null;
+        if (newWindow || previousDispatch != _dispatchUid) { _animationWait = 0f; _phaseStarted = Time.unscaledTime; }
         _applyPendingQueued = phase == CombatPhase.Executing && LocalDue;
         TraceTurn("phase-transition", $"{prev}->{phase}");
         EmpLog.Debug("Combat phase changed to {CombatPhase}, round {RoundId}, time {Clock}", phase, RoundId, clock);
+        if (prev == CombatPhase.Inactive && phase != CombatPhase.Inactive) Msg.SayGod("emp_ui_combat_enter".lang());
         switch (phase) {
             case CombatPhase.Inactive:
                 // Rejoin vanilla scheduling with the outstanding action debt intact.
@@ -278,12 +331,10 @@ public class ActionModeCombat
                 Msg.SayGod("emp_ui_combat_exit".lang());
                 break;
             case CombatPhase.Deciding:
-                if (prev == CombatPhase.Inactive) Msg.SayGod("emp_ui_combat_enter".lang());
                 // Keep continuing goal enumerators intact.
                 break;
             case CombatPhase.Executing:
-                _pcActedThisRound = false;
-                _reportedComplete = false;
+                if (newWindow) { _pcActedThisRound = false; _reportedComplete = false; }
                 break;
             case CombatPhase.Advancing:
                 _advanceProcessed = false;
@@ -298,6 +349,7 @@ public class ActionModeCombat
         var participants = players.Select(p => p.FindChara())
             .Where(c => c is not null && !c.isDead).Select(c => new KeyValuePair<int, double>(
                 c!.uid, System.Math.Max(0, c.actTime - c.roundTimer))).ToArray();
+        var previousDue = _timeline.Due.ToArray();
         _timeline.Synchronize(participants);
         active &= participants.Length > 0;
 
@@ -306,7 +358,7 @@ public class ActionModeCombat
             if (Activated) PublishPhase(net, CombatPhase.Inactive);
             return;
         }
-        if (Activated && players.Count != _lastPlayerCount) PublishPhase(net, Phase);
+        if (Activated && (players.Count != _lastPlayerCount || !previousDue.ToHashSet().SetEquals(_timeline.Due))) PublishPhase(net, Phase);
         _lastPlayerCount = players.Count;
         if (Time.unscaledTime >= _nextWaitTrace) {
             _nextWaitTrace = Time.unscaledTime + 2f;
@@ -323,26 +375,37 @@ public class ActionModeCombat
             case CombatPhase.Deciding:
                 if (_timeline.Due.Contains(EClass.pc.uid)) _timeline.SetReady(EClass.pc.uid, RoundId, SelfDecided);
                 if (_timeline.AllReady) PublishPhase(net, CombatPhase.Executing);
+                else RetrySnapshot(net);
                 break;
             case CombatPhase.Executing:
-                _executingTimer += Time.unscaledDeltaTime;
+                // Death and other authoritative results may be deferred one flush.
+                // Put them on the reliable stream BEFORE the next grant or enemy time.
+                if (net.Delta.HasDeferredOut) { RetrySnapshot(net); break; }
                 if (_timeline.AllDone) {
                     if (!active) PublishPhase(net, CombatPhase.Inactive);
                     else BeginAdvance(net);
-                } else if (_executingTimer > ExecutingTimeout) {
-                    // Retry the same epoch. Never forgive missing cost or execute twice.
-                    EmpLog.Warning("Combat completion delayed; retrying epoch {Epoch}", RoundId);
-                    _executingTimer = 0f;
+                } else if (_dispatchUid != _timeline.NextActor) {
+                    // Earlier action deltas have been applied before their completion
+                    // report. Publish the next grant after those resulting deltas.
                     PublishPhase(net, CombatPhase.Executing);
-                }
+                } else RetrySnapshot(net);
                 break;
             case CombatPhase.Advancing:
-                if (_advanceProcessed) {
+                if (_advanceProcessed && !net.Delta.HasDeferredOut) {
                     _timeline.BeginWindow();
                     PublishPhase(net, CombatPhase.Deciding);
                 }
                 break;
         }
+    }
+
+    private static void RetrySnapshot(ElinNetBase net)
+    {
+        _executingTimer += Time.unscaledDeltaTime;
+        if (_executingTimer < ExecutingTimeout) return;
+        _executingTimer = 0f;
+        TraceTurn("recover-snapshot", $"dispatch={_dispatchUid};missing={string.Join(",", _timeline.Due.Except(_timeline.Done))}");
+        PublishPhase(net, Phase, retry: true);
     }
 
     private static void BeginAdvance(ElinNetBase net)
@@ -355,15 +418,18 @@ public class ActionModeCombat
         EmpLog.Debug("Combat timeline advanced {Elapsed} to {Clock}", elapsed, _timeline.Now);
     }
 
-    private static void PublishPhase(ElinNetBase net, CombatPhase phase)
+    private static void PublishPhase(ElinNetBase net, CombatPhase phase, bool retry = false)
     {
-        var packet = new CombatPhaseDelta {
+        var packet = retry && _lastPhaseSnapshot is { } previous ? previous : new CombatPhaseDelta {
             Phase = phase, RoundId = _timeline.Epoch,
             DuePlayers = phase is CombatPhase.Deciding or CombatPhase.Executing ? _timeline.Due.ToArray() : [],
+            DispatchUid = phase == CombatPhase.Executing ? _timeline.NextActor : -1,
+            Revision = retry ? _revision : _revision + 1,
             Clock = _timeline.Now, Deadlines = _timeline.Deadlines.ToDictionary(p => p.Key, p => p.Value),
         };
+        _lastPhaseSnapshot = packet;
         net.Delta.AddRemote(packet);
-        ChangePhaseLocal(packet.Phase, packet.RoundId, packet.DuePlayers, packet.Clock, packet.Deadlines);
+        ChangePhaseLocal(packet.Phase, packet.RoundId, packet.DuePlayers, packet.Clock, packet.Deadlines, packet.DispatchUid, packet.Revision);
         if (phase == CombatPhase.Inactive && net is ElinNetHost host) {
             foreach (var chara in host.ActiveRemoteCharas.Values) {
                 if (packet.Deadlines.TryGetValue(chara.uid, out var at)) {
@@ -382,19 +448,27 @@ public class ActionModeCombat
 
     private static void UpdateDecideMessage()
     {
-        if (Phase != CombatPhase.Deciding) {
-            WaitForSelf = false;
+        WaitForSelf = Phase == CombatPhase.Deciding && LocalDue && !SelfDecided;
+        if (!Activated) {
+            _combatStatus?.Kill();
+            _combatStatus = null;
             return;
         }
-
-        if (LocalDue && !SelfDecided) {
-            if (!WaitForSelf) {
-                WaitForSelf = true;
-                Msg.SayGod("emp_ui_combat_decide".lang());
-            }
-        } else if (WaitForSelf) {
-            WaitForSelf = false;
-            Msg.SayGod("emp_ui_combat_wait".lang());
+        var action = _pendingAi?.GetText() ?? (!EClass.pc.HasNoGoal ? EClass.pc.ai.GetText() : null);
+        var queued = action is null ? "" : $"Queued: {action}. ";
+        _statusText = Phase switch {
+            CombatPhase.Deciding when WaitForSelf => "Your turn: choose an action.",
+            CombatPhase.Deciding when !LocalDue => queued + "Your next turn is later. Waiting for the other player.",
+            CombatPhase.Deciding => queued + "Waiting for the other player to choose.",
+            CombatPhase.Executing when LocalDispatched && !_reportedComplete => "Resolving your action…",
+            CombatPhase.Executing => queued + "Resolving the other player's action…",
+            _ => queued + "Resolving enemy turns…",
+        };
+        if (Phase == CombatPhase.Executing && Time.unscaledTime - _phaseStarted > ExecutingTimeout) {
+            _statusText += " Synchronization is delayed; retrying safely. If it persists, reconnect the client.";
+        }
+        if (_combatStatus is null || _combatStatus.IsKilled) {
+            _combatStatus = EGui.CreatePopup(() => new(_statusText), _ => false, 0.2f);
         }
     }
 
@@ -561,7 +635,7 @@ public class ActionModeCombat
         var tp = pos.Copy();
         Act.CC = cc;
         // no pos
-        cc.SetAIImmediate(new QueuedCombatAct(act.GetText(), () => act.Perform(cc, tc, tp)));
+        cc.SetAIImmediate(CombatInputBuffer.CreateAct(act, cc, tc, tp));
 
         __result = false;
         return false;

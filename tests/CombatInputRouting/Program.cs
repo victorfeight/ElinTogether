@@ -6,6 +6,7 @@ void Check(bool ok,string name) { if(!ok) throw new Exception(name); Console.Wri
 bool Invoke(string name, params object?[] args) => (bool)typeof(CombatInputBuffer)
     .GetMethod(name,BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,args)!;
 bool ExecutePending() {
+    if (ActionModeCombat.Pending is QueuedCombatAct queued && !queued.CanStart()) return false;
     using var run = ActionModeCombat.Pending!.Run().GetEnumerator();
     return run.MoveNext() && run.Current == AIAct.Status.Success;
 }
@@ -46,17 +47,37 @@ CombatInputBuffer.BeginInput(out outer);
 Invoke("BeforeAct",act,pc,target,new Point(),false);
 CombatInputBuffer.EndInput(outer);
 gun.root=new Chara();
-Check(ExecutePending() && act.performed==1,
+Check(!ExecutePending() && act.performed==1,
     "queued shot cannot use a weapon transferred to another player");
 gun.root=pc;
 CombatInputBuffer.BeginInput(out outer);
 Invoke("BeforeAbility",pc,spell,target,new Point(),false,false);
 CombatInputBuffer.EndInput(outer);
 target.isDestroyed=true; mana=pc.mana;
-Check(ExecutePending() && pc.mana==mana,
+Check(!ExecutePending() && pc.mana==mana,
     "destroyed queued target does not consume mana");
 Check(Invoke("BeforeAct",act,pc,target,new Point(),false),"scripted effects outside input remain immediate");
 CombatInputBuffer.BeginInput(out outer);
 ActionModeCombat.Activated=false;
 Check(Invoke("BeforeAct",act,pc,target,new Point(),false),"turn mode inactive retains vanilla input");
 CombatInputBuffer.EndInput(outer);
+
+ActionModeCombat.Activated=true;
+target.isDestroyed=false;
+var victim = new Chara();
+var queuedShot = CombatInputBuffer.CreateAct(act, pc, victim, new Point());
+Check(queuedShot.CanStart(), "living target passes preflight");
+victim.isDead=true;
+Check(!queuedShot.CanStart() && act.performed==1, "partner kill invalidates queued shot before vanilla tick");
+act.valid=false;
+Check(!CombatInputBuffer.CreateAct(act,pc,target,new Point()).CanStart(), "vanilla range/LOS validation rejects stale input before tick");
+act.valid=true;
+CombatInputBuffer.BeginInput(out outer);
+Invoke("BeforeAbility",pc,spell,target,new Point(),false,false);
+CombatInputBuffer.EndInput(outer);
+pc.cooldown=true;
+Check(!ExecutePending() && pc.mana==mana, "cooldown blocks queued ability before spending mana or entering tick");
+pc.cooldown=false;
+using (var run = new QueuedCombatAct("failed",()=>false).Run().GetEnumerator()) {
+ Check(run.MoveNext() && run.Current==AIAct.Status.Fail,"execution failure is not reported as AI success");
+}

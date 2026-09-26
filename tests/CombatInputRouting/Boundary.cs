@@ -1,9 +1,9 @@
 using System.Reflection;
 public class Point { public Point Copy() => new(); }
 public class Card { public bool isDestroyed; public Point pos = new(); }
-public class Thing : Card { public Card? root; public Card? GetRootCard() => root; }
-public class Chara : Card { public bool IsPC = true; public Thing? ranged; public int mana = 10; public bool UseAbility(Act a, Card? tc, Point? pos, bool pt) { mana--; return a.Perform(this,tc,pos); } }
-public class Act { public int performed; public bool valid = true; public string GetText() => "action"; public bool CanPerform(Chara c, Card? t, Point? p) => valid; public bool Perform(Chara c, Card? t, Point? p) { if (!valid) return false; performed++; return true; } }
+public class Thing : Card { public Card? root; public Card? GetRootCard() => root; public bool CanAutoFire(Chara c, Card? t) => root == c; }
+public class Chara : Card { public bool IsPC = true, isDead; public bool HasCooldown(int id) => cooldown; public bool cooldown; public Thing? ranged; public int mana = 10; public bool UseAbility(Act a, Card? tc, Point? pos, bool pt) { mana--; return a.Perform(this,tc,pos); } }
+public class Act { public int id, performed; public bool ValidatePerform(Chara c, Card? t, Point? p) => valid; public bool valid = true; public string GetText() => "action"; public bool CanPerform(Chara c, Card? t, Point? p) => valid; public bool Perform(Chara c, Card? t, Point? p) { if (!valid) return false; performed++; return true; } }
 public class ActThrow : Act { public Thing? target; }
 public class ActRanged : ActThrow {}
 public class AIAct {
@@ -11,6 +11,7 @@ public class AIAct {
  public virtual bool CancelWhenDamaged => true;
  public virtual string GetText(string str = "") => str;
  public virtual IEnumerable<Status> Run() { yield return Status.Success; }
+ public Status Cancel() => Status.Fail;
  public Status Success() => Status.Success;
 }
 public class Player { public void EndTurn(bool consume = true) {} }

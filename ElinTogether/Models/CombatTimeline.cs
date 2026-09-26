@@ -15,6 +15,15 @@ internal sealed class CombatTimeline
     internal HashSet<int> Due { get; } = new();
     internal HashSet<int> Ready { get; } = new();
     internal HashSet<int> Done { get; } = new();
+    // Resolve ties in a stable rotating order, not according to packet arrival.
+    private int _firstActor = -1;
+    internal int NextActor {
+        get {
+            var pending = Due.Where(uid => !Done.Contains(uid)).OrderBy(uid => uid).ToArray();
+            foreach (var uid in pending) if (uid >= _firstActor) return uid;
+            return pending.Length == 0 ? -1 : pending[0];
+        }
+    }
     internal bool AllReady => Due.All(Ready.Contains);
     internal bool AllDone => Due.All(Done.Contains);
     internal IReadOnlyDictionary<int, double> Deadlines => _next;
@@ -42,6 +51,11 @@ internal sealed class CombatTimeline
         Done.Clear();
         foreach (var pair in _next) {
             if (pair.Value <= Now + Epsilon) Due.Add(pair.Key);
+        }
+        if (Due.Count > 1) {
+            var sorted = Due.OrderBy(uid => uid).ToArray();
+            var next = sorted.Where(uid => uid > _firstActor).ToArray();
+            _firstActor = next.Length > 0 ? next[0] : sorted[0];
         }
     }
 
@@ -78,7 +92,7 @@ internal sealed class CombatTimeline
     internal void Reset(bool resetEpoch = true)
     {
         Now = 0;
-        if (resetEpoch) Epoch = 0;
+        if (resetEpoch) { Epoch = 0; _firstActor = -1; }
         _next.Clear();
         Due.Clear();
         Ready.Clear();

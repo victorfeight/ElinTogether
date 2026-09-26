@@ -34,27 +34,7 @@ internal static class CombatInputBuffer
     private static bool BeforeAct(Act __instance, Chara _cc, Card? _tc, Point? _tp, ref bool __result)
     {
         if (!ShouldBuffer(_cc)) return true;
-        var pos = (_tp ?? _tc?.pos ?? _cc.pos).Copy();
-        var ranged = _cc.ranged;
-        var throwAct = __instance as ActThrow;
-        var thrown = throwAct?.target;
-        ActionModeCombat.QueueInput(new QueuedCombatAct(__instance.GetText(), () => {
-            if (_tc is { isDestroyed: true }) return false;
-            if (__instance is ActRanged && ranged is not null &&
-                (ranged.isDestroyed || ranged.GetRootCard() != _cc)) return false;
-            if (__instance is ActThrow and not ActRanged && thrown is not null &&
-                (thrown.isDestroyed || thrown.GetRootCard() != _cc)) return false;
-            var oldRanged = _cc.ranged;
-            var oldThrown = throwAct?.target;
-            try {
-                if (__instance is ActRanged) _cc.ranged = ranged;
-                if (throwAct is not null) throwAct.target = thrown;
-                return __instance.Perform(_cc, _tc, pos);
-            } finally {
-                _cc.ranged = oldRanged;
-                if (throwAct is not null) throwAct.target = oldThrown;
-            }
-        }));
+        ActionModeCombat.QueueInput(CreateAct(__instance, _cc, _tc, _tp));
         _deferred = true;
         __result = false;
         return false;
@@ -66,13 +46,46 @@ internal static class CombatInputBuffer
     {
         if (!ShouldBuffer(__instance)) return true;
         var point = pos?.Copy();
-        ActionModeCombat.QueueInput(new QueuedCombatAct(a.GetText(), () =>
-            tc is not { isDestroyed: true } && a.CanPerform(__instance, tc, point) &&
-            __instance.UseAbility(a, tc, point, pt)));
+        ActionModeCombat.QueueInput(new QueuedCombatAct(a.GetText(),
+            () => __instance.UseAbility(a, tc, point, pt),
+            () => TargetExists(tc) && !__instance.HasCooldown(a.id) &&
+                  a.CanPerform(__instance, tc, point) && a.ValidatePerform(__instance, tc, point)));
         _deferred = true;
         __result = false;
         return false;
     }
+
+    // Shared by shortcuts and ActPlan clicks. Preserve captured equipment around both
+    // validation and execution; Act instances (including ACT.Throw) are singletons.
+    internal static QueuedCombatAct CreateAct(Act act, Chara actor, Card? target, Point? point)
+    {
+        var pos = (point ?? target?.pos ?? actor.pos).Copy();
+        var ranged = actor.ranged;
+        var throwAct = act as ActThrow;
+        var thrown = throwAct?.target;
+        bool WithEquipment(bool execute)
+        {
+            if (!TargetExists(target)) return false;
+            if (act is ActRanged && (ranged is null || ranged.isDestroyed ||
+                !ranged.CanAutoFire(actor, target))) return false;
+            if (act is ActThrow and not ActRanged && (thrown is null || thrown.isDestroyed ||
+                thrown.GetRootCard() != actor)) return false;
+            var oldRanged = actor.ranged;
+            var oldThrown = throwAct?.target;
+            try {
+                if (act is ActRanged) actor.ranged = ranged;
+                if (throwAct is not null) throwAct.target = thrown;
+                return execute ? act.Perform(actor, target, pos) : act.CanPerform(actor, target, pos);
+            } finally {
+                actor.ranged = oldRanged;
+                if (throwAct is not null) throwAct.target = oldThrown;
+            }
+        }
+        return new QueuedCombatAct(act.GetText(), () => WithEquipment(true), () => WithEquipment(false));
+    }
+
+    private static bool TargetExists(Card? target) => target is not { isDestroyed: true } &&
+        target is not Chara { isDead: true };
 
     [HarmonyPrefix]
     [HarmonyPatch(typeof(Player), nameof(Player.EndTurn))]

@@ -17,6 +17,9 @@ public class CombatPhaseDelta : ElinDelta
     [Key(3)] public double Clock { get; init; }
     [Key(4)] public required Dictionary<int, double> Deadlines { get; init; }
 
+    [Key(5)] public int DispatchUid { get; init; }
+    [Key(6)] public int Revision { get; init; }
+
     protected override void OnApply(ElinNetBase net)
     {
         // host only
@@ -24,6 +27,6 @@ public class CombatPhaseDelta : ElinDelta
             return;
         }
 
-        ActionModeCombat.ChangePhaseLocal(Phase, RoundId, DuePlayers, Clock, Deadlines);
+        ActionModeCombat.ChangePhaseLocal(Phase, RoundId, DuePlayers, Clock, Deadlines, DispatchUid, Revision);
     }
 }

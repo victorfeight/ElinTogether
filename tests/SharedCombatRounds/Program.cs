@@ -71,6 +71,45 @@ Check(state.Epoch>epoch && !state.Complete(1,epoch,.3), "combat re-entry rejects
 state.Reset();
 Check(state.Now==0 && state.Epoch==0 && state.Deadlines.Count==0, "session reset clears timeline");
 
+// Ordered grants preserve every due player's opportunity, rotating ties fairly.
+state = Start((1,0),(719,0));
+Check(state.NextActor==1,"first tie grants one player, not simultaneous local execution");
+state.Complete(1,state.Epoch,1);
+Check(state.NextActor==719 && !state.AllDone,"second due player follows first completion at same time");
+state.Complete(719,state.Epoch,1);
+Check(state.NextActor==-1 && state.AllDone,"completed window grants nobody twice");
+state.Advance(); state.BeginWindow();
+Check(state.NextActor==719,"next tie rotates priority away from host");
+state.Complete(719,state.Epoch,1);
+state.Complete(1,state.Epoch,0);
+Check(Near(state.Advance(),0),"invalid second attack grants no additional enemy time");
+state.BeginWindow();
+Check(state.NextActor==1 && state.Due.Count==1,"invalidated player can choose again without partner spending another action");
+state.Synchronize(new[]{new KeyValuePair<int,double>(719,0)});
+Check(state.NextActor==-1 && state.AllDone,"disconnect releases a dispatched player's barrier");
+state=Start((719,0),(1,0),(500,0));
+Check(state.NextActor==1,"tie order is independent of participant enumeration");
+state.Complete(1,state.Epoch,1); state.Complete(500,state.Epoch,1); state.Complete(719,state.Epoch,1);
+state.Advance(); state.BeginWindow();
+Check(state.NextActor==500,"tie priority rotates across more than two players");
+state.Complete(500,state.Epoch,1);
+Check(state.NextActor==719,"rotated order continues before wrapping");
+state.Complete(719,state.Epoch,1);
+Check(state.NextActor==1,"rotated order wraps without losing a turn");
+
+// Exercise the real mod queue: deferred deaths must precede the next grant.
+var deltas = new ElinTogether.Net.ElinDeltaManager();
+deltas.AddRemote(new ProbeDelta("attack"));
+deltas.DeferRemote(new ProbeDelta("death"));
+deltas.RefreshBuffer();
+Check(deltas.HasDeferredOut,"deferred death holds the next dispatch barrier");
+var firstBatch=deltas.FlushOutBuffer().Cast<ProbeDelta>().Select(d=>d.Label).ToArray();
+Check(firstBatch.SequenceEqual(new[]{"attack"}) && !deltas.HasDeferredOut,
+    "first flush promotes deferred death without discarding it");
+deltas.AddRemote(new ProbeDelta("next grant")); deltas.RefreshBuffer();
+Check(deltas.FlushOutBuffer().Cast<ProbeDelta>().Select(d=>d.Label).SequenceEqual(new[]{"death","next grant"}),
+    "authoritative death precedes the next player's execution grant on the wire");
+
 // Inspect and transform the REAL installed vanilla IL, without launching Unity.
 var game = @"C:\Program Files (x86)\Steam\steamapps\common\Elin";
 var repo = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
