@@ -35,11 +35,13 @@ internal static class PersonalMsgSayPatch
     internal static bool OnCollectionMessage(string idLang, int i, string? ref1, string? ref2,
         ref string __result)
     {
-        if (idLang != "addedCards" || NetSession.Instance.Connection is not ElinNetHost host ||
-            PeerFor(host, CodexCollector) is not > 0) return true;
-        // Preserve vanilla's numeric plural selection; it has no GetRawText overload.
-        return Route(host, PeerFor(host, CodexCollector),
-            GameLang.Parse(Msg.GetGameText(idLang), Msg.IsThirdPerson(i), ref1, ref2), ref __result);
+        if (idLang != "addedCards" || NetSession.Instance.Connection is null) return true;
+        // CodexCountDelta now announces the confirmed shared change to everyone.
+        // Suppress vanilla's misleading personal line on both host and client.
+        __result = "";
+        Msg.SetColor();
+        Msg.alwaysVisible = false;
+        return false;
     }
 
     internal static int? RefuelPeer { get; set; }

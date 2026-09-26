@@ -23,3 +23,5 @@ The host save's codex is authoritative. Previously divergent client-only collect
 counts are not imported or added to it, which would risk crediting the same drops twice.
 
 Message routing checks also link production PersonalMsgSayPatch with mocked formatting/transport. They cover collector routing, nested and exception cleanup, first-craft host suppression, failed/muted delivery, existing craft/refuel routing, toggle suppression and unrelated messages. These do not validate Harmony hooks in Unity; use the packaged two-player checklist.
+
+Shared collection confirmations now use the existing CodexCountDelta.Message field. The host announces successful AddCard changes with collector/species/quantity and successful withdrawals after delivery/debit. Vanilla addedCards is suppressed only in multiplayer. Private failures still use the requester-only reply. Tests link the production count packet and CodexEvents hook as well as the transaction and personal-routing code; the fake AddCard boundary invokes the real postfix to check duplicate-request notification behavior.

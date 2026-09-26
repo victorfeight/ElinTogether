@@ -106,7 +106,7 @@ public class CodexRequestDelta : ElinDelta
                 return;
             }
             entry.numCard--;
-            CodexCountDelta.Publish(Species);
+            CodexCountDelta.Publish(Species, receiver, -1);
             EmpLog.Information("Codex withdrawal {RequestId}: species {Species}, receiver {Uid}, remaining {Count}",
                 RequestId, Species, receiver.uid, entry.numCard);
         } finally {

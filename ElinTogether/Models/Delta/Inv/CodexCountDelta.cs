@@ -29,12 +29,25 @@ public class CodexCountDelta : ElinDelta
         return true;
     }
 
-    internal static void Publish(string species)
+    internal static void Publish(string species, Chara? actor = null, int change = 0)
     {
         if (NetSession.Instance.Connection is not ElinNetHost host) return;
+        var entry = player.codex.GetOrCreate(species);
+        string? message = null;
+        if (actor is not null && change != 0) {
+            var name = actor.c_altName ?? actor.NameSimple;
+            var count = System.Math.Abs(change);
+            var cards = count == 1 ? "card" : "cards";
+            message = change > 0
+                ? $"{name} added {count} {entry.Name} {cards} to the shared collection."
+                : $"{name} withdrew {count} {entry.Name} {cards} from the shared collection.";
+        }
+        // Reuse the authoritative count packet: one confirmation on every peer,
+        // with no extra message relay or client-side prediction of a successful change.
         host.Delta.AddRemote(new CodexCountDelta {
-            Species = species, Count = player.codex.GetOrCreate(species).numCard,
+            Species = species, Count = entry.numCard, Message = message,
         });
+        if (message is not null) Msg.Say(message);
         RefreshUI();
     }
 

@@ -7,7 +7,7 @@ var host = new ElinNetHost();
 NetSession.Instance.Connection = host;
 EClass.sources.charas.map["putit"] = new();
 EClass.pc = new Chara { uid = 1 };
-var client = new Chara { uid = 719 };
+var client = new Chara { uid = 719, c_altName = "Vic" };
 host.ActiveRemoteCharas[7] = client;
 var entry = EClass.player.codex.GetOrCreate("putit");
 CodexRequestDelta Request() => new() { Action = CodexRequestDelta.Operation.Withdraw, Species = "putit", OriginPeer = 7 };
@@ -37,7 +37,11 @@ Check(entry.numCard == 0 && second.things.Items.Count == 0, "competing requests 
 var collectible = new Thing { parent = client, trait = new TraitCard(), c_idRefCard = "putit", Num = 3 };
 CardCache.Cards[123] = collectible;
 var collect = new CodexRequestDelta { Action = CodexRequestDelta.Operation.Collect, ThingUid = 123, OriginPeer = 7 };
+var announcementsBefore=host.Delta.Items.Count;
 collect.Apply(host); collect.Apply(host);
+Check(host.Delta.Items.Count==announcementsBefore+1 &&
+      ((CodexCountDelta)host.Delta.Items.Last()).Message=="Vic added 3 Putit cards to the shared collection.",
+      "deposit hook broadcasts actor-specific shared confirmation exactly once for a duplicate request");
 Check(entry.numCard == 3 && collectible.isDestroyed, "deposit consumes stack and credits once");
 new CodexRequestDelta { Action = CodexRequestDelta.Operation.Collect, ThingUid = 123, OriginPeer = 7 }.Apply(host);
 Check(entry.numCard == 3, "new request cannot collect already consumed item");
@@ -64,11 +68,11 @@ host.Replies.Clear();
 var result = "";
 using (PersonalMsgSayPatch.ForCollector(client)) {
  Check(!PersonalMsgSayPatch.OnCollectionMessage("addedCards", 3, "3", null, ref result) &&
-       host.LastPeer == 7 && host.Replies.Count == 1 && result == "addedCards:True",
-       "collection routes to collector and suppresses host, preserving plural selection");
+       host.Replies.Count == 0 && result == "",
+       "vanilla personal collection message suppressed without a duplicate targeted packet");
  using (PersonalMsgSayPatch.ForCollector(EClass.pc)) {
-  Check(PersonalMsgSayPatch.OnCollectionMessage("addedCards", 1, "1", null, ref result) && host.Replies.Count == 1,
-        "nested host collection stays local");
+  Check(!PersonalMsgSayPatch.OnCollectionMessage("addedCards", 1, "1", null, ref result) && host.Replies.Count == 0,
+        "host collection also suppresses vanilla personal wording");
  }
  Check(PersonalMsgSayPatch.CodexCollector == client, "nested scope restores collector");
 }
@@ -78,14 +82,14 @@ catch (InvalidOperationException) {}
 Check(PersonalMsgSayPatch.CodexCollector == null, "collector restored after exception");
 PersonalMsgSayPatch.FirstTimeCraftReceiver = client;
 Check(!PersonalMsgSayPatch.OnFirstTimeCraftMessage("firstTimeCraft", "chair", null, null, null, ref result) &&
-      host.LastPeer == 7 && host.Replies.Count == 2, "first craft reaches crafter without host duplicate");
+      host.LastPeer == 7 && host.Replies.Count == 1, "first craft reaches crafter without host duplicate");
 host.Deliver = false;
 Check(PersonalMsgSayPatch.OnFirstTimeCraftMessage("firstTimeCraft", "chair", null, null, null, ref result),
       "failed delivery retains vanilla message");
 host.Deliver = true;
 Msg.ignoreAll = true;
 Check(PersonalMsgSayPatch.OnFirstTimeCraftMessage("firstTimeCraft", "chair", null, null, null, ref result) &&
-      host.Replies.Count == 2, "muted vanilla messages are not forwarded");
+      host.Replies.Count == 1, "muted vanilla messages are not forwarded");
 Msg.ignoreAll = false;
 RemoteCraft.ProductReceiver = client;
 Check(!PersonalMsgSayPatch.OnPersonalMessage("crafted", new Thing(), null, null, null, ref result) && host.LastPeer == 7,
@@ -99,3 +103,30 @@ Check(!PersonalMsgSayPatch.OnRemoteToggleMessage("open", client, new Thing(), nu
       host.Replies.Count == sent, "toggle replay suppressed without sending duplicate");
 Check(PersonalMsgSayPatch.OnPersonalMessage("unrelated", new Thing(), null, null, null, ref result) && host.Replies.Count == sent,
       "unclassified messages retain vanilla behavior");
+
+// Production count packet carries the shared confirmation; replay only displays it.
+host.Delta.Items.Clear(); Msg.Lines.Clear();
+entry.numCard = 3;
+CodexCountDelta.Publish("putit", client, 3);
+var announcement = (CodexCountDelta)host.Delta.Items.Single();
+Check(announcement.Message == "Vic added 3 Putit cards to the shared collection." &&
+      Msg.Lines.Single() == announcement.Message, "collection names actor/species/count and shows once on host");
+Msg.Lines.Clear();
+var receiverNet = new ElinNetBase();
+announcement.Apply(receiverNet);
+Check(Msg.Lines.Single() == announcement.Message && receiverNet.Delta.Items.Count == 0,
+      "client sees the same shared confirmation without re-broadcasting");
+host.Delta.Items.Clear(); Msg.Lines.Clear();
+entry.numCard=1;
+Request().Apply(host);
+var withdrawal=(CodexCountDelta)host.Delta.Items.Single();
+Check(withdrawal.Count==0 && withdrawal.Message=="Vic withdrew 1 Putit card from the shared collection." &&
+      Msg.Lines.Count==1,"successful withdrawal is announced after delivery and debit");
+host.Delta.Items.Clear(); Msg.Lines.Clear();
+Request().Apply(host);
+Check(host.Delta.Items.Count==0 && Msg.Lines.Count==0 && host.LastPeer==7,
+      "failed withdrawal remains private and emits no shared success");
+NetSession.Instance.Connection=null;
+Check(PersonalMsgSayPatch.OnCollectionMessage("addedCards",1,"1",null,ref result),
+      "single-player retains vanilla collection messages");
+NetSession.Instance.Connection=host;

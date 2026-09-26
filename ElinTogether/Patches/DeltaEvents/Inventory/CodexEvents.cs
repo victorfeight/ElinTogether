@@ -62,8 +62,9 @@ internal static class CodexEvents
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(CodexManager), nameof(CodexManager.AddCard))]
-    private static void CountChanged(CodexManager __instance, string id)
+    private static void CountChanged(CodexManager __instance, string id, int num)
     {
-        if (__instance == EClass.player.codex) CodexCountDelta.Publish(id);
+        if (__instance == EClass.player.codex)
+            CodexCountDelta.Publish(id, PersonalMsgSayPatch.CodexCollector ?? EClass.pc, num);
     }
 }

@@ -1,23 +1,31 @@
 // Test doubles for game/transport APIs only; transaction logic is linked from production.
+global using Object = UnityEngine.Object;
 using ElinTogether.Models;
 public class EClass { public static Chara pc = new(); public static Player player = new(); public static Sources sources = new(); public static object _zone = new(); }
 public class Player { public CodexManager codex = new(); }
 public class Sources { public Charas charas = new(); public class Charas { public Dictionary<string, object> map = new(); } }
-public class CodexCreature { public int numCard; }
-public class CodexManager { readonly Dictionary<string,CodexCreature> entries = new(); public CodexCreature GetOrCreate(string id) { if (!entries.ContainsKey(id)) entries[id] = new(); return entries[id]; } }
-public class Card { public object? parent; public bool isDestroyed; public object GetRootCard() => parent is Card c ? c.GetRootCard() : this; public virtual Thing AddThing(Thing t, bool stack) => throw new NotImplementedException(); }
-public class Chara : Card { public int uid; public bool IsInActiveMap = true; public Bag things; public Chara() { things = new(this); } public int Dist(object p) => 1; public override Thing AddThing(Thing t, bool stack) { t.parent = this; things.Items.Add(t); return t; } }
+public class CodexCreature { public string id="putit"; public int numCard; public string Name => "Putit"; }
+public class CodexManager { public void AddCard(string id, int num = 1) {
+ GetOrCreate(id).numCard += num;
+ // Simulate Harmony calling the actual production postfix at the API boundary.
+ typeof(ElinTogether.Patches.CodexEvents).GetMethod("CountChanged",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Static)!.Invoke(null,new object[]{this,id,num});
+ } readonly Dictionary<string,CodexCreature> entries = new(); public CodexCreature GetOrCreate(string id) { if (!entries.ContainsKey(id)) entries[id] = new(); return entries[id]; } }
+public class Card { public int uid; public object? parent; public bool isDestroyed; public object GetRootCard() => parent is Card c ? c.GetRootCard() : this; public virtual Thing AddThing(Thing t, bool stack) => throw new NotImplementedException(); }
+public class Chara : Card { public string? c_altName; public string NameSimple => "Player"; public void Pick(Thing t) {} public bool IsInActiveMap = true; public Bag things; public Chara() { things = new(this); } public int Dist(object p) => 1; public override Thing AddThing(Thing t, bool stack) { t.parent = this; things.Items.Add(t); return t; } }
 public class Bag(Chara owner) : List<Thing> { public int GridSize = 40; public bool Full; public Thing? Stack; public List<Thing> Items => this; public Dest GetDest(Thing t) => new() { stack = Stack, container = Full ? null : owner }; public List<Thing> List(Func<Thing,bool> f, bool onlyAccessible) => Items.Where(f).ToList(); }
 public class Dest { public Card? container; public Thing? stack; public bool IsValid => stack != null || container != null; }
 public class Thing : Card { public string id = "figure3", c_idRefCard = ""; public object trait = new TraitCard(); public object pos = new(); public int invY; public bool isEquipped; public int Num = 1; public void MakeFigureFrom(string s) { c_idRefCard = s; } public void Destroy() { isDestroyed = true; } public bool TryStackTo(Thing t) { t.Num += Num; Destroy(); return true; } }
 public class TraitCard {}
 public static class ThingGen { public static Thing? Last; public static Thing Create(string s) => Last = new(); }
-public static class ContentCodex { public static void Collect(Thing t) { EClass.player.codex.GetOrCreate(t.c_idRefCard).numCard += t.Num; t.Destroy(); } }
+public class ContentCodex { public void OnClickGetCard() {} public void OnClickAddCards() {} public TestList list = new(); public CodexCreature? currentCodex; public void RefreshList() {} public void RefreshInfo() {} public static void Collect(Thing t) { EClass.player.codex.AddCard(t.c_idRefCard,t.Num); t.Destroy(); } }
+public class TestList { public bool isBuilt; public void Select(CodexCreature c) {} }
+namespace UnityEngine { public static class Object { public static T[] FindObjectsOfType<T>() => []; } }
 public struct TestColor { public float r, g, b, a; }
 public static class Msg {
  public static bool ignoreAll, alwaysVisible;
  public static TestColor currentColor;
- public static void Say(string s) {}
+ public static List<string> Lines = new();
+ public static void Say(string s) => Lines.Add(s);
  public static void SetColor() => currentColor = default;
  public static string GetGameText(string s) => s;
  public static bool IsThirdPerson(int i) => i != 1;
@@ -29,6 +37,8 @@ namespace HarmonyLib {
  [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple=true)]
  public class HarmonyPatch : Attribute { public HarmonyPatch() {} public HarmonyPatch(Type type, string name, params Type[] args) {} }
  public class HarmonyPrefix : Attribute {}
+ public class HarmonyPostfix : Attribute {}
+ public class HarmonyFinalizer : Attribute {}
 }
 namespace ElinTogether.Models {
  public static class RemoteCraft { public static Chara? ProductReceiver; }
@@ -40,13 +50,13 @@ public static class EmpLog { public static void Information(string s, params obj
 namespace MessagePack { public class MessagePackObjectAttribute : Attribute {} public class KeyAttribute(int n) : Attribute {} }
 namespace ElinTogether.Helper { internal class Placeholder {} }
 namespace ElinTogether.Models {
- public abstract class ElinDelta : EClass { public int OriginPeer; protected virtual void OnApply(ElinTogether.Net.ElinNetBase n) {} public void Apply(ElinTogether.Net.ElinNetBase n) => OnApply(n); protected static IDisposable Simulate() => new Scope(); class Scope : IDisposable { public void Dispose() {} } }
- public class CodexCountDelta : ElinDelta { public string Species = "", Message = ""; public int Count; public static void Publish(string s) {} public static void RefreshUI() {} }
+ public abstract class ElinDelta : EClass { public static bool IsApplying; public int OriginPeer; protected virtual void OnApply(ElinTogether.Net.ElinNetBase n) {} public void Apply(ElinTogether.Net.ElinNetBase n) => OnApply(n); protected virtual bool OnRefresh() => true; public bool Refresh() => OnRefresh(); protected static IDisposable Simulate() => new Scope(); class Scope : IDisposable { public void Dispose() {} } }
  public static class CardCache { public static Dictionary<int,Card> Cards = new(); public static Card? Find(int uid) => Cards.GetValueOrDefault(uid); }
 }
 namespace ElinTogether.Net {
- public class Queue { public void AddRemote(ElinDelta d) {} }
- public class ElinNetBase { public Queue Delta = new(); }
+ public class Queue { public List<ElinDelta> Items = new(); public void AddRemote(ElinDelta d) => Items.Add(d); }
+ public class ElinNetBase { public bool IsHost => this is ElinNetHost; public Queue Delta = new(); }
+ public class ElinNetClient : ElinNetBase {}
  public class ElinNetHost : ElinNetBase { public Dictionary<int,Chara> ActiveRemoteCharas = new(); public List<ElinDelta> Replies = new(); public bool Deliver = true; public int LastPeer; public bool SendDeltaTo(int peer, ElinDelta d) { LastPeer = peer; if (!Deliver) return false; Replies.Add(d); return true; } }
  public class NetSession { public static NetSession Instance = new(); public ElinNetBase? Connection; }
 }
