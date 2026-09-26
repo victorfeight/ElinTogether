@@ -18,8 +18,8 @@ internal class PauseGame
             return;
         }
 
-        if (ActionModeCombat.Phase == ActionModeCombat.CombatPhase.Executing) {
-            // Players may both be idle after their single turn while NPC budget settles.
+        if (ActionModeCombat.Phase is ActionModeCombat.CombatPhase.Executing or ActionModeCombat.CombatPhase.Advancing) {
+            // Dispatch or elapsed-time settlement must run even when the host is not due.
             __result = false;
             return;
         }

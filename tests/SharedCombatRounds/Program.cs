@@ -5,20 +5,71 @@ using HarmonyLib;
 using ElinTogether.Models;
 
 void Check(bool ok, string name) { if (!ok) throw new Exception(name); Console.WriteLine("PASS " + name); }
-var state = new CombatRoundState();
-Check(state.Advance(1), "first round starts");
-state.SetReady(719, 1, true);
-Check(state.Ready.Contains(719), "matching readiness accepted");
-state.SetReady(719, 0, false);
-Check(state.Ready.Contains(719), "old cancellation cannot revoke current readiness");
-Check(!state.Complete(719, 0) && state.Done.Count == 0, "stale completion cannot end current turn");
-Check(state.Complete(719, 1) && !state.Complete(719, 1), "completion accepted once, avoiding duplicate cost");
-Check(state.Advance(2) && state.Ready.Count == 0 && state.Done.Count == 0, "next round requires fresh readiness and completion");
-Check(!state.Advance(1) && state.Id == 2, "old phase cannot roll back round");
-state.SetReady(719, 3, true);
-Check(state.Ready.Count == 0, "future readiness cannot jump rounds");
+CombatTimeline Start(params (int uid, double debt)[] players) {
+    var t = new CombatTimeline();
+    t.Synchronize(players.Select(p => new KeyValuePair<int,double>(p.uid,p.debt)));
+    t.Advance(); t.BeginWindow(); return t;
+}
+bool Near(double a, double b) => Math.Abs(a-b) < 0.00001;
+var state = Start((1,0), (719,0));
+Check(state.Due.SetEquals(new[]{1,719}), "simultaneously due players both participate");
+Check(state.SetReady(1, state.Epoch, true) && !state.AllReady, "one ready player cannot start another due player's action");
+state.SetReady(719, state.Epoch, true);
+Check(state.AllReady, "due player readiness opens execution");
+Check(!state.Complete(1, state.Epoch-1, .5), "stale completion ignored");
+Check(!state.Complete(99, state.Epoch, .5), "nonparticipant cannot spend timeline time");
+Check(!state.Complete(1, state.Epoch, double.NaN) && !state.Complete(1,state.Epoch,double.PositiveInfinity) &&
+      !state.Complete(1,state.Epoch,-1), "invalid costs cannot alter deadlines");
+Check(state.Complete(1,state.Epoch,.5) && !state.Complete(1,state.Epoch,2), "completed action charged once");
+try { state.Advance(); Check(false,"must reject unfinished advancement"); }
+catch (InvalidOperationException) { Check(true,"unfinished due action prevents clock advance"); }
+state.Complete(719,state.Epoch,1);
+Check(Near(state.Advance(),.5), "world advances to earliest deadline, not slowest action cost");
+state.BeginWindow();
+Check(state.Due.SetEquals(new[]{1}), "fast player receives the intermediate turn");
+Check(!state.SetReady(719,state.Epoch,true), "slower player's input is not a readiness barrier");
+Check(!state.SetReady(1,state.Epoch-1,true), "old readiness cannot open next decision window");
+state.Complete(1,state.Epoch,.5);
+Check(Near(state.Advance(),.5) && Near(state.Now,1), "enemy time advances once per elapsed slice");
+state.BeginWindow();
+Check(state.Due.SetEquals(new[]{1,719}), "both players due again at shared deadline");
+
+// Preserve speed advantage over many turns, rather than only the first pair.
+state = Start((1,0),(719,0));
+int fast=0,slow=0;
+while (state.Now < 100 - CombatTimeline.Epsilon) {
+    foreach (var uid in state.Due.ToArray()) {
+        if (uid==1) fast++; else slow++;
+        state.Complete(uid,state.Epoch,uid==1 ? .5 : 1);
+    }
+    state.Advance(); state.BeginWindow();
+}
+Check(fast==200 && slow==100 && Near(state.Now,100), "200-speed vs 100-speed opportunities stay 2:1 over time");
+state.Complete(1,state.Epoch,2); state.Complete(719,state.Epoch,1);
+state.Advance(); state.BeginWindow();
+Check(state.Due.SetEquals(new[]{719}), "a costly fast-player action postpones its next opportunity");
+
+state = Start((1,0),(719,0));
+state.Complete(1,state.Epoch,0); state.Complete(719,state.Epoch,1);
+Check(Near(state.Advance(),0), "cancelled unspent action grants no enemy time");
+state.BeginWindow();
+Check(state.Due.SetEquals(new[]{1}) && !state.AllReady, "cancelled action requests a fresh decision at same timestamp");
+state.Synchronize(new[]{new KeyValuePair<int,double>(719,0)});
+Check(state.AllDone && !state.Due.Contains(1), "disconnect removes missing player from current barrier");
+Check(Near(state.Advance(),1), "survivor's outstanding debt survives disconnect");
+state.Synchronize(new[]{new KeyValuePair<int,double>(719,0),new KeyValuePair<int,double>(720,.25)});
+state.BeginWindow();
+Check(state.Due.SetEquals(new[]{719}) && Near(state.Remaining(720),.25), "join seeds debt without stealing or blocking an existing turn");
+state.Complete(719,state.Epoch,1); state.Advance(); state.BeginWindow();
+Check(state.Due.SetEquals(new[]{720}), "new player participates when its deadline arrives");
+state = Start((1,.25),(719,.75));
+Check(Near(state.Now,.25) && state.Due.SetEquals(new[]{1}) && Near(state.Remaining(719),.5),
+      "combat entry retains unequal timer debts");
+var epoch = state.Epoch;
+state.Reset(false); state.Synchronize(new[]{new KeyValuePair<int,double>(1,0)}); state.BeginWindow();
+Check(state.Epoch>epoch && !state.Complete(1,epoch,.3), "combat re-entry rejects previous encounter acknowledgements");
 state.Reset();
-Check(state.Id == 0 && state.Ready.Count == 0 && state.Done.Count == 0, "new session clears round state");
+Check(state.Now==0 && state.Epoch==0 && state.Deadlines.Count==0, "session reset clears timeline");
 
 // Inspect and transform the REAL installed vanilla IL, without launching Unity.
 var game = @"C:\Program Files (x86)\Steam\steamapps\common\Elin";

@@ -1,0 +1,29 @@
+using System.Reflection;
+public class Point { public Point Copy() => new(); }
+public class Card { public bool isDestroyed; public Point pos = new(); }
+public class Thing : Card { public Card? root; public Card? GetRootCard() => root; }
+public class Chara : Card { public bool IsPC = true; public Thing? ranged; public int mana = 10; public bool UseAbility(Act a, Card? tc, Point? pos, bool pt) { mana--; return a.Perform(this,tc,pos); } }
+public class Act { public int performed; public bool valid = true; public string GetText() => "action"; public bool CanPerform(Chara c, Card? t, Point? p) => valid; public bool Perform(Chara c, Card? t, Point? p) { if (!valid) return false; performed++; return true; } }
+public class ActThrow : Act { public Thing? target; }
+public class ActRanged : ActThrow {}
+public class AIAct {}
+public class DynamicAIAct(string name, Func<bool> action) : AIAct { public bool Execute() => action(); }
+public class Player { public void EndTurn(bool consume = true) {} }
+public class EClass { public static Chara pc = new(); }
+public class AM_Adv { public void _OnUpdateInput() {} }
+public class ButtonAbility { public static bool TryUse() => true; }
+namespace ElinTogether.Models { public class ElinDelta { public static bool IsApplying; } }
+namespace ElinTogether.Patches {
+ public static class ActionModeCombat {
+  public static bool Activated = true, IsDispatching;
+  public static AIAct? Pending;
+  public static void QueueInput(AIAct g) => Pending = g;
+ }
+}
+namespace HarmonyLib {
+ [AttributeUsage(AttributeTargets.Class|AttributeTargets.Method,AllowMultiple=true)]
+ public class HarmonyPatch : Attribute { public HarmonyPatch(){} public HarmonyPatch(Type t,string m,params Type[] args) {} }
+ public class HarmonyPrefix : Attribute {}
+ public class HarmonyFinalizer : Attribute {}
+ public static class AccessTools { public static MethodInfo Method(Type t,string name) => t.GetMethod(name)!; }
+}

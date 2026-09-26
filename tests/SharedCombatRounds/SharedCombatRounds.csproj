@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
 <ItemGroup>
-<Compile Include="../../ElinTogether/Models/CombatRoundState.cs" Link="CombatRoundState.cs" />
+<Compile Include="../../ElinTogether/Models/CombatTimeline.cs" Link="CombatTimeline.cs" />
 <Reference Include="0Harmony"><HintPath>C:\Program Files (x86)\Steam\steamapps\common\Elin\BepInEx\core\0Harmony.dll</HintPath></Reference>
 </ItemGroup>
 </Project>
