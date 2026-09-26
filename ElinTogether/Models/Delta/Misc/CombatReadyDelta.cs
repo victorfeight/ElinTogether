@@ -10,6 +10,8 @@ public class CombatReadyDelta : ElinDelta
     [Key(0)]
     public required bool Ready { get; init; }
 
+    [Key(1)] public int RoundId { get; init; }
+
     protected override void OnApply(ElinNetBase net)
     {
         // client -> host intent only
@@ -21,6 +23,6 @@ public class CombatReadyDelta : ElinDelta
             return;
         }
 
-        ActionModeCombat.OnRemoteTaskReport(chara.uid, Ready);
+        ActionModeCombat.OnRemoteReady(chara.uid, RoundId, Ready);
     }
 }

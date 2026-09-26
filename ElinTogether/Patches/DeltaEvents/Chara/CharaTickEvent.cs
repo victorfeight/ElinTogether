@@ -14,6 +14,7 @@ internal static class CharaTickEvent
     [HarmonyPrefix]
     internal static bool OnCharaTick(Chara __instance)
     {
+        if (ActionModeCombat.BlockLocalTick(__instance)) return false;
         if (NetSession.Instance.Connection is not { } connection) {
             return true;
         }

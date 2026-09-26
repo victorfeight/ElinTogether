@@ -41,7 +41,6 @@ public class CharaTaskDelta : ElinDelta
         // relay to clients
         if (net.IsHost) {
             net.Delta.AddRemote(this);
-            ActionModeCombat.OnRemoteTaskReport(chara.uid, act is not null);
         }
 
         if (chara.ai is not GoalRemote) {

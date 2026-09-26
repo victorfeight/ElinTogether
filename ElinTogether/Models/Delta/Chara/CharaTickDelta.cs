@@ -36,7 +36,6 @@ public class CharaTickDelta : ElinDelta
             }
 
             net.Delta.AddRemote(this);
-            ActionModeCombat.OnRemotePlayerTick(chara);
         }
 
         // do a remote tick

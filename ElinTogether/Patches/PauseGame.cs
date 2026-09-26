@@ -18,6 +18,12 @@ internal class PauseGame
             return;
         }
 
+        if (ActionModeCombat.Phase == ActionModeCombat.CombatPhase.Executing) {
+            // Players may both be idle after their single turn while NPC budget settles.
+            __result = false;
+            return;
+        }
+
         if (!__result) {
             return;
         }
