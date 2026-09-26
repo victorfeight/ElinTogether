@@ -6,8 +6,13 @@ public class Chara : Card { public bool IsPC = true; public Thing? ranged; publi
 public class Act { public int performed; public bool valid = true; public string GetText() => "action"; public bool CanPerform(Chara c, Card? t, Point? p) => valid; public bool Perform(Chara c, Card? t, Point? p) { if (!valid) return false; performed++; return true; } }
 public class ActThrow : Act { public Thing? target; }
 public class ActRanged : ActThrow {}
-public class AIAct {}
-public class DynamicAIAct(string name, Func<bool> action) : AIAct { public bool Execute() => action(); }
+public class AIAct {
+ public enum Status { Running, Fail, Success }
+ public virtual bool CancelWhenDamaged => true;
+ public virtual string GetText(string str = "") => str;
+ public virtual IEnumerable<Status> Run() { yield return Status.Success; }
+ public Status Success() => Status.Success;
+}
 public class Player { public void EndTurn(bool consume = true) {} }
 public class EClass { public static Chara pc = new(); }
 public class AM_Adv { public void _OnUpdateInput() {} }

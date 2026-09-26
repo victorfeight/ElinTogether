@@ -38,7 +38,7 @@ internal static class CombatInputBuffer
         var ranged = _cc.ranged;
         var throwAct = __instance as ActThrow;
         var thrown = throwAct?.target;
-        ActionModeCombat.QueueInput(new DynamicAIAct(__instance.GetText(), () => {
+        ActionModeCombat.QueueInput(new QueuedCombatAct(__instance.GetText(), () => {
             if (_tc is { isDestroyed: true }) return false;
             if (__instance is ActRanged && ranged is not null &&
                 (ranged.isDestroyed || ranged.GetRootCard() != _cc)) return false;
@@ -66,7 +66,7 @@ internal static class CombatInputBuffer
     {
         if (!ShouldBuffer(__instance)) return true;
         var point = pos?.Copy();
-        ActionModeCombat.QueueInput(new DynamicAIAct(a.GetText(), () =>
+        ActionModeCombat.QueueInput(new QueuedCombatAct(a.GetText(), () =>
             tc is not { isDestroyed: true } && a.CanPerform(__instance, tc, point) &&
             __instance.UseAbility(a, tc, point, pt)));
         _deferred = true;

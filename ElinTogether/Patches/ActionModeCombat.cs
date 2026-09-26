@@ -561,7 +561,7 @@ public class ActionModeCombat
         var tp = pos.Copy();
         Act.CC = cc;
         // no pos
-        cc.SetAIImmediate(new DynamicAIAct(act.GetText(), () => act.Perform(cc, tc, tp)));
+        cc.SetAIImmediate(new QueuedCombatAct(act.GetText(), () => act.Perform(cc, tc, tp)));
 
         __result = false;
         return false;

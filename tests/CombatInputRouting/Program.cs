@@ -5,6 +5,16 @@ using ElinTogether.Models;
 void Check(bool ok,string name) { if(!ok) throw new Exception(name); Console.WriteLine("PASS "+name); }
 bool Invoke(string name, params object?[] args) => (bool)typeof(CombatInputBuffer)
     .GetMethod(name,BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,args)!;
+bool ExecutePending() {
+    using var run = ActionModeCombat.Pending!.Run().GetEnumerator();
+    return run.MoveNext() && run.Current == AIAct.Status.Success;
+}
+var probeCalls=0;
+using (var run = new QueuedCombatAct("probe",()=>{probeCalls++; return true;}).Run().GetEnumerator()) {
+ Check(run.MoveNext() && run.Current==AIAct.Status.Success && probeCalls==1,
+    "instant queued action runs on first tick without DynamicAIAct wait");
+ Check(!run.MoveNext() && probeCalls==1,"queued action completion does not repeat effect");
+}
 var pc=EClass.pc;
 var gun=new Thing{root=pc}; pc.ranged=gun;
 var target=new Card(); var act=new ActRanged();
@@ -18,7 +28,7 @@ Check(!Invoke("BeforeEndTurn"),"nested input scopes retain deferred action");
 CombatInputBuffer.EndInput(outer);
 Check(Invoke("BeforeEndTurn"),"input finalizer clears deferred flag");
 ActionModeCombat.IsDispatching=true;
-Check(((DynamicAIAct)ActionModeCombat.Pending!).Execute() && act.performed==1,
+Check(ExecutePending() && act.performed==1,
     "scheduled Fire performs its effect once");
 CombatInputBuffer.BeginInput(out outer);
 Check(Invoke("BeforeAct",act,pc,target,new Point(),false),"scheduled execution is not recursively buffered");
@@ -30,20 +40,20 @@ var spell=new Act(); var mana=pc.mana;
 Check(!Invoke("BeforeAbility",pc,spell,target,new Point(),false,false) && pc.mana==mana && spell.performed==0,
     "ability shortcut is buffered before mana payment");
 CombatInputBuffer.EndInput(outer);
-Check(((DynamicAIAct)ActionModeCombat.Pending!).Execute() && pc.mana==mana-1 && spell.performed==1,
+Check(ExecutePending() && pc.mana==mana-1 && spell.performed==1,
     "ability pays mana and applies effect when dispatched");
 CombatInputBuffer.BeginInput(out outer);
 Invoke("BeforeAct",act,pc,target,new Point(),false);
 CombatInputBuffer.EndInput(outer);
 gun.root=new Chara();
-Check(!((DynamicAIAct)ActionModeCombat.Pending!).Execute() && act.performed==1,
+Check(ExecutePending() && act.performed==1,
     "queued shot cannot use a weapon transferred to another player");
 gun.root=pc;
 CombatInputBuffer.BeginInput(out outer);
 Invoke("BeforeAbility",pc,spell,target,new Point(),false,false);
 CombatInputBuffer.EndInput(outer);
 target.isDestroyed=true; mana=pc.mana;
-Check(!((DynamicAIAct)ActionModeCombat.Pending!).Execute() && pc.mana==mana,
+Check(ExecutePending() && pc.mana==mana,
     "destroyed queued target does not consume mana");
 Check(Invoke("BeforeAct",act,pc,target,new Point(),false),"scripted effects outside input remain immediate");
 CombatInputBuffer.BeginInput(out outer);
