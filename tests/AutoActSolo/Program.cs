@@ -22,8 +22,35 @@ Check(((TaskHarvestArgs)((CharaTaskDelta)client.Delta.Items[0]).TaskArgs!).Pos.X
 var mine=new TaskMine{parent=controller,owner=owner,pos=new(11,12)};controller.child=mine;client.Delta.Items.Clear();CharaTaskProgressEvents.OnProgressBegin(Progress(mine));
 Check(((CharaTaskDelta)client.Delta.Items[0]).TaskArgs!.CreateSubAct() is TaskMine {pos.X:11},"harvest-to-mine transition uses existing mine serializer");
 owner.IsPC=false;Check(AutoActTaskBridge.FindController(owner,mine)==null,"NPC/remote characters excluded");owner.IsPC=true;
-NetSession.Instance.Connection=new ElinNetHost();Check(AutoActTaskBridge.FindController(owner,mine)==null,"host automation untouched");
-NetSession.Instance.Connection=null;Check(AutoActTaskBridge.FindController(owner,mine)==null,"single player untouched");NetSession.Instance.Connection=client;
+var publishingHost=new ElinNetHost();NetSession.Instance.Connection=publishingHost;
+Check(AutoActTaskBridge.FindController(owner,mine)==null,"host excluded from client controller lifecycle");
+foreach(var isPc in new[]{true,false}) {
+ owner.IsPC=isPc;
+ foreach(var action in new AIAct[]{Harvest(),mine}) {
+  controller.child=action;publishingHost.Delta.Items.Clear();
+  CharaTaskProgressEvents.OnProgressBegin(Progress(action));
+  Check(publishingHost.Delta.Items.Count==2 && publishingHost.Delta.Items[0] is CharaTaskDelta && publishingHost.Delta.Items[1] is CharaProgressBeginDelta,
+   $"host {(isPc?"human":"NPC")} {action.GetType().Name} publishes task before progress");
+  var sent=(CharaTaskDelta)publishingHost.Delta.Items[0];
+  Check(sent.TaskArgs!.CreateSubAct().GetType()==action.GetType(),"host child uses existing concrete task serializer");
+  // Emulate the receiver's reconstructed task. The real completion delta must
+  // invoke the terrain callback, not just its attached item updates.
+  var receiver=new Chara{IsPC=false};var remote=new GoalRemote{owner=receiver};receiver.ai=remote;
+  var replayTask=sent.TaskArgs.CreateSubAct();replayTask.owner=receiver;remote.child=replayTask;
+  bool terrainChanged=false,itemChanged=false;
+  replayTask.child=new AIProgress{owner=receiver,parent=replayTask,Complete=()=>terrainChanged=true};
+  new CharaProgressCompleteDelta{Owner=receiver,CompletedActId=action is TaskHarvest?1:2,
+   DeltaList=[new Callback(()=>{Check(terrainChanged,"terrain completion precedes attached item results");itemChanged=true;})]}.Apply(client);
+  Check(terrainChanged&&itemChanged,"host/ally completion replays terrain and attached results");
+ }
+}
+publishingHost.ActiveRemoteCharas[1]=owner;publishingHost.Delta.Items.Clear();
+AutoActTaskBridge.PublishChild(owner,mine);
+Check(publishingHost.Delta.Items.Count==0,"host cannot publish a remote human's stale Auto Act controller");
+publishingHost.ActiveRemoteCharas.Clear();owner.IsPC=true;
+NetSession.Instance.Connection=null;Check(AutoActTaskBridge.FindController(owner,mine)==null,"single player untouched");AutoActTaskBridge.PublishChild(owner,mine);NetSession.Instance.Connection=client;
+owner.IsPC=false;client.Delta.Items.Clear();AutoActTaskBridge.PublishChild(owner,mine);
+Check(client.Delta.Items.Count==0,"client cannot publish NPC automation");owner.IsPC=true;
 var stale=new TaskMine{parent=new AutoActHarvestMine()};Check(AutoActTaskBridge.FindController(owner,stale)==null,"detached old controller excluded");
 var other=new AutoActOther();owner.ai=other;mine.parent=other;Check(AutoActTaskBridge.FindController(owner,mine)==other,"other Auto Act controllers share lifecycle support");owner.ai=controller;mine.parent=controller;
 client.Delta.Items.Clear();ElinDelta.IsApplying=true;AutoActTaskBridge.PublishChild(owner,mine);ElinDelta.IsApplying=false;Check(client.Delta.Items.Count==0,"replay does not submit a fresh task");

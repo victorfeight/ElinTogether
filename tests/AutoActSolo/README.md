@@ -8,7 +8,10 @@ optional and uses the installed Auto Act implementation for custom terrain steps
 
 1. Shared progress-task serialization and local controller lifecycle. Each
    fully initialized child is queued before progress begins, including reused
-   instances with new targets. Completion applies results before normal scheduler
+   instances with new targets. Publication covers the client player, host player,
+   and host-controlled NPC Auto Act controllers. The host never publishes tasks
+   on behalf of connected remote humans. Client controller lifecycle handling
+   remains client-only. Completion applies results before normal scheduler
    continuation. Cancellation stops the controller without Auto Act retries.
 2. All remaining progress controllers use this same mechanism. Pouring preserves
    the custom subtype and targetCount; training uses DelegateProgress so host AI
@@ -82,6 +85,12 @@ staging build. The independent preserved wand anti-blink patch is also included.
   local-dialogue behavior; this is not a general multiplayer dialogue rewrite.
 - Enable Ally Expansion: host NPC companions may automate; the client's held
   tool and AI must remain untouched. Client automation must not assign host NPCs.
+- Have the host, then a host-controlled ally, harvest several white flowers and
+  mine several walls while the client watches. Each removed tile must disappear
+  on both screens; those completions must not log `child not running`. Repeat
+  with client automation and without Auto Act. Include consecutive reused tasks.
+- After upgrading both peers, reconnect the client. The existing join path fetches
+  a fresh host zone snapshot, replacing tiles left stale by the previous build.
 - Summon anti-blink acceptance remains separate: animation, one authoritative
   summon group, and summon-cap/failure feedback.
 

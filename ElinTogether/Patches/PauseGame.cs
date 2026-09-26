@@ -1,5 +1,4 @@
 using System.Linq;
-using ElinTogether.Elements;
 using ElinTogether.Helper;
 using ElinTogether.Net;
 using HarmonyLib;
@@ -28,10 +27,15 @@ internal class PauseGame
             return;
         }
 
-        // pause only if all players have no goal
-        __result &= EClass.pc.party.members
-            .Where(c => c.IsRemotePlayer)
-            .All(c => c.ai is GoalRemote { child: null });
+        // The host's reconstructed child can be empty between a client's steps.
+        // Keep time moving while that connected player still reports a live goal.
+        if (NetSession.Instance.Connection is ElinNetHost host) {
+            __result = !host.ActiveRemoteCharas.Any(pair => PlayerActivity.IsBusy(pair.Value,
+                host.States.TryGetValue(pair.Key, out var state) ? state.LastAct : 0));
+        } else {
+            __result = !EClass.pc.party.members
+                .Any(c => c.IsRemotePlayer && PlayerActivity.IsBusy(c));
+        }
     }
 
     [HarmonyPostfix]

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
 using ElinTogether.Elements;
+using ElinTogether.Helper;
 using ElinTogether.Models;
 using ElinTogether.Net;
 using EModding.Helper;
@@ -185,13 +186,11 @@ public class ActionModeCombat
 
     private static void UpdatePendingDecision(ElinNetBase net)
     {
-        // Damage or an authoritative task result may finish a goal between turns.
-        // Clear that ended goal so vanilla keyboard input sees HasNoGoal again.
-        if (Activated && !EClass.pc.HasNoGoal && !EClass.pc.ai.IsRunning) {
-            _finishingManualStep = true;
-            try { EClass.pc.SetNoGoal(); }
-            finally { _finishingManualStep = false; }
-        }
+        // Run in both time modes, even with the game clock paused. Finishing a
+        // goal must release vanilla input without consuming another character tick.
+        _finishingManualStep = true;
+        try { PlayerActivity.ClearFinishedLocalGoal(EClass.pc); }
+        finally { _finishingManualStep = false; }
         if (_applyPendingQueued && Phase == CombatPhase.Inactive) {
             _applyPendingQueued = false;
             ApplyPendingDecision(net);

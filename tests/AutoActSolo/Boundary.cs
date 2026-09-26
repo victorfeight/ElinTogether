@@ -10,7 +10,7 @@ public class AIAct {
  public void Tick(){Ticks++; status=Status.Success;owner=null;child=null;}
  public void Cancel(){Cancels++;status=Status.Fail;owner=null;child=null;}
 }
-public class AIProgress:AIAct { public int progress; public int MaxProgress=>7; public virtual void OnProgressBegin(){} }
+public class AIProgress:AIAct { public int progress; public int MaxProgress=>7; public Action? Complete; public override void OnProgressComplete()=>Complete?.Invoke(); public virtual void OnProgressBegin(){} }
 public class NoGoal:AIAct{}
 public class Card { public Card GetRootCard()=>this; }
 public class Chara:Card {
@@ -56,7 +56,7 @@ namespace ElinTogether.Models {
 namespace ElinTogether.Net {
  public class Buffer {public List<ElinDelta> Items=[];public void AddRemote(ElinDelta d)=>Items.Add(d);}
  public class ElinNetBase {public bool IsHost=>this is ElinNetHost;public bool IsClient=>this is ElinNetClient;public Buffer Delta=new();}
- public class ElinNetClient:ElinNetBase{} public class ElinNetHost:ElinNetBase{}
+ public class ElinNetClient:ElinNetBase{} public class ElinNetHost:ElinNetBase{public Dictionary<int,Chara> ActiveRemoteCharas=[];}
  public class NetSession {public static NetSession Instance=new();public ElinNetBase? Connection;}
 }
 namespace ElinTogether.Patches {

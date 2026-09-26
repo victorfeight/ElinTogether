@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using ElinTogether.API.SourceValidation;
 using ElinTogether.Helper;
 using ElinTogether.Net;
 using ElinTogether.Patches;
@@ -69,7 +68,7 @@ public class CharaStateSnapshot : EClass
             UidMaster = pc.c_uidMaster,
             MinionType = pc.c_minionType,
             State = new() {
-                LastAct = ActMappingValidator.Default.ActToIdMapping.GetValueOrDefault(pc.ai.GetType(), 0),
+                LastAct = PlayerActivity.ReportAct(pc),
                 LastReceivedTick = NetSession.Instance.Tick,
                 Speed = pc.Stub_get_Speed(),
             },

@@ -1,3 +1,4 @@
+using System.Linq;
 using ElinTogether.Models;
 using ElinTogether.Net;
 
@@ -9,8 +10,14 @@ internal static class AutoActTaskBridge
 {
     internal static AIAct? FindController(Chara owner, AIAct task)
     {
-        if (!owner.IsPC || NetSession.Instance.Connection is not ElinNetClient ||
-            !IsController(owner.ai)) return null;
+        if (!owner.IsPC || NetSession.Instance.Connection is not ElinNetClient) return null;
+
+        return FindAttachedController(owner, task);
+    }
+
+    private static AIAct? FindAttachedController(Chara owner, AIAct task)
+    {
+        if (!IsController(owner.ai)) return null;
 
         // Reject detached/stale tasks. Completion and cancel target the current tree.
         for (var parent = task.parent; parent is not null; parent = parent.parent) {
@@ -29,7 +36,16 @@ internal static class AutoActTaskBridge
 
     internal static void PublishChild(Chara owner, AIAct task)
     {
-        if (ElinDelta.IsApplying || FindController(owner, task) is null) return;
+        if (ElinDelta.IsApplying || FindAttachedController(owner, task) is null) return;
+        // SetChild bypasses SetAI on both peers. Publish every locally authoritative
+        // controller, including host NPCs, so receivers can replay terrain changes.
+        // Remote humans remain client-controlled even if their host AI is stale.
+        var canPublish = NetSession.Instance.Connection switch {
+            ElinNetClient => owner.IsPC,
+            ElinNetHost host => !host.ActiveRemoteCharas.Values.Contains(owner),
+            _ => false,
+        };
+        if (!canPublish) return;
         // OnProgressBegin runs after Auto Act's SetNextTask has configured the target.
         // Serialize every run, even when the same task/Point is reused on another tile.
         var args = CharaTaskRemoteEvent.CreateTaskArgs(owner, task);
