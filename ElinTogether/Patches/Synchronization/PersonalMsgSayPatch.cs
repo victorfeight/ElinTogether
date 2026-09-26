@@ -8,23 +8,54 @@ namespace ElinTogether.Patches;
 [HarmonyPatch]
 internal static class PersonalMsgSayPatch
 {
+    internal static Chara? CodexCollector { get; set; }
+
+    internal static ScopeExit ForCollector(Chara collector)
+    {
+        var previous = CodexCollector;
+        CodexCollector = collector;
+        return new() { OnExit = () => CodexCollector = previous };
+    }
+
+    private static int PeerFor(ElinNetHost host, Chara? receiver) => receiver is null
+        ? 0 : host.ActiveRemoteCharas.FirstOrDefault(pair => pair.Value == receiver).Key;
+
+    // All personal confirmations use the existing packet and suppress only after delivery.
+    private static bool Route(ElinNetHost host, int peer, string text, ref string result)
+    {
+        if (peer <= 0 || Msg.ignoreAll || !SendToPeer(host, peer, text)) return true;
+        result = text;
+        Msg.SetColor();
+        Msg.alwaysVisible = false;
+        return false;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(Msg), nameof(Msg.Say), typeof(string), typeof(int), typeof(string), typeof(string))]
+    internal static bool OnCollectionMessage(string idLang, int i, string? ref1, string? ref2,
+        ref string __result)
+    {
+        if (idLang != "addedCards" || NetSession.Instance.Connection is not ElinNetHost host ||
+            PeerFor(host, CodexCollector) is not > 0) return true;
+        // Preserve vanilla's numeric plural selection; it has no GetRawText overload.
+        return Route(host, PeerFor(host, CodexCollector),
+            GameLang.Parse(Msg.GetGameText(idLang), Msg.IsThirdPerson(i), ref1, ref2), ref __result);
+    }
+
     internal static int? RefuelPeer { get; set; }
     internal static bool RemoteToggleReplay { get; set; }
     internal static Chara? FirstTimeCraftReceiver { get; set; }
 
     [HarmonyPrefix]
     [HarmonyPatch(typeof(Msg), nameof(Msg.Say), typeof(string), typeof(string), typeof(string), typeof(string), typeof(string))]
-    internal static void OnFirstTimeCraftMessage(string idLang, string ref1, string? ref2, string? ref3, string? ref4)
+    internal static bool OnFirstTimeCraftMessage(string idLang, string ref1, string? ref2, string? ref3,
+        string? ref4, ref string __result)
     {
         if (idLang != "firstTimeCraft" || FirstTimeCraftReceiver is not { } receiver ||
-            NetSession.Instance.Connection is not ElinNetHost host) {
-            return;
-        }
-
-        var peerIndex = host.ActiveRemoteCharas.FirstOrDefault(pair => pair.Value == receiver).Key;
-        if (peerIndex > 0) {
-            SendToPeer(host, peerIndex, Msg.GetRawText(idLang, ref1, ref2, ref3, ref4));
-        }
+            NetSession.Instance.Connection is not ElinNetHost host) return true;
+        var peer = PeerFor(host, receiver);
+        if (peer <= 0) return true;
+        return Route(host, peer, Msg.GetRawText(idLang, ref1, ref2, ref3, ref4), ref __result);
     }
 
     [HarmonyPrefix]
@@ -38,7 +69,7 @@ internal static class PersonalMsgSayPatch
 
         var peerIndex = idLang switch {
             "crafted" when RemoteCraft.ProductReceiver is { } receiver =>
-                host.ActiveRemoteCharas.FirstOrDefault(pair => pair.Value == receiver).Key,
+                PeerFor(host, receiver),
             "fueled" => RefuelPeer.GetValueOrDefault(),
             _ => 0,
         };
@@ -46,15 +77,7 @@ internal static class PersonalMsgSayPatch
             return true;
         }
 
-        var text = Msg.GetRawText(idLang, c1, ref1, ref2, ref3);
-        if (!SendToPeer(host, peerIndex, text)) {
-            return true;
-        }
-
-        __result = text;
-        Msg.SetColor();
-        Msg.alwaysVisible = false;
-        return false;
+        return Route(host, peerIndex, Msg.GetRawText(idLang, c1, ref1, ref2, ref3), ref __result);
     }
 
     private static bool SendToPeer(ElinNetHost host, int peerIndex, string text)

@@ -41,6 +41,17 @@ public class ActionModeCombat
     private static bool _applyPendingQueued;
     private static bool _cancelRequested;
     private static bool? _lastReportedReady;
+    private static float _nextWaitTrace;
+    private static float _nextMoveBlockTrace;
+
+    // Diagnostic build: observes gates without changing combat decisions.
+    private static void TraceTurn(string reason, string action = "")
+    {
+        EmpLog.Debug("TurnTrace {Reason}: uid {Uid}, phase {Phase}, action {Action}, acted {Acted}, noGoal {NoGoal}, pending {Pending}, decided {Decided}, done {Done}",
+            reason, EClass.pc?.uid ?? -1, Phase, action, _pcActedThisRound,
+            EClass.pc?.HasNoGoal, _pendingAi?.GetType().Name ?? "none",
+            string.Join(",", _decided.OrderBy(uid => uid)), string.Join(",", _done.OrderBy(uid => uid)));
+    }
 
     internal static Dictionary<int, bool> EnemyVisibility { get; } = [];
     internal static CombatPhase Phase { get; private set; }
@@ -194,6 +205,7 @@ public class ActionModeCombat
             return;
         }
 
+        TraceTurn("phase-transition", $"{Phase}->{phase}");
         var prev = Phase;
         Phase = phase;
         _executingTimer = 0f;
@@ -206,6 +218,7 @@ public class ActionModeCombat
             _turnBuffer.Clear();
             _turnBuffered = 0f;
             _pcActedThisRound = false;
+            if (_pendingAi is not null) TraceTurn("discard-pending", _pendingAi.GetType().Name);
             _pendingAi = null;
         }
 
@@ -257,6 +270,13 @@ public class ActionModeCombat
             });
         }
         _lastPlayerCount = players.Count;
+        if (Time.unscaledTime >= _nextWaitTrace) {
+            _nextWaitTrace = Time.unscaledTime + 2f;
+            TraceTurn("host-wait", string.Join(";", players.Select(p => {
+                var c = p.FindChara();
+                return $"{p.CharaUid}:dead={c?.isDead},goal={c?.ai?.GetType().Name},sleep={c?.conSleep is not null}";
+            })));
+        }
 
         switch (Phase) {
             case CombatPhase.Inactive:
@@ -437,6 +457,9 @@ public class ActionModeCombat
             EmpLog.Debug("Combat pending decision {ActType}", g.GetType().Name);
         }
 
+        if (_pendingAi?.GetType() != g.GetType() || g is not GoalManualMove) {
+            TraceTurn("queue-decision", g.GetType().Name);
+        }
         _pendingAi = g;
         if (g is GoalManualMove) {
             _pendingMoveDir = EClass.player.nextMove;
@@ -454,6 +477,7 @@ public class ActionModeCombat
         }
 
         if (_pendingAi is not null) {
+            TraceTurn("cancel-pending", _pendingAi.GetType().Name);
             _pendingAi = null;
             EmpLog.Debug("Combat pending decision revoked");
         }
@@ -481,6 +505,7 @@ public class ActionModeCombat
                 return true;
             }
 
+            TraceTurn("reject-action-executing", $"{act.GetType().Name}@{pos.x},{pos.z}");
             if (!_executingBlockNotified) {
                 _executingBlockNotified = true;
                 Msg.SayGod("emp_ui_combat_wait".lang());
@@ -528,6 +553,10 @@ public class ActionModeCombat
             return true;
         }
 
+        if (Time.unscaledTime >= _nextMoveBlockTrace) {
+            _nextMoveBlockTrace = Time.unscaledTime + 0.25f;
+            TraceTurn("reject-move-already-acted", EClass.player.nextMove.ToString());
+        }
         EClass.player.nextMove = Vector2.zero;
         __result = false;
         return false;

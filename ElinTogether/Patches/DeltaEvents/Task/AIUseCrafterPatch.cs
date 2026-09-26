@@ -321,11 +321,12 @@ internal static class AIUseCrafterPatch
                             .SetParticleColor(recipe.GetColorMaterial().GetColor())
                             .Emit(10 + EClass.rnd(10));
                         act.owner.renderer.PlayAnime(AnimeID.JumpSmall);
+                        var previousReceiver = PersonalMsgSayPatch.FirstTimeCraftReceiver;
                         PersonalMsgSayPatch.FirstTimeCraftReceiver = act.owner;
                         try {
                             recipe.TryGetFirstTimeBonus();
                         } finally {
-                            PersonalMsgSayPatch.FirstTimeCraftReceiver = null;
+                            PersonalMsgSayPatch.FirstTimeCraftReceiver = previousReceiver;
                         }
                     } else {
                         var t = crafter.Craft(act);
