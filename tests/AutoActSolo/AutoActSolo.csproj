@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+<PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+<ItemGroup>
+<Compile Include="../../ElinTogether/Patches/DeltaEvents/Chara/AutoActTaskBridge.cs" Link="AutoActTaskBridge.cs" />
+<Compile Include="../../ElinTogether/Patches/DeltaEvents/Chara/CharaProgressBeginEvent.cs" Link="CharaProgressBeginEvent.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Chara/CharaProgressCompleteDelta.cs" Link="CharaProgressCompleteDelta.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Chara/CharaTaskCancelDelta.cs" Link="CharaTaskCancelDelta.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Task/TaskHarvestArgs.cs" Link="TaskHarvestArgs.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Task/TaskMineArgs.cs" Link="TaskMineArgs.cs" />
+</ItemGroup>
+</Project>

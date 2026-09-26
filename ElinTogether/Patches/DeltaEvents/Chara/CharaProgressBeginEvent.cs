@@ -50,6 +50,9 @@ internal static class CharaTaskProgressEvents
             return;
         }
 
+        // Auto Act installs children via SetChild, bypassing the SetAI event.
+        AutoActTaskBridge.PublishChild(owner, __instance.parent);
+
         connection.Delta.AddRemote(new CharaProgressBeginDelta {
             Owner = owner,
             Pos = owner.pos,

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+<PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+<ItemGroup>
+<Compile Include="../../ElinTogether/Models/Delta/Act/AutoActStepDelta.cs" Link="AutoActStepDelta.cs" />
+<Compile Include="../../ElinTogether/Patches/DeltaEvents/Chara/AutoActAllyGuard.cs" Link="AutoActAllyGuard.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Task/TaskPourWaterArgs.cs" Link="TaskPourWaterArgs.cs" />
+<Compile Include="../../ElinTogether/Patches/Compatibility/AutoActCustomActions.cs" Link="AutoActCustomActions.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Task/TaskDigArgs.cs" Link="TaskDigArgs.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Task/TaskPlowArgs.cs" Link="TaskPlowArgs.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Task/TaskDrawWaterArgs.cs" Link="TaskDrawWaterArgs.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Task/AI/AIReadArgs.cs" Link="AIReadArgs.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Task/AI/AIShearArgs.cs" Link="AIShearArgs.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Task/AI/AISlaughterArgs.cs" Link="AISlaughterArgs.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Task/AI/AIStealArgs.cs" Link="AIStealArgs.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Task/AI/AIOpenLockArgs.cs" Link="AIOpenLockArgs.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Task/AI/AIFuckArgs.cs" Link="AIFuckArgs.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Task/AI/AIPracticeDummyArgs.cs" Link="AIPracticeDummyArgs.cs" />
+</ItemGroup>
+</Project>

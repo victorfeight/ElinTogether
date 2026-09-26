@@ -52,8 +52,14 @@ internal static class CharaTaskRemoteEvent
             return false;
         }
 
+        PublishTask(__instance, g, CreateTaskArgs(__instance, g));
+        return true;
+    }
+
+    internal static TaskArgsBase CreateTaskArgs(Chara owner, AIAct g)
+    {
         // a switch case is inevitable for the mapping layer
-        TaskArgsBase args = g switch {
+        return g switch {
             // no goal/reset
             NoGoal and not GoalRemote => NoTask.Default,
             // task
@@ -89,7 +95,7 @@ internal static class CharaTaskRemoteEvent
             AI_Dance ai => AIDanceArgs.Create(ai),
             AI_Deconstruct ai => AIDeconstructArgs.Create(ai),
             AI_Drink ai => AIDrinkArgs.Create(ai),
-            AI_Eat ai => AIEatArgs.Create(ai, __instance),
+            AI_Eat ai => AIEatArgs.Create(ai, owner),
             AI_Equip ai => AIEquipArgs.Create(ai),
             AI_Farm ai => AIFarmArgs.Create(ai),
             AI_Fish ai => AIFishArgs.Create(ai),
@@ -115,7 +121,7 @@ internal static class CharaTaskRemoteEvent
             // AI_Paint ai => AIPaintArgs.Create(ai),
             // AI_PassTime ai => AIPassTimeArgs.Create(ai),
             // AI_Practice ai => AIPracticeArgs.Create(ai),
-            // AI_PracticeDummy ai => AIPracticeDummyArgs.Create(ai),
+            AI_PracticeDummy => new AIPracticeDummyArgs(),
             // AI_Pray ai => AIPrayArgs.Create(ai),
             // AI_PryOpen ai => AIPryOpenArgs.Create(ai),
             // AI_ReleaseHeld ai => AIReleaseHeldArgs.Create(ai),
@@ -168,17 +174,19 @@ internal static class CharaTaskRemoteEvent
             // default
             _ => FakeTask.Default,
         };
+    }
 
+    internal static void PublishTask(Chara owner, AIAct g, TaskArgsBase args)
+    {
+        if (NetSession.Instance.Connection is not { } connection) return;
         connection.Delta.AddRemote(new CharaTaskDelta {
-            Owner = __instance,
+            Owner = owner,
             TaskArgs = args,
         });
 
-        if (connection.IsClient && __instance.IsPC && args is AIUseCrafterArgs crafterArgs &&
+        if (connection.IsClient && owner.IsPC && args is AIUseCrafterArgs crafterArgs &&
             g is AI_UseCrafter craft) {
             RemoteCraft.Attach(craft, crafterArgs);
         }
-
-        return true;
     }
 }

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using ElinTogether.API.SourceValidation;
 using ElinTogether.Net;
+using ElinTogether.Elements;
 using ElinTogether.Patches;
 using MessagePack;
 
@@ -33,7 +34,7 @@ public class CharaTaskCancelDelta : ElinDelta
         }
 
         var ai = chara.ai.Current;
-        while (ai is not null && ai.GetType() != type) {
+        while (ai is not null && ai.GetType() != type && !DelegateProgress.Represents(ai, type)) {
             ai = ai.parent;
         }
 
@@ -62,6 +63,10 @@ public class CharaTaskCancelDelta : ElinDelta
 
         LastCancelDelta.Remove(Owner.Uid);
 
+        var autoAct = AutoActTaskBridge.FindController(chara, ai);
         ai.Stub_Cancel();
+        if (autoAct is not null) {
+            AutoActTaskBridge.Stop(chara, autoAct);
+        }
     }
 }

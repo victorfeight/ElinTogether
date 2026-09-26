@@ -1,3 +1,5 @@
+using System;
+using ElinTogether.Patches;
 using ElinTogether.Helper;
 using ElinTogether.Net;
 using MessagePack;
@@ -28,7 +30,25 @@ public class CharaBuildDelta : ElinDelta
     [Key(6)]
     public int TargetUid { get; set; }
 
+    [Key(7)] public Guid AutoActRequestId { get; init; }
+
     protected override void OnApply(ElinNetBase net)
+    {
+        var applied = false;
+        try {
+            ApplyBuild(net, ref applied);
+        } finally {
+            if (AutoActRequestId != Guid.Empty) {
+                if (net.IsClient) AutoActCustomActions.Complete(AutoActRequestId, applied);
+                else if (!applied) net.Delta.AddRemote(new AutoActStepDelta {
+                    RequestId = AutoActRequestId, Owner = Owner, Pos = Pos,
+                    ZoneUid = _zone.uid, Reply = true, Success = false,
+                });
+            }
+        }
+    }
+
+    private void ApplyBuild(ElinNetBase net, ref bool applied)
     {
         if (Owner.Find() is not Chara chara || Held.Find() is not { } held) {
             return;
@@ -64,6 +84,7 @@ public class CharaBuildDelta : ElinDelta
 
         taskBuild.recipe._dir = Dir;
         taskBuild.OnProgressComplete();
+        applied = true;
 
         if (net.IsHost) {
             TargetUid = (taskBuild.target?.uid).GetValueOrDefault();

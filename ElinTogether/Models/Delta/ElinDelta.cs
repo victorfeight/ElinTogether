@@ -88,6 +88,7 @@ namespace ElinTogether.Models;
 [Union(806, typeof(QuestChangePhaseDelta))]
 // Act
 [Union(900, typeof(ActThrowDelta))]
+[Union(901, typeof(AutoActStepDelta))]
 // Element
 [Union(1000, typeof(ElementChangeDelta))]
 public abstract class ElinDelta : EClass

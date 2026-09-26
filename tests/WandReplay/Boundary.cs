@@ -71,3 +71,7 @@ namespace HarmonyLib {
  public class HarmonyPrefix:Attribute{} public class HarmonyPostfix:Attribute{}
  public static class AccessTools {public static MethodInfo Method(Type t,string n)=>t.GetMethod(n)!;}
 }
+
+public enum EffectId { Summon, Silence }
+public struct ActRef { public Thing? refThing; }
+public static class ActEffect { public static void ProcAt(){} }

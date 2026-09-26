@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using ElinTogether.API.SourceValidation;
 using ElinTogether.Elements;
 using ElinTogether.Net;
+using ElinTogether.Patches;
 using MessagePack;
 
 namespace ElinTogether.Models;
@@ -59,12 +60,15 @@ public class CharaProgressCompleteDelta : ElinDelta
         EmpLog.Debug("Replaying progress complete {ActType} of chara {Uid}, {ReplayCount} deltas",
             type.Name, Owner.Uid, DeltaList.Count);
 
+        var autoAct = AutoActTaskBridge.FindController(chara, ai);
         Current = this;
         try {
             progress.OnProgressComplete();
             progress.Success();
 
-            if (ai != progress) {
+            // Its next normal tick resumes the child/controller after all results land.
+            // Ticking here can clear Auto Act or choose a target from stale world state.
+            if (ai != progress && autoAct is null) {
                 ai.Tick();
                 if (ai.status != AIAct.Status.Running) {
                     chara.SetNoGoal();

@@ -42,3 +42,14 @@ Check(ActZap.Conditions==1&&wand.c_charges==0,"empty wand retains vanilla no-eff
 NetSession.Instance.Connection=null;ActZapEvent.Before(zap,out var standalone);
 Check(standalone==null,"single-player zap is not captured");
 Console.WriteLine("Boundary tests do not run Unity or replace live multiplayer acceptance.");
+
+var summonRef=new ActRef{refThing=wand};caster.IsPC=true;NetSession.Instance.Connection=client;
+Check(!ClientWandSummonEvent.Before(EffectId.Summon,caster,summonRef),"local wand summon waits for authoritative creatures");
+Check(ClientWandSummonEvent.Before(EffectId.Silence,caster,summonRef),"non-summon wand effect unchanged");
+Check(ClientWandSummonEvent.Before(EffectId.Summon,caster,default),"ordinary summoning spell unchanged");
+NetSession.Instance.Connection=host;
+Check(ClientWandSummonEvent.Before(EffectId.Summon,caster,summonRef),"host summon still executes");
+NetSession.Instance.Connection=null;
+Check(ClientWandSummonEvent.Before(EffectId.Summon,caster,summonRef),"single player summon unchanged");
+NetSession.Instance.Connection=client;caster.IsPC=false;
+Check(ClientWandSummonEvent.Before(EffectId.Summon,caster,summonRef),"other caster excluded from local wand suppression");

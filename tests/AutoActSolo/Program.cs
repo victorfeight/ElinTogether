@@ -1,0 +1,55 @@
+using AutoActMod.Actions;
+using ElinTogether.Models;
+using ElinTogether.Net;
+using ElinTogether.Patches;
+using ElinTogether.Elements;
+int passed=0;
+void Check(bool ok,string name){if(!ok)throw new Exception(name);passed++;Console.WriteLine("PASS "+name);}
+var client=new ElinNetClient();NetSession.Instance.Connection=client;
+var owner=new Chara{IsPC=true};
+var controller=new AutoActHarvestMine{owner=owner}; owner.ai=controller;
+TaskHarvest Harvest(){var t=new TaskHarvest{owner=owner,parent=controller};controller.child=t;return t;}
+AIProgress Progress(AIAct t){var p=new AIProgress{owner=owner,parent=t};t.child=p;return p;}
+var task=Harvest();var progress=Progress(task);
+CharaTaskProgressEvents.OnProgressBegin(progress);
+Check(client.Delta.Items.Count==2&&client.Delta.Items[0] is CharaTaskDelta&&client.Delta.Items[1] is CharaProgressBeginDelta,"child request precedes progress request");
+Check(progress.progress==HeldProgress.Held,"client waits for authoritative completion");
+var request=(CharaTaskDelta)client.Delta.Items[0];
+var reconstructed=(TaskHarvest)request.TaskArgs!.CreateSubAct();
+Check(reconstructed.pos.X==2&&reconstructed.mode==task.mode&&reconstructed.target==task.target,"existing harvest serializer preserves target and mode");
+client.Delta.Items.Clear();task.pos=new(8,9);progress=Progress(task);CharaTaskProgressEvents.OnProgressBegin(progress);
+Check(((TaskHarvestArgs)((CharaTaskDelta)client.Delta.Items[0]).TaskArgs!).Pos.X==8,"same task instance republishes new target");
+var mine=new TaskMine{parent=controller,owner=owner,pos=new(11,12)};controller.child=mine;client.Delta.Items.Clear();CharaTaskProgressEvents.OnProgressBegin(Progress(mine));
+Check(((CharaTaskDelta)client.Delta.Items[0]).TaskArgs!.CreateSubAct() is TaskMine {pos.X:11},"harvest-to-mine transition uses existing mine serializer");
+owner.IsPC=false;Check(AutoActTaskBridge.FindController(owner,mine)==null,"NPC/remote characters excluded");owner.IsPC=true;
+NetSession.Instance.Connection=new ElinNetHost();Check(AutoActTaskBridge.FindController(owner,mine)==null,"host automation untouched");
+NetSession.Instance.Connection=null;Check(AutoActTaskBridge.FindController(owner,mine)==null,"single player untouched");NetSession.Instance.Connection=client;
+var stale=new TaskMine{parent=new AutoActHarvestMine()};Check(AutoActTaskBridge.FindController(owner,stale)==null,"detached old controller excluded");
+var other=new AutoActOther();owner.ai=other;mine.parent=other;Check(AutoActTaskBridge.FindController(owner,mine)==other,"other Auto Act controllers share lifecycle support");owner.ai=controller;mine.parent=controller;
+client.Delta.Items.Clear();ElinDelta.IsApplying=true;AutoActTaskBridge.PublishChild(owner,mine);ElinDelta.IsApplying=false;Check(client.Delta.Items.Count==0,"replay does not submit a fresh task");
+// Completion must land results without ticking or discarding either level of local automation.
+task=Harvest();progress=Progress(task);bool landed=false;
+new CharaProgressCompleteDelta{Owner=owner,CompletedActId=1,DeltaList=[new Callback(()=>{landed=true;Check(task.Ticks==0&&controller.Ticks==0,"results apply before any task/controller tick");})]}.Apply(client);
+Check(landed&&progress.status==AIAct.Status.Success&&owner.ai==controller&&owner.Resets==0&&task.Ticks==0,"completion preserves controller and leaves continuation to normal scheduler");
+// Existing non-Auto-Act completion still finishes and clears its root task.
+var regular=new TaskHarvest{owner=owner};owner.ai=regular;Progress(regular);
+new CharaProgressCompleteDelta{Owner=owner,CompletedActId=1,DeltaList=[]}.Apply(client);
+Check(regular.Ticks==1&&owner.Resets==1,"ordinary task completion unchanged");
+owner.ai=controller;controller.owner=owner;task=Harvest();Progress(task);
+new CharaTaskCancelDelta{Owner=owner,ActId=1}.Apply(client);
+Check(task.Cancels==1&&controller.Cancels==1&&owner.ai is NoGoal,"host rejection cancels both task and controller without retry");
+Check(client.Delta.Items.Last() is CharaTaskDelta{TaskArgs:null},"stop requests host task cleanup through existing NoTask path");
+var replacement=new AutoActHarvestMine();owner.ai=replacement;var resets=owner.Resets;AutoActTaskBridge.Stop(owner,controller);
+Check(owner.ai==replacement&&owner.Resets==resets,"old controller stop cannot clear a replacement");
+// The existing cancellation delta relays a client stop and cancels its host task.
+var host=new ElinNetHost();var hostOwner=new Chara{IsPC=false};var hostRoot=new GoalRemote{owner=hostOwner};hostOwner.ai=hostRoot;
+var hostTask=new TaskMine{owner=hostOwner,parent=hostRoot};hostRoot.child=hostTask;Progress(hostTask);
+new CharaTaskCancelDelta{Owner=hostOwner,ActId=2}.Apply(host);
+Check(hostTask.Cancels==1&&host.Delta.Items.Single() is CharaTaskCancelDelta,"client stop cancels host child and relays acknowledgement");
+Check(hostOwner.ai==hostRoot&&hostOwner.Resets==0,"cancellation preserves host remote controller");
+// A delayed completion still applies authoritative world changes after a manual stop.
+owner.ai=new NoGoal();landed=false;
+new CharaProgressCompleteDelta{Owner=owner,CompletedActId=1,DeltaList=[new Callback(()=>landed=true)]}.Apply(client);
+Check(landed&&owner.ai is NoGoal,"late completion lands results without restarting automation");
+Console.WriteLine($"{passed} checks passed. Fake Unity/network boundary; live two-peer acceptance remains required.");
+class Callback(Action action):ElinDelta{protected override void OnApply(ElinNetBase net)=>action();}

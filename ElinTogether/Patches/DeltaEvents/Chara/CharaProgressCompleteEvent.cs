@@ -143,6 +143,8 @@ internal static class CharaProgressCompleteEvent
             Dir = taskBuild.recipe._dir,
             Altitude = taskBuild.altitude,
             BridgeHeight = taskBuild.bridgeHeight,
+            AutoActRequestId = AutoActTaskBridge.FindController(taskBuild.owner, taskBuild) is not null
+                ? AutoActCustomActions.BeginBuild(taskBuild) : Guid.Empty,
         });
     }
 }

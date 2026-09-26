@@ -6,4 +6,5 @@
 <Compile Include="../../ElinTogether/Patches/DeltaEvents/Chara/CharaActPerformEvent.cs" Link="CharaActPerformEvent.cs" />
 <Compile Include="../../ElinTogether/Patches/DeltaEvents/Card/CardGenEvent.cs" Link="CardGenEvent.cs" />
 <Compile Include="../../ElinTogether/Patches/DeltaEvents/Zone/ZoneAddCardEvent.cs" Link="ZoneAddCardEvent.cs" />
+<Compile Include="../../ElinTogether/Patches/DeltaEvents/Act/ClientWandSummonEvent.cs" Link="ClientWandSummonEvent.cs" />
 </ItemGroup></Project>
