@@ -99,6 +99,12 @@ internal static class PersonalMsgSayPatch
     internal static bool OnRemoteToggleMessage(string idLang, Card c1, Card c2, string? ref1, string? ref2,
         ref string __result)
     {
+        if (idLang is "talisman" or "talisman_pc" && TalismanCraftPatch.Receiver is { } receiver &&
+            NetSession.Instance.Connection is ElinNetHost craftHost) {
+            return Route(craftHost, PeerFor(craftHost, receiver),
+                Msg.GetRawText(idLang, c1, c2, ref1, ref2), ref __result);
+        }
+
         var isRemoteToggle = RemoteToggleReplay &&
             idLang is "toggle_fire" or "toggle_ele" or "lever" or "open" or "close";
         var isRemoteRefuel = idLang == "toggle_fire" && RefuelPeer is > 0;

@@ -1,8 +1,9 @@
 // Test doubles for game/transport APIs only; transaction logic is linked from production.
 global using Object = UnityEngine.Object;
 using ElinTogether.Models;
-public class EClass { public static Chara pc = new(); public static Player player = new(); public static Sources sources = new(); public static object _zone = new(); }
-public class Player { public CodexManager codex = new(); }
+public class EClass { public static Chara pc { get => player.chara; set => player.chara=value; } public static Game game = new(); public static Player player = new(); public static Sources sources = new(); public static object _zone = new(); }
+public class Game { public Player player => EClass.player; }
+public class Player { public Chara chara = new(); public CodexManager codex = new(); }
 public class Sources { public Charas charas = new(); public class Charas { public Dictionary<string, object> map = new(); } }
 public class CodexCreature { public string id="putit"; public int numCard; public string Name => "Putit"; }
 public class CodexManager { public void AddCard(string id, int num = 1) {
@@ -14,7 +15,7 @@ public class Card { public int uid; public object? parent; public bool isDestroy
 public class Chara : Card { public string? c_altName; public string NameSimple => "Player"; public void Pick(Thing t) {} public bool IsInActiveMap = true; public Bag things; public Chara() { things = new(this); } public int Dist(object p) => 1; public override Thing AddThing(Thing t, bool stack) { t.parent = this; things.Items.Add(t); return t; } }
 public class Bag(Chara owner) : List<Thing> { public int GridSize = 40; public bool Full; public Thing? Stack; public List<Thing> Items => this; public Dest GetDest(Thing t) => new() { stack = Stack, container = Full ? null : owner }; public List<Thing> List(Func<Thing,bool> f, bool onlyAccessible) => Items.Where(f).ToList(); }
 public class Dest { public Card? container; public Thing? stack; public bool IsValid => stack != null || container != null; }
-public class Thing : Card { public string id = "figure3", c_idRefCard = ""; public object trait = new TraitCard(); public object pos = new(); public int invY; public bool isEquipped; public int Num = 1; public void MakeFigureFrom(string s) { c_idRefCard = s; } public void Destroy() { isDestroyed = true; } public bool TryStackTo(Thing t) { t.Num += Num; Destroy(); return true; } }
+public class Thing : Card { public Thing? ammoData; public int c_ammo, refVal, encLV; public string id = "figure3", c_idRefCard = ""; public object trait = new TraitCard(); public object pos = new(); public int invY; public bool isEquipped; public int Num = 1; public void MakeFigureFrom(string s) { c_idRefCard = s; } public void Destroy() { isDestroyed = true; } public bool TryStackTo(Thing t) { t.Num += Num; Destroy(); return true; } }
 public class TraitCard {}
 public static class ThingGen { public static Thing? Last; public static Thing Create(string s) => Last = new(); }
 public class ContentCodex { public void OnClickGetCard() {} public void OnClickAddCards() {} public TestList list = new(); public CodexCreature? currentCodex; public void RefreshList() {} public void RefreshInfo() {} public static void Collect(Thing t) { EClass.player.codex.AddCard(t.c_idRefCard,t.Num); t.Destroy(); } }
@@ -46,7 +47,7 @@ namespace ElinTogether.Models {
 }
 public class GameIOContext {}
 public class ElinPreLoadAttribute : Attribute {}
-public static class EmpLog { public static void Information(string s, params object[] args) {} }
+public static class EmpLog { public static void Debug(string s, params object[] args) {} public static void Information(string s, params object[] args) {} }
 namespace MessagePack { public class MessagePackObjectAttribute : Attribute {} public class KeyAttribute(int n) : Attribute {} }
 namespace ElinTogether.Helper { internal class Placeholder {} }
 namespace ElinTogether.Models {
@@ -60,3 +61,13 @@ namespace ElinTogether.Net {
  public class ElinNetHost : ElinNetBase { public Dictionary<int,Chara> ActiveRemoteCharas = new(); public List<ElinDelta> Replies = new(); public bool Deliver = true; public int LastPeer; public bool SendDeltaTo(int peer, ElinDelta d) { LastPeer = peer; if (!Deliver) return false; Replies.Add(d); return true; } }
  public class NetSession { public static NetSession Instance = new(); public ElinNetBase? Connection; }
 }
+
+public class AI_UseCrafter { public Chara owner=null!; public List<Thing> ings=new(); }
+public class TraitCrafter { public enum MixType { Talisman } public class Row { public string type="Talisman"; } public Row Source=new(); public Row GetSource(AI_UseCrafter ai)=>Source; public void Craft(AI_UseCrafter ai) {} }
+public static class LayerInventory { public static Thing? Dirty; public static void SetDirty(Thing t)=>Dirty=t; }
+namespace ElinTogether.Models {
+ public class RemoteCard(Card card) { public Card? Find()=>card; public static implicit operator RemoteCard(Card card)=>new(card); }
+ // Snapshot boundary substitutes compression, preserving independent embedded state.
+ public class LZ4Bytes { Thing value=null!; public static LZ4Bytes Create(Thing t)=>new(){value=new Thing{uid=t.uid,refVal=t.refVal,encLV=t.encLV}}; public T Decompress<T>()=>(T)(object)new Thing{uid=value.uid,refVal=value.refVal,encLV=value.encLV}; }
+}
+namespace ElinTogether.Patches { public static class CharaProgressCompleteEvent { public static bool Packing; public static List<ElinDelta> Packed=new(); public static bool ShouldPack(bool _) => Packing; public static void Pack(ElinDelta d)=>Packed.Add(d); } }

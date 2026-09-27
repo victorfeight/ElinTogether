@@ -130,3 +130,33 @@ NetSession.Instance.Connection=null;
 Check(PersonalMsgSayPatch.OnCollectionMessage("addedCards",1,"1",null,ref result),
       "single-player retains vanilla collection messages");
 NetSession.Instance.Connection=host;
+
+// Production talisman completion, routing, and state application.
+var originalPC=EClass.pc;
+var weapon=new Thing{uid=800,parent=client};
+var crafting=new AI_UseCrafter{owner=client,ings=[weapon]};
+var crafter=new TraitCrafter();
+TalismanCraftPatch.Before(crafter,crafting,out var craftContext);
+try {
+ Check(EClass.pc==client && TalismanCraftPatch.Receiver==client,"talisman evaluates requesting player's feats and message context");
+ weapon.ammoData=new Thing{uid=801,refVal=1234,encLV=150}; weapon.c_ammo=12;
+ host.Replies.Clear(); host.Deliver=true;
+ Check(!PersonalMsgSayPatch.OnRemoteToggleMessage("talisman_pc",weapon,weapon.ammoData,null,null,ref result) && host.Replies.Count==1 && host.LastPeer==7,"talisman confirmation reaches crafting client exactly once");
+ CharaProgressCompleteEvent.Packing=true;
+ TalismanCraftPatch.After(craftContext);
+} finally { TalismanCraftPatch.Restore(craftContext); }
+Check(EClass.pc==originalPC && TalismanCraftPatch.Receiver==null,"craft context restores host player");
+var spellUpdate=(CardAmmoDelta)CharaProgressCompleteEvent.Packed.Single();
+weapon.ammoData=null; weapon.c_ammo=0;
+spellUpdate.Apply(host);
+Check(weapon.ammoData==null && weapon.c_ammo==0,"host rejects incoming weapon-state overwrite");
+spellUpdate.Apply(new ElinNetClient()); spellUpdate.Apply(new ElinNetClient());
+Check(weapon.ammoData?.refVal==1234 && weapon.ammoData.encLV==150 && weapon.c_ammo==12 && weapon.parent==client && LayerInventory.Dirty==weapon,"client receives spell potency and charges idempotently without replacing weapon");
+weapon.isDestroyed=true; weapon.c_ammo=0; spellUpdate.Apply(new ElinNetClient());
+Check(weapon.c_ammo==0,"late spell update ignores destroyed weapon");
+crafter.Source.type="Grind"; TalismanCraftPatch.Before(crafter,crafting,out var unrelated);
+Check(unrelated==null && EClass.pc==originalPC,"unrelated crafting retains vanilla context");
+crafter.Source.type="Talisman"; crafting.owner=originalPC;
+TalismanCraftPatch.Before(crafter,crafting,out var ownContext);
+try { Check(PersonalMsgSayPatch.OnRemoteToggleMessage("talisman_pc",weapon,weapon,null,null,ref result),"host's own talisman confirmation remains local"); }
+finally { TalismanCraftPatch.Restore(ownContext); }

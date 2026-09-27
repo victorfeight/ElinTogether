@@ -19,9 +19,11 @@ public class BuildVersionIntegrity : EClass
         V6 = 6,
         // Auto Act custom steps and depth-preserving task payloads
         V7 = 7,
+        // Authoritative embedded weapon spell state.
+        V8 = 8,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V7;
+    public const APIVersion APIVersionLatest = APIVersion.V8;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

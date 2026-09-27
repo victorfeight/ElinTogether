@@ -1,0 +1,27 @@
+using ElinTogether.Elements;
+using ElinTogether.Models;
+using ElinTogether.Net;
+void Check(bool value,string name){if(!value)throw new Exception(name);Console.WriteLine("PASS "+name);}
+var net=new ElinNetBase{IsHost=true};
+var owner=new Chara{uid=719};var root=new GoalRemote();root.SetOwner(owner);owner.ai=root;
+var pick=new Thing{uid=1,parent=owner};var axe=new Thing{uid=2,parent=owner};var sickle=new Thing{uid=3,parent=owner};owner.held=pick;
+CharaSwitchHeldDelta Switch(Card? item)=>new(){Owner=owner,HeldMainHand=item is null?null:(RemoteCard)item,HeldOffHand=item is null?null:(RemoteCard)item};
+root.child=new AIAct();Switch(axe).Apply(net);
+Check(owner.held==pick && root.PendingHeld!=null,"running task retains original tool and queues switch");
+var next=new BaseTaskHarvest();root.InsertAction(next);
+Check(owner.held==axe && next.Captured==axe && root.PendingHeld==null,"next harvest snapshots deferred axe instead of stale pick");
+Switch(pick).Apply(net);Switch(sickle).Apply(net);root.HaltChildAct();
+Check(owner.held==sickle,"latest switch wins while task runs");
+root.child=new AIAct();Switch(null).Apply(net);root.HaltChildAct();
+Check(owner.held==null,"empty-hand switch also survives running task");
+root.child=new AIAct();Switch(pick).Apply(net);root.child.status=AIAct.Status.Success;Switch(axe).Apply(net);root.HaltChildAct();
+Check(owner.held==axe && root.PendingHeld==null,"new idle switch supersedes queued switch");
+root.child=new AIAct();Switch(sickle).Apply(net);var foreign=new Chara();sickle.parent=foreign;root.HaltChildAct();
+Check(owner.held==axe,"deferred switch cannot take an item that changed owner");
+owner.IsPC=true;Switch(pick).Apply(net);
+Check(owner.held==axe,"remote replication does not overwrite local player tool");
+owner.IsPC=false;root.child=new AIAct();Switch(pick).Apply(net);var before=net.Delta.Items.Count;root.HaltChildAct();
+Check(net.Delta.Items.Count==before,"applying pending switch does not rebroadcast packet");
+root.child=new AIAct();Switch(axe).Apply(net);root.child.status=AIAct.Status.Success;
+var run=root.Run().GetEnumerator();run.MoveNext();run.MoveNext();
+Check(owner.held==axe && root.PendingHeld==null,"normal goal cleanup applies queued switch without a new task");

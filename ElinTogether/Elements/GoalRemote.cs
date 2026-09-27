@@ -1,9 +1,12 @@
 using System.Collections.Generic;
+using ElinTogether.Models;
 
 namespace ElinTogether.Elements;
 
 internal class GoalRemote : NoGoal
 {
+    internal CharaSwitchHeldDelta? PendingHeld;
+
     internal static GoalRemote Default => new();
 
     public override bool IsIdle => true;
@@ -50,5 +53,12 @@ internal class GoalRemote : NoGoal
     {
         child?.Reset();
         child = null;
+        // Preserve switches received during progress and apply before the next task
+        // snapshots owner.Tool. Never change a tool halfway through its current task.
+        if (PendingHeld is { } held) {
+            PendingHeld = null;
+            held.ApplyHeld(owner);
+            EmpLog.Debug("Applied deferred held tool for chara {Uid}: {HeldUid}", owner.uid, owner.held?.uid);
+        }
     }
 }

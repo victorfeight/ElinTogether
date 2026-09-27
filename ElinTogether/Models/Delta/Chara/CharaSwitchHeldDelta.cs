@@ -36,9 +36,18 @@ public class CharaSwitchHeldDelta : ElinDelta
         chara.NetProfile.RemoteOffHand = new(HeldOffHand, false);
 
         // do not update tool if running task
-        if (chara.ai is GoalRemote { child.status: AIAct.Status.Running }) {
+        if (chara.ai is GoalRemote { child.status: AIAct.Status.Running } remote) {
+            remote.PendingHeld = this;
+            EmpLog.Debug("Deferred held tool for chara {Uid}: {HeldUid}", chara.uid, HeldMainHand?.Uid);
             return;
         }
+
+        if (chara.ai is GoalRemote idle) idle.PendingHeld = null;
+        ApplyHeld(chara);
+    }
+
+    internal void ApplyHeld(Chara chara)
+    {
 
         // empty hand
         if (HeldMainHand is null && HeldOffHand is null) {
