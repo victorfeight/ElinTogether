@@ -25,3 +25,23 @@ Check(net.Delta.Items.Count==before,"applying pending switch does not rebroadcas
 root.child=new AIAct();Switch(axe).Apply(net);root.child.status=AIAct.Status.Success;
 var run=root.Run().GetEnumerator();run.MoveNext();run.MoveNext();
 Check(owner.held==axe && root.PendingHeld==null,"normal goal cleanup applies queued switch without a new task");
+
+CharaTaskDelta Task(Card? tool,TaskArgsBase? args=null)=>new(){Owner=owner,TaskArgs=args??new HarvestArgs(),Tool=tool is null?null:(RemoteCard)tool};
+root.HaltChildAct();owner.held=axe;Task(pick).Apply(net);
+Check(owner.held==pick && ((BaseTaskHarvest)root.child!).Captured==pick,"task arriving before visual tool update captures requested pick");
+Switch(axe).Apply(net);Task(pick).Apply(net);
+Check(owner.held==pick && ((BaseTaskHarvest)root.child!).Captured==pick,"task tool supersedes deferred stale visual switch before snapshot");
+Task(null).Apply(net);
+Check(owner.held==null && ((BaseTaskHarvest)root.child!).Captured==null,"barehand harvest explicitly clears stale tool");
+var oldChild=root.child;var cancelled=TaskCache.Cancelled;Task(sickle).Apply(net);
+Check(root.child==oldChild && TaskCache.Cancelled==cancelled+1 && sickle.parent==foreign,"foreign tool is rejected without stealing or replacing task");
+pick.isDestroyed=true;Task(pick).Apply(net);
+Check(root.child==oldChild && TaskCache.Cancelled==cancelled+2,"destroyed selected tool rejects task");pick.isDestroyed=false;
+owner.held=axe;Task(pick,new IdleArgs()).Apply(net);
+Check(owner.held==axe,"non-harvest tasks leave tool alone");
+owner.IsPC=true;oldChild=root.child;Task(pick).Apply(new ElinNetBase());
+Check(root.child==oldChild && owner.held==axe,"relayed task does not reassign local player's tool");owner.IsPC=false;
+TaskCache.Taken=true;cancelled=TaskCache.Cancelled;Task(pick).Apply(net);
+Check(owner.held==axe && TaskCache.Cancelled==cancelled+1,"occupied tile rejection precedes tool mutation");TaskCache.Taken=false;
+Task(pick).Apply(new ElinNetBase());
+Check(owner.held==pick && ((BaseTaskHarvest)root.child!).Captured==pick,"observer reproduces task with supplied tool");

@@ -53,6 +53,7 @@ namespace ElinTogether.Models;
 // Zone
 [Union(400, typeof(SpatialGenDelta))]
 [Union(401, typeof(ZoneAddCardDelta))]
+[Union(402, typeof(BossLootTileDelta))]
 // World
 [Union(500, typeof(GameDelta))]
 [Union(501, typeof(WorldDateAdvanceDelta))]

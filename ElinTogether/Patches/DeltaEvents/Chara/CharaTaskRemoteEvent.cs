@@ -182,6 +182,7 @@ internal static class CharaTaskRemoteEvent
         connection.Delta.AddRemote(new CharaTaskDelta {
             Owner = owner,
             TaskArgs = args,
+            Tool = g is BaseTaskHarvest ? owner.Tool : null,
         });
 
         if (connection.IsClient && owner.IsPC && args is AIUseCrafterArgs crafterArgs &&

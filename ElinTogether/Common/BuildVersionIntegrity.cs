@@ -21,9 +21,11 @@ public class BuildVersionIntegrity : EClass
         V7 = 7,
         // Authoritative embedded weapon spell state.
         V8 = 8,
+        // Atomic task tools and authoritative boss loot terrain.
+        V9 = 9,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V8;
+    public const APIVersion APIVersionLatest = APIVersion.V9;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

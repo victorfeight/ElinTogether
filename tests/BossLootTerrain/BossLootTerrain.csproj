@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+<PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+<ItemGroup>
+<Reference Include="0Harmony"><HintPath>$(ElinGamePath)/BepInEx/core/0Harmony.dll</HintPath></Reference>
+<Reference Include="MonoMod.Utils"><HintPath>$(ElinGamePath)/BepInEx/core/MonoMod.Utils.dll</HintPath></Reference>
+<Reference Include="MonoMod.RuntimeDetour"><HintPath>$(ElinGamePath)/BepInEx/core/MonoMod.RuntimeDetour.dll</HintPath></Reference>
+<Reference Include="Mono.Cecil"><HintPath>$(ElinGamePath)/BepInEx/core/Mono.Cecil.dll</HintPath></Reference>
+<Compile Include="../../ElinTogether/Patches/DeltaEvents/Chara/BossLootTerrainPatch.cs" Link="BossLootTerrainPatch.cs"/>
+<Compile Include="../../ElinTogether/Models/Delta/Zone/BossLootTileDelta.cs" Link="BossLootTileDelta.cs"/>
+</ItemGroup></Project>

@@ -31,12 +31,18 @@ internal class GoalRemote : NoGoal
         }
     }
 
-    public void InsertAction(AIAct? action)
+    public void InsertAction(AIAct? action, Card? taskTool = null, bool applyTaskTool = false)
     {
         HaltChildAct();
 
         if (action is null) {
             return;
+        }
+
+        if (applyTaskTool) {
+            if (taskTool is null) owner.PickHeld();
+            else owner.HoldCard(taskTool);
+            EmpLog.Debug("Task tool selected for {Uid}: requested {RequestedUid}, held {HeldUid}", owner.uid, taskTool?.uid, owner.held?.uid);
         }
 
         if (action is BaseTaskHarvest t) {
