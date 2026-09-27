@@ -138,6 +138,7 @@ internal partial class ElinNetHost : ElinNetBase
         EmpPop.Information("emp_player_disconnected".lang(), peer, disconnectInfo);
 
         _handshakes.Remove(peer.Id);
+        WishInteraction.ReleasePeer(peer.Id);
         PendingRebind.ReleasePeer(peer.Id);
 
         if (States.Remove(peer.Id, out var state)) {

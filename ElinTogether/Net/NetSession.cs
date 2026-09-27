@@ -50,6 +50,7 @@ public class NetSession : EClass
 
     public void RemoveComponent()
     {
+        ElinTogether.Models.WishInteraction.Clear();
         if (Connection != null) {
             if (!Connection.IsHost && core.IsGameStarted) {
                 ui.hud?.SetDragImage(null);

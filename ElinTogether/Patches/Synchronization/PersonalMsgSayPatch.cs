@@ -45,6 +45,15 @@ internal static class PersonalMsgSayPatch
     }
 
     internal static int? RefuelPeer { get; set; }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(Msg), nameof(Msg.Say), typeof(string))]
+    internal static bool OnWishResult(string idLang, ref string __result)
+    {
+        if (idLang is not ("dropReward" or "wishFail") || WishInteraction.Receiver is not { } receiver ||
+            NetSession.Instance.Connection is not ElinNetHost host) return true;
+        return Route(host, PeerFor(host, receiver), Msg.GetGameText(idLang), ref __result);
+    }
     internal static bool RemoteToggleReplay { get; set; }
     internal static Chara? FirstTimeCraftReceiver { get; set; }
 
@@ -70,6 +79,7 @@ internal static class PersonalMsgSayPatch
         }
 
         var peerIndex = idLang switch {
+            "wish" when WishInteraction.Receiver is { } receiver => PeerFor(host, receiver),
             "crafted" when RemoteCraft.ProductReceiver is { } receiver =>
                 PeerFor(host, receiver),
             "fueled" => RefuelPeer.GetValueOrDefault(),

@@ -73,6 +73,8 @@ namespace ElinTogether.Models;
 [Union(610, typeof(SleepStartDelta))]
 [Union(611, typeof(SleepCancelDelta))]
 [Union(612, typeof(CombatTurnCompleteDelta))]
+[Union(613, typeof(WishPromptDelta))]
+[Union(614, typeof(WishReplyDelta))]
 // Inv
 [Union(700, typeof(InvOwnerOnProcessDelta))]
 [Union(701, typeof(InvRerollDelta))]

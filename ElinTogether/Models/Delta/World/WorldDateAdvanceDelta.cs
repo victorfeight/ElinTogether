@@ -14,6 +14,9 @@ public class WorldDateAdvanceDelta : ElinDelta
     [Key(1)]
     public required ImmutableArray<int> GameDate { get; init; }
 
+    [Key(2)]
+    public WeatherStateSnapshot? Weather { get; init; }
+
     protected override void OnApply(ElinNetBase net)
     {
         if (net.IsHost) {
@@ -24,6 +27,7 @@ public class WorldDateAdvanceDelta : ElinDelta
         var days = world.date.GetRawDay();
 
         SetClientDate([..GameDate]);
+        Weather?.Apply();
 
         foreach (var zoneEvent in _zone.events.list) {
             zoneEvent.minElapsed += Minutes;

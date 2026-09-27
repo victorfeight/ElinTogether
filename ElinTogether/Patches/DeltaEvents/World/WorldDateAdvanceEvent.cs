@@ -24,6 +24,7 @@ internal static class WorldDateAdvanceEvent
         host.Delta.AddRemote(new WorldDateAdvanceDelta {
             Minutes = a,
             GameDate = [..EClass.world.date.raw],
+            Weather = WeatherStateSnapshot.Create(),
         });
     }
 }

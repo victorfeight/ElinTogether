@@ -23,9 +23,13 @@ public class BuildVersionIntegrity : EClass
         V8 = 8,
         // Atomic task tools and authoritative boss loot terrain.
         V9 = 9,
+        // Host-authorized wish dialog and reply.
+        V10 = 10,
+        // Authoritative weather in world/time snapshots.
+        V11 = 11,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V9;
+    public const APIVersion APIVersionLatest = APIVersion.V11;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

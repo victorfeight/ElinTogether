@@ -30,6 +30,9 @@ public class WorldStateSnapshot : EClass
     [Key(4)]
     public required int SharedSpeed { get; init; }
 
+    [Key(5)]
+    public WeatherStateSnapshot? Weather { get; init; }
+
     [ElinPreLoad]
     private static void ClearSweepStrikes(GameIOContext context)
     {
@@ -69,6 +72,7 @@ public class WorldStateSnapshot : EClass
             CharaSnapshots = [..snapshots.Values],
             GlobalUidNext = game.cards.uidNext,
             SharedSpeed = NetSession.Instance.SharedSpeed,
+            Weather = WeatherStateSnapshot.Create(),
         };
     }
 
@@ -82,6 +86,7 @@ public class WorldStateSnapshot : EClass
             Action = _ => {
                 // 1
                 WorldDateAdvanceDelta.SetClientDate([..GameDate]);
+                Weather?.Apply();
 
                 // 2
                 foreach (var snapshot in CharaSnapshots) {

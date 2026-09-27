@@ -40,7 +40,16 @@ internal static class CardTryStackEvent
             return true;
         }
 
-        __result = true;
+        if (InvSortEvent.QueuedSources is { } queued) {
+            __result = false;
+            // Each source may be merged once. A previously queued source will
+            // disappear on the host, so it cannot be a later merge's target.
+            if (queued.Contains(to.uid) || !queued.Add(__instance.uid)) {
+                return false;
+            }
+        } else {
+            __result = true;
+        }
         client.Delta.AddRemote(new CardTryStackToDelta {
             Card = __instance,
             To = to,
