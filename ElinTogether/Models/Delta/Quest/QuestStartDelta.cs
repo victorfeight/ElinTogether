@@ -25,6 +25,8 @@ public class QuestStartDelta : ElinDelta
         }
 
         var quest = Data.Decompress<Quest>();
+        // The guild snapshot carries phase and task atomically, including starts.
+        if (GuildStateSnapshot.IsGuildQuest(quest)) return;
 
         game.quests.globalList.RemoveAll(q => q.uid == Uid);
 

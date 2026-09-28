@@ -19,14 +19,9 @@ public class QuestUpdateDelta : ElinDelta
         }
 
         var quest = Data.Decompress<Quest>();
+        if (GuildStateSnapshot.IsGuildQuest(quest)) return;
 
-        var i = game.quests.list.FindIndex(q => q.uid == quest.uid);
-        game.quests.list[i] = quest;
-        if (quest.person.chara is not { } chara) {
-            return;
-        }
-
-        quest.SetClient(chara, AssignQuest);
+        QuestReplica.Apply(quest, AssignQuest);
     }
 
     public static QuestUpdateDelta Create(Quest quest)

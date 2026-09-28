@@ -14,6 +14,8 @@ internal class QuestChangePhaseEvent
             return true;
         }
 
+        if (GuildStateSnapshot.IsGuildQuest(__instance) && !ElinDelta.IsApplying) return false;
+
         __instance.phase = a;
         __instance.UpdateJournal();
 

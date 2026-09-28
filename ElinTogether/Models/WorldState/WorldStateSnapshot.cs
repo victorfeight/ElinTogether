@@ -33,6 +33,12 @@ public class WorldStateSnapshot : EClass
     [Key(5)]
     public WeatherStateSnapshot? Weather { get; init; }
 
+    [Key(6)]
+    public GuildStateSnapshot? Guilds { get; init; }
+
+    [Key(7)]
+    public int[]? KnownBGMs { get; init; }
+
     [ElinPreLoad]
     private static void ClearSweepStrikes(GameIOContext context)
     {
@@ -73,6 +79,8 @@ public class WorldStateSnapshot : EClass
             GlobalUidNext = game.cards.uidNext,
             SharedSpeed = NetSession.Instance.SharedSpeed,
             Weather = WeatherStateSnapshot.Create(),
+            Guilds = GuildStateSnapshot.Capture(),
+            KnownBGMs = MusicCollectionSync.Capture(),
         };
     }
 
@@ -87,6 +95,8 @@ public class WorldStateSnapshot : EClass
                 // 1
                 WorldDateAdvanceDelta.SetClientDate([..GameDate]);
                 Weather?.Apply();
+                Guilds?.Apply();
+                MusicCollectionSync.Apply(KnownBGMs);
 
                 // 2
                 foreach (var snapshot in CharaSnapshots) {

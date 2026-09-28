@@ -17,6 +17,10 @@ public class QuestCompleteDelta : ElinDelta
             return;
         }
 
+        // Guild completion is part of its authoritative state, not an instruction
+        // from a client or a second gameplay replay on receipt.
+        if (GuildStateSnapshot.IsGuildQuest(quest)) return;
+
         if (net.IsHost) {
             using (Simulate()) {
                 quest.Complete();

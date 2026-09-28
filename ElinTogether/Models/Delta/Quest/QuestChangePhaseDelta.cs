@@ -20,6 +20,7 @@ public class QuestChangePhaseDelta : ElinDelta
         }
 
         var quest = game.quests.list.Find(q => q.uid == Uid);
+        if (quest is not null && GuildStateSnapshot.IsGuildQuest(quest)) return;
         quest?.ChangePhase(Modifier);
     }
 }

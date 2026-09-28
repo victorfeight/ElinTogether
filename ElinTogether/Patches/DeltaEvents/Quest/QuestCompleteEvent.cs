@@ -14,6 +14,8 @@ internal static class QuestCompleteEvent
             return true;
         }
 
+        if (GuildStateSnapshot.IsGuildQuest(__instance)) return false;
+
         var game = EClass.game;
         game.quests.Remove(__instance);
         game.quests.completedIDs.Add(__instance.id);
@@ -34,6 +36,7 @@ internal static class QuestCompleteEvent
     [HarmonyPostfix]
     internal static void OnQuestComplete(Quest __instance)
     {
+        if (GuildStateSnapshot.IsGuildQuest(__instance)) return;
         if (NetSession.Instance.Connection is not { } connection || ElinDelta.IsApplying) {
             return;
         }

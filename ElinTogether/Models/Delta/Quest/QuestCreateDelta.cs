@@ -28,6 +28,7 @@ public class QuestCreateDelta : ElinDelta
         }
 
         var quest = Data.Decompress<Quest>();
+        if (GuildStateSnapshot.IsGuildQuest(quest)) return;
         if (quest.person.chara is not { } chara) {
             return;
         }

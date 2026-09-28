@@ -27,9 +27,13 @@ public class BuildVersionIntegrity : EClass
         V10 = 10,
         // Authoritative weather in world/time snapshots.
         V11 = 11,
+        // Shared guild state and validated guild dialogue actions.
+        V12 = 12,
+        // Host-owned unlocked cassette collection in world snapshots.
+        V13 = 13,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V11;
+    public const APIVersion APIVersionLatest = APIVersion.V13;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 
