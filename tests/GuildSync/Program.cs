@@ -29,13 +29,39 @@ Check(existing.track && clientGame.quests.list.Contains(unrelated) && Guild.Thie
 Check(!GuildQuestProgressPatch.Before(existing) && GuildQuestProgressPatch.Before(unrelated), "client replay cannot progress shared guild trial but ordinary quests are unaffected");
 initial.Apply();
 Check(existing.task.num == -2, "repeated snapshot cannot add progress twice");
+var retainedTask = existing.task;
+var decoded = LZ4Bytes.DecodeCount;
+Guild.Thief.relation.type = FactionRelation.RelationType.Member;
+Guild.Thief.relation.rank = 4;
+Guild.Thief.relation.exp = 500;
+Guild.Thief.relation.affinity = -10;
+initial.Apply();
+Check(Guild.Thief.relation.type == FactionRelation.RelationType.Default && Guild.Thief.relation.rank == 0 &&
+      Guild.Thief.relation.exp == 0 && Guild.Thief.relation.affinity == 42,
+    "same revision repairs client membership, rank, contribution and affinity drift");
+Check(LZ4Bytes.DecodeCount == decoded && ReferenceEquals(retainedTask, existing.task) && existing.track,
+    "same revision does not deserialize quests or replace task/UI references");
+foreach (var connection in new ElinNetBase?[] { host, null }) {
+    NetSession.Instance.Connection = connection;
+    Guild.Thief.relation.exp = 123;
+    initial.Apply();
+    Check(Guild.Thief.relation.exp == 123 && LZ4Bytes.DecodeCount == decoded,
+        "relation reconciliation cannot mutate host or solo state");
+}
 EClass.game = hostGame; NetSession.Instance.Connection = host;
+Guild.Thief.relation.exp = 17;
 thiefTrial.CompleteTask();
 var completed = GuildStateSnapshot.Capture();
 Check(completed.Revision > initial.Revision, "phase mutation advances shared revision");
 EClass.game = clientGame; NetSession.Instance.Connection = client;
 completed.Apply(); initial.Apply();
 Check(existing.phase == 1 && existing.task == null, "completed phase and removed task arrive together; stale snapshot cannot undo them");
+Check(Guild.Thief.relation.exp == 17, "older revision cannot roll back newer contribution");
+Guild.Thief.relation.exp = 999;
+initial.Apply();
+Check(Guild.Thief.relation.exp == 999, "older revision is rejected even when client state has drifted");
+completed.Apply();
+Check(Guild.Thief.relation.exp == 17, "current revision repairs drift after stale revision was rejected");
 var missing = new QuestGuild { id = "guild_mage", uid = 101, phase = 0 };
 QuestReplica.Apply(missing, false);
 Check(clientGame.quests.list.Contains(missing), "missing quest is safely inserted");

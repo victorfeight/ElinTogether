@@ -121,9 +121,10 @@ namespace ElinTogether.Net {
 }
 namespace ElinTogether.Models {
     public class LZ4Bytes {
+        public static int DecodeCount;
         private Quest value = null!;
         public static LZ4Bytes Create<T>(T value) => new() { value = ((Quest)(object)value!).Clone() };
-        public T Decompress<T>() => (T)(object)value.Clone();
+        public T Decompress<T>() { DecodeCount++; return (T)(object)value.Clone(); }
     }
     public class RemoteCard(Card c) {
         public Card Find() => c;

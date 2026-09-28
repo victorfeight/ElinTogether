@@ -69,9 +69,13 @@ public class GuildStateSnapshot : EClass
 
     internal void Apply()
     {
-        if (NetSession.Instance.Connection is not ElinNetClient || Revision <= _appliedRevision) return;
-        // Decode before changing live state. No gameplay methods are replayed here.
-        var quests = Quests.Select(q => q.Decompress<Quest>()).Where(IsGuildQuest).ToArray();
+        if (NetSession.Instance.Connection is not ElinNetClient || Revision < _appliedRevision) return;
+        // Decode new quest state before changing live state. Repeated current
+        // revisions still repair client-only relation writes, without decoding
+        // quests or replacing task references held by the UI each tick.
+        var quests = Revision > _appliedRevision
+            ? Quests.Select(q => q.Decompress<Quest>()).Where(IsGuildQuest).ToArray()
+            : null;
         foreach (var state in Relations) {
             if (Find(state.Id) is not { } guild) continue;
             guild.relation.type = state.Type;
@@ -79,6 +83,7 @@ public class GuildStateSnapshot : EClass
             guild.relation.exp = state.Exp;
             guild.relation.affinity = state.Affinity;
         }
+        if (quests is null) return;
         game.quests.list.RemoveAll(q => IsGuildQuest(q) && !quests.Any(s => s.uid == q.uid));
         game.quests.globalList.RemoveAll(q => IsGuildQuest(q) && quests.Any(s => s.uid == q.uid));
         foreach (var quest in quests) QuestReplica.Apply(quest, false);

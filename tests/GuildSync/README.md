@@ -6,6 +6,11 @@ against boundary stubs. It checks state reconciliation and request validation; i
 does not exercise Unity, real Harmony installation, MessagePack/LZ4 transport, or
 the live dialogue UI. The full mod build checks the installed game API separately.
 
+Phase 1 reconciliation checks also cover local relation drift repaired by the same
+accepted revision, preserved task references with no repeated deserialization,
+older revision rejection, and host/solo isolation. Quest state is still applied
+only when a new revision arrives; relation fields reconcile every current snapshot.
+
 ## Source-backed design
 
 Audited against local Elin 23.338.2 source:
@@ -38,7 +43,7 @@ every transaction awarding guild contribution. Host contribution changes sync.
 Client stolen-goods sales (`ShopTransaction.OnEndTransaction`) and shop investment
 (a local dialogue callback in `DramaCustomSequence`) still lack host transaction
 requests. Locally awarded contribution there is not guaranteed to reach the host
-and may be replaced by its next guild revision. Do those transactions on the host
+and is replaced by its next current guild snapshot. Do those transactions on the host
 until their payment/item changes and guild credit can be committed together.
 Do not add a generic client-supplied contribution amount: it would allow duplicate
 credits and separate credit from the transaction that earned it.
