@@ -11,20 +11,18 @@ internal static class CharaAddConditionEvent
     [HarmonyPostfix]
     internal static void OnCharaAddCondition(Chara __instance, Condition? __result, Condition c, bool force)
     {
-        // only propagate successful add condition events
-        if (__result is null) {
-            return;
-        }
-
         if (NetSession.Instance.Connection is not ElinNetHost host) {
             return;
         }
 
         host.Delta.AddRemote(new CharaAddConditionDelta {
             Owner = __instance,
-            ConditionId = __result.id,
-            Power = __result.power,
+            ConditionId = c.id,
+            Power = c.power,
             Force = force,
+            // Stacking/toggle/nullification can change the family while returning
+            // null. The final family also corrects a locally stale resisted status.
+            State = ConditionSync.Capture(__instance, c.id),
         });
     }
 

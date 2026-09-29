@@ -22,6 +22,7 @@ internal static class CharaRemoveConditionEvent
             Power = 0,
             Force = true,
             Remove = true,
+            State = ConditionSync.Capture(__instance.Owner, __instance.id),
         });
     }
 }

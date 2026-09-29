@@ -23,6 +23,8 @@ public class CharaAddConditionDelta : ElinDelta
     [Key(4)]
     public bool Remove { get; set; }
 
+    [Key(5)] public LZ4Bytes? State { get; init; }
+
     protected override void OnApply(ElinNetBase net)
     {
         if (net.IsHost) {
@@ -31,6 +33,11 @@ public class CharaAddConditionDelta : ElinDelta
         }
 
         if (Owner.Find() is not Chara chara) {
+            return;
+        }
+
+        if (State is not null) {
+            ConditionSync.Apply(chara, ConditionId, State);
             return;
         }
 

@@ -4,13 +4,16 @@ using HarmonyLib;
 
 namespace ElinTogether.Patches;
 
-[HarmonyPatch(typeof(Card), nameof(Card.ModCharge))]
+[HarmonyPatch(typeof(Card), nameof(Card.c_charges), MethodType.Setter)]
 internal static class CardChargeEvent
 {
+    [HarmonyPrefix]
+    internal static void Before(Card __instance, out int __state) => __state = __instance.c_charges;
+
     [HarmonyPostfix]
-    internal static void OnModCharge(Card __instance, int a)
+    internal static void OnChargeChanged(Card __instance, int __state)
     {
-        if (a == 0) {
+        if (__instance.c_charges == __state) {
             return;
         }
 
