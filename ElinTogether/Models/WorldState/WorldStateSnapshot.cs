@@ -44,6 +44,7 @@ public class WorldStateSnapshot : EClass
     [Key(10)] public OwnerProgressionAward[]? ProgressionAwards { get; init; }
     [Key(11)] public int ZoneDevelopment { get; init; }
     [Key(12)] public int ZoneInvestment { get; init; }
+    [Key(13)] public PersonalKarmaState[]? Karma { get; init; }
 
     [ElinPreLoad]
     private static void ClearSweepStrikes(GameIOContext context)
@@ -93,6 +94,7 @@ public class WorldStateSnapshot : EClass
             ZoneDevelopment = _zone.development,
             ZoneInvestment = _zone.investment,
             ProgressionAwards = OwnerProgressionAwards.CapturePending(),
+            Karma = PersonalKarma.CaptureAll(),
         };
     }
 
@@ -108,6 +110,7 @@ public class WorldStateSnapshot : EClass
                 WorldDateAdvanceDelta.SetClientDate([..GameDate]);
                 Weather?.Apply();
                 Guilds?.Apply();
+                if (Karma is not null) foreach (var karma in Karma) PersonalKarma.Receive(karma);
                 MusicCollectionSync.Apply(KnownBGMs);
                 OwnerProgressionAwards.Receive(ProgressionAwards);
                 if (_zone.uid == ZoneUid) {

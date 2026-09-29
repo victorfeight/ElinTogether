@@ -93,6 +93,7 @@ internal partial class ElinNetHost
         Session.CurrentPlayers.Add(state);
 
         peer.Send(NetSession.Instance.Rules);
+        PersonalKarma.BeginSession(chara);
         peer.Send(SaveDataProbe.Create(chara.uid));
     }
 
@@ -147,6 +148,7 @@ internal partial class ElinNetHost
             player.chara = host;
         }
 
+        PersonalKarma.Initialize(chara, 30);
         SavedRemoteCharas[peer.User] = chara.uid;
 
         SendSaveProbe(chara, peer);

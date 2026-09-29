@@ -39,9 +39,11 @@ public class BuildVersionIntegrity : EClass
         V16 = 16,
         // Personal fighter bounties with host-only eligibility during damage replay.
         V17 = 17,
+        // Host-saved personal karma and actor-specific criminal checks.
+        V18 = 18,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V17;
+    public const APIVersion APIVersionLatest = APIVersion.V18;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

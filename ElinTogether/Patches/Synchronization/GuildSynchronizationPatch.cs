@@ -64,12 +64,6 @@ internal static class RemoteGuildBookPatch
         // completion; its client replay is suppressed by GuildContributionReplayPatch.
         if (__instance.BookType == TraitBaseSpellbook.Type.Ancient) {
             Guild.Mage.AddContribution(5 + __instance.owner.refVal * 2);
-        } else if (__instance.BookType == TraitBaseSpellbook.Type.Dojin) {
-            // Vanilla's Dojin karma call is also guarded by c.IsPC. Credit the
-            // shared trial without modifying the host's personal karma instead.
-            foreach (var quest in EClass.game.quests.list.ToArray()) {
-                if (GuildStateSnapshot.IsGuildQuest(quest)) quest.OnModKarma(-1);
-            }
         }
     }
 }

@@ -75,6 +75,8 @@ namespace ElinTogether.Models;
 [Union(612, typeof(CombatTurnCompleteDelta))]
 [Union(613, typeof(WishPromptDelta))]
 [Union(614, typeof(WishReplyDelta))]
+[Union(615, typeof(PersonalKarmaDelta))]
+[Union(616, typeof(LocalKarmaOutcomeDelta))]
 // Inv
 [Union(700, typeof(InvOwnerOnProcessDelta))]
 [Union(701, typeof(InvRerollDelta))]

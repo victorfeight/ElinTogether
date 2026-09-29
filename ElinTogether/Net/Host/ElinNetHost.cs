@@ -152,6 +152,7 @@ internal partial class ElinNetHost : ElinNetBase
             }
 
             Session.CurrentPlayers.Remove(state);
+            _zone.RefreshCriminal();
         }
 
         EmpLog.Debug("Player {PlayerName} disconnected. {Remaining} players remaining",

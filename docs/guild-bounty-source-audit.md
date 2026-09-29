@@ -1,5 +1,9 @@
 # Fighter bounty attribution and remaining karma work
 
+The karma follow-up below records the audit at the bounty phase. Its implemented
+follow-up and local-outcome trust boundary are documented in
+[personal-karma-source-audit.md](personal-karma-source-audit.md).
+
 Implemented against local Elin 23.338.2 and verified against the installed Elin.dll.
 
 ## Native payout boundary

@@ -11,10 +11,11 @@ internal sealed class ActorOwnership : EClass
     internal static Chara? PlayerFor(Card? origin)
     {
         if (NetSession.Instance.Connection is not ElinNetHost host) return origin == pc ? pc : null;
+        var hostPlayer = NetSession.Instance.Player ?? pc;
         var actor = origin as Chara;
         var visited = new HashSet<int>();
         while (actor is not null && visited.Add(actor.uid)) {
-            if (actor == pc || host.ActiveRemoteCharas.Values.Contains(actor)) return actor;
+            if (actor == hostPlayer || host.ActiveRemoteCharas.Values.Contains(actor)) return actor;
             actor = actor.master ?? actor.FindMaster();
         }
         return null;

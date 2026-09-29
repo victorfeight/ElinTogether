@@ -119,7 +119,7 @@ Check(!Guild.Fighter.IsMember, "unfinished trial cannot grant membership");
 var karmaTrial = new QuestGuild { id = "guild_thief_test", uid = 777, task = new() { num = -1 } };
 hostGame.quests.list.Add(karmaTrial);
 RemoteGuildBookPatch.After(new TraitBaseSpellbook { BookType = TraitBaseSpellbook.Type.Dojin }, actor);
-Check(karmaTrial.task.num == -2, "remote Dojin completion credits shared karma trial on host");
+Check(karmaTrial.task.num == -1, "Dojin book hook does not duplicate the personal-karma event bridge");
 hostGame.quests.list.Remove(karmaTrial);
 Guild.Mage.relation.exp = 0;
 var book = new TraitBaseSpellbook { BookType = TraitBaseSpellbook.Type.Ancient, owner = new Card { refVal = 4 } };
