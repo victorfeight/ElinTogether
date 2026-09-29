@@ -15,6 +15,7 @@ public class Party {public List<Chara> members=[];}
 public class EClass {public static Chara pc=new();}
 public class AM_Adv {public bool ShouldPauseGame=>true;}
 public class UI {public bool IsPauseGame=>true;}
+public static class Game {public static bool isPaused;}
 namespace HarmonyLib {
  public enum MethodType{Getter}
  [AttributeUsage(AttributeTargets.Class|AttributeTargets.Method)] public class HarmonyPatch:Attribute{

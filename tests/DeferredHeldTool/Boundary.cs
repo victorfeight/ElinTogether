@@ -2,9 +2,9 @@ using ElinTogether.Models;
 public class EClass {public static Chara pc=new();public static Player player=new();public static Core core=new();}
 public class Player {public HotItem currentHotItem=new();} public class HotItem {public Thing? RenderThing;}
 public class Core {public Config config=new();} public class Config {public GameConfig game=new();} public class GameConfig {public bool hideWeapons,showOffhand;}
-public class Card {public bool isDestroyed;public int uid;public Card? parent;public Card GetRootCard()=>parent?.GetRootCard()??this;}
+public class Card {public bool isDestroyed;public int uid;public int Num=1;public int LightRadius;public int GetLightRadius()=>LightRadius;public Card? parent;public Card GetRootCard()=>parent?.GetRootCard()??this;}
 public class Thing:Card {}
-public class Chara:Card {public bool IsPC,isDead;public void SetAI(AIAct a){ai=a;a.SetOwner(this); }public int combatCount;public AIAct ai=new();public Card? held;public Body body=new();public Profile NetProfile=new();public void HoldCard(Card c)=>held=c;public void PickHeld()=>held=null;}
+public class Chara:Card {public bool IsPC,isDead;public void SetAI(AIAct a){ai=a;a.SetOwner(this); }public int combatCount;public AIAct ai=new();public Card? held;public Body body=new();public Profile NetProfile=new();public int LightRefreshes;public void RecalculateFOV()=>LightRefreshes++;public void HoldCard(Card c)=>throw new Exception("Selection must not call vanilla HoldCard: it can drop overflow and recreate renderers");public void PickHeld()=>throw new Exception("Selection must not call vanilla PickHeld: it can drop overflow");}
 public class Body {public Slot? slotMainHand,slotOffHand;}public class Slot {public Thing? thing;}
 public class Profile {public Hand? RemoteMainHand,RemoteOffHand;} public record Hand(RemoteCard? Card,bool Flag);
 public class AIAct {public enum Status {Running,Success}public Status status;public AIAct? child;public Chara owner=null!;public bool IsChildRunning=>child?.status==Status.Running;public virtual bool IsIdle=>false;public virtual bool IsNoGoal=>false;public virtual int MaxRestart=>0;public virtual bool CancelWhenDamaged=>true;public virtual bool PushChara=>true;public virtual IEnumerable<Status> Run(){yield break;}public void SetOwner(Chara c)=>owner=c;public void Reset()=>status=Status.Success;public void Tick(){} }

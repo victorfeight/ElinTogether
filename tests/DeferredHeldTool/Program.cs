@@ -45,3 +45,32 @@ TaskCache.Taken=true;cancelled=TaskCache.Cancelled;Task(pick).Apply(net);
 Check(owner.held==axe && TaskCache.Cancelled==cancelled+1,"occupied tile rejection precedes tool mutation");TaskCache.Taken=false;
 Task(pick).Apply(new ElinNetBase());
 Check(owner.held==pick && ((BaseTaskHarvest)root.child!).Captured==pick,"observer reproduces task with supplied tool");
+
+// Vanilla mutation methods throw at the boundary: these production replay paths
+// must never reach the overflow/stack/renderer side effects, at any capacity.
+root.HaltChildAct();owner.held=pick;var pickCount=pick.Num;Switch(axe).Apply(net);
+Check(owner.held==axe && pick.parent==owner && axe.parent==owner && pick.Num==pickCount,
+    "idle switch preserves old and new tool ownership and stack count");
+Switch(null).Apply(net);
+Check(owner.held==null && axe.parent==owner,"empty-hand replay clears selection without dropping old tool");
+owner.held=pick;axe.isDestroyed=true;Switch(axe).Apply(net);
+Check(owner.held==pick,"destroyed visual target cannot replace selected tool");axe.isDestroyed=false;
+axe.Num=0;Switch(axe).Apply(net);
+Check(owner.held==pick,"zero-count visual target cannot replace selected tool");axe.Num=1;
+Check(!ElinTogether.Helper.RemoteHeldItem.TrySelect(owner,sickle) && owner.held==pick,
+    "shared helper rejects foreign items without inventory mutation");
+Check(!ElinTogether.Helper.RemoteHeldItem.TrySelect(owner,new Chara{parent=owner}) && owner.held==pick,
+    "shared helper does not turn character carrying into tool selection");
+var bag=new Thing{parent=owner};var nested=new Thing{parent=bag};
+Check(ElinTogether.Helper.RemoteHeldItem.TrySelect(owner,nested) && nested.parent==bag,
+    "owned nested tool selection does not move it out of its container");
+var torch=new Thing{parent=owner,LightRadius=4};var lightBefore=owner.LightRefreshes;
+ElinTogether.Helper.RemoteHeldItem.TrySelect(owner,torch);
+Check(owner.LightRefreshes==lightBefore+1,"selecting held light refreshes FOV without recreating renderer");
+ElinTogether.Helper.RemoteHeldItem.TrySelect(owner,torch);
+Check(owner.LightRefreshes==lightBefore+1,"repeated same-item selection has no side effects");
+ElinTogether.Helper.RemoteHeldItem.TrySelect(owner,null);
+Check(owner.LightRefreshes==lightBefore+2 && torch.parent==owner,"clearing light refreshes FOV without dropping torch");
+owner.IsPC=true;owner.held=pick;
+Check(!ElinTogether.Helper.RemoteHeldItem.TrySelect(owner,axe) && owner.held==pick,
+    "shared helper cannot replace local player pickup and overflow mechanics");

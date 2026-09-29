@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using ElinTogether.Helper;
 using ElinTogether.Models;
 
 namespace ElinTogether.Elements;
@@ -40,8 +41,10 @@ internal class GoalRemote : NoGoal
         }
 
         if (applyTaskTool) {
-            if (taskTool is null) owner.PickHeld();
-            else owner.HoldCard(taskTool);
+            if (!RemoteHeldItem.TrySelect(owner, taskTool)) {
+                EmpLog.Warning("Remote task tool selection rejected for {Uid}: {ToolUid}", owner.uid, taskTool?.uid);
+                return;
+            }
             EmpLog.Debug("Task tool selected for {Uid}: requested {RequestedUid}, held {HeldUid}", owner.uid, taskTool?.uid, owner.held?.uid);
         }
 

@@ -43,7 +43,10 @@ internal class PauseGame
     public static void GetIsPauseGame(UI __instance, ref bool __result)
     {
         if (NetSession.Instance.HasActiveConnection) {
-            __result = false;
+            // Menus must not stop other players, but Game.Pause is a mandatory
+            // world pause. Quest timers otherwise keep queuing return callbacks
+            // while character ticks are already stopped by Game.isPaused.
+            __result = Game.isPaused;
         }
     }
 }

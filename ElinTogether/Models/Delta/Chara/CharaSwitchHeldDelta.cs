@@ -51,7 +51,7 @@ public class CharaSwitchHeldDelta : ElinDelta
 
         // empty hand
         if (HeldMainHand is null && HeldOffHand is null) {
-            chara.PickHeld();
+            RemoteHeldItem.TrySelect(chara, null);
             return;
         }
 
@@ -60,7 +60,7 @@ public class CharaSwitchHeldDelta : ElinDelta
             HeldOffHand?.Find() is { } offHand &&
             mainHand == offHand &&
             mainHand.GetRootCard() == chara) {
-            chara.HoldCard(mainHand);
+            RemoteHeldItem.TrySelect(chara, mainHand);
         }
     }
 

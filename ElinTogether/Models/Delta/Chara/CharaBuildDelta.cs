@@ -79,7 +79,7 @@ public class CharaBuildDelta : ElinDelta
             // HoldCard here recreates the card renderer while its prior actor can still
             // be present in Scene.syncList, leaving a visible ghost after placement.
             if (chara.IsRemotePlayer && held.GetRootCard() == chara) {
-                chara.held = held;
+                if (!RemoteHeldItem.TrySelect(chara, held)) return;
             } else {
                 chara.HoldCard(held);
             }

@@ -50,4 +50,36 @@ local.isDead=true;local.ai=new AutoAct{running=false};var deadGoal=local.ai;
 PlayerActivity.ClearFinishedLocalGoal(local);Check(local.ai==deadGoal,"dead player's goal left to death lifecycle");
 remote.ai=new TaskHarvest{running=false};var remoteGoal=remote.ai;
 PlayerActivity.ClearFinishedLocalGoal(remote);Check(remote.ai==remoteGoal,"remote character's goal is never cleared by local cleanup");
+// Scene combines UI pause and action-mode pause with OR. Exercise the production
+// UI patch while a remote goal/combat phase wants time to continue.
+bool UiPauses(bool vanilla=true){PauseGame.GetIsPauseGame(new UI(),ref vanilla);return vanilla;}
+foreach(var connection in new object[]{host,new object()}) {
+ NetSession.Instance.Connection=connection;
+ foreach(var phase in new[]{ActionModeCombat.CombatPhase.Inactive,ActionModeCombat.CombatPhase.Executing,ActionModeCombat.CombatPhase.Advancing}) {
+  ActionModeCombat.Phase=phase;Game.isPaused=false;
+  Check(!UiPauses(),$"ordinary menu does not pause MP in {phase}");
+  Game.isPaused=true;
+  Check(UiPauses(false),$"mandatory pause wins even with non-pausing top layer in {phase}");
+  Game.isPaused=false;
+  Check(!UiPauses(),$"closing mandatory pause restores MP menu policy in {phase}");
+ }
+}
+// Model only the vanilla event/UI boundary: an expired quest queues a callback
+// every event round; GameUpdater.Update stops event rounds on scene.paused.
+// This is not a Unity test of actual layer destruction or zone activation.
+NetSession.Instance.Connection=host;ActionModeCombat.Phase=ActionModeCombat.CombatPhase.Inactive;
+host.ActiveRemoteCharas[1]=remote;remote.ai=new GoalRemote{child=new TaskHarvest()};
+Game.isPaused=false;int pendingReturns=0;
+for(int frame=0;frame<5;frame++) {
+ bool scenePaused=UiPauses(false)||Pauses();
+ if(!scenePaused){pendingReturns++;Game.isPaused=true;}
+}
+Check(pendingReturns==1,"expired quest cannot accumulate return callbacks while remote remains busy");
+Game.isPaused=false;Check(!UiPauses(false)&&!Pauses(),"world can resume after mandatory pause closes");
+NetSession.Instance.Connection=null;
+foreach(bool hardPause in new[]{false,true}) {
+ Game.isPaused=hardPause;
+ Check(UiPauses(true)&&!UiPauses(false),"disconnected UI preserves vanilla result");
+}
+Game.isPaused=false;
 Console.WriteLine($"{passed} checks passed; simulated game/network boundary.");
