@@ -82,8 +82,8 @@ namespace ElinTogether.Models;
 [Union(703, typeof(InvPlaceAbilityDelta))]
 [Union(704, typeof(CodexRequestDelta))]
 [Union(705, typeof(CodexCountDelta))]
-[Union(706, typeof(ShopInvestmentDelta))]
-[Union(707, typeof(ShopInvestmentResultDelta))]
+[Union(706, typeof(InvestmentDelta))]
+[Union(707, typeof(InvestmentResultDelta))]
 [Union(708, typeof(OwnerProgressionCommitDelta))]
 // Quest
 [Union(800, typeof(QuestCreateDelta))]

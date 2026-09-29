@@ -1,4 +1,4 @@
-# Phase 2: shop investment
+# Investment transactions: shop and town
 
 Source checks: Elin 23.338.2 `DramaCustomSequence.Build`'s `_investShop` step,
 `DramaActor` choice callbacks, `DramaEventMethod`, `CalcMoney.InvestShop/Invest`,
@@ -51,8 +51,16 @@ is not reopened by a late receipt. Request/result state clears on session/load.
 The pending-award list is JSON in existing Card string storage; no separate save file.
 Transient UI/deduplication state resets on session/load; saved pending awards remain.
 
-Scope: shop investment only. Town investment (`_investZone`), stolen-goods sales,
-and karma handling remain separate phases. V14 required on both peers.
+Town investment (`_investZone`) reuses the same request, receipt, pricing context,
+UI interception and XP acknowledgement. The host validates town capability and
+absence of a guild at the location, checks the quoted development/price, adds
+paid currency to cumulative investment, rolls `5 + rnd(5)` development once,
+adds 2 influence and awards `100 + resulting development * 2` XP. Town investment
+does not upgrade the NPC or award Merchant contribution. World snapshots include
+development and cumulative investment; quick-invest uses the acknowledged state.
+The cumulative investment overflow display sentinel follows vanilla behavior.
+
+Stolen-goods sales and karma handling remain separate phases. V15 required on both peers.
 
 Run `dotnet run --project tests/ShopInvestment/ShopInvestment.csproj` with the
 pinned .NET 11 SDK. Production request/result, dialogue patch, progression acknowledgement, element
@@ -79,6 +87,8 @@ Two-player acceptance:
    Disconnect just after acceptance to exercise pending-award recovery, then repeat
    after acknowledgement and verify that no additional XP is granted.
 
-Host session log contains `Shop investment` with request ID, peer, shop UID,
+Host session log contains `Investment` with request ID, peer, shop UID,
 accepted status, calculated price and resulting level. Runtime acceptance remains
 required before calling this phase multiplayer-tested.
+
+Town acceptance: repeat normal/quick/cancel/stale/insufficient/reconnect cases at a town representative. Verify development rises by 5–9 once, influence by 2, cumulative investment by the quoted payment, and no Merchant contribution is awarded. Host town investment must also reach client snapshots.

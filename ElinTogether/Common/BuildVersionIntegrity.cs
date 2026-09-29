@@ -33,9 +33,11 @@ public class BuildVersionIntegrity : EClass
         V13 = 13,
         // Host-validated shop investment and synchronized shop/zone results.
         V14 = 14,
+        // Shared town investment transaction and authoritative town development.
+        V15 = 15,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V14;
+    public const APIVersion APIVersionLatest = APIVersion.V15;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

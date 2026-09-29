@@ -5,11 +5,12 @@ public class Sources { public SourceTable elements = new(); }
 public class EClass {
     public static Core core = new(); public static Sources sources = new();
     public static Game game = new(); public static Zone _zone = new();
+    public static int RandomCalls; public static int rnd(int max) { RandomCalls++; return 2; }
     public static Chara pc => game.player.chara;
 }
 public class Game { public Player player = new(); }
 public class Player { public Chara chara = new(); }
-public class Zone { public int uid = 7, influence; public void ModInfluence(int a) => influence += a; }
+public class Zone { public bool AllowInvest = true; public int uid = 7, influence, development, investment; public void ModDevelopment(int a) => development += a; public void ModInfluence(int a) => influence += a; }
 public class Card { public int uid; }
 public class Element {
     public int id, vBase = 1, vExp, vPotential = 100, vTempPotential, vSource, vLink;
@@ -44,13 +45,15 @@ public class Chara : Card {
         LV++; exp += 4; feat++;
     }
 }
-public class Trait { public bool CanInvest = true; }
+public class Trait { public bool CanInvest = true, CanInvestTown = true; }
 public class Guild {
+    public static Guild? Current; public static Guild? GetCurrentGuild() => Current;
     public static Guild Merchant = new(); public int Exp;
     public void AddContribution(int a) => Exp += a;
 }
 public static class CalcMoney {
     public static bool Throw;
+    public static int InvestZone(Chara ignored) => 500 + EClass._zone.development * 50 - EClass.pc.Discount;
     public static int InvestShop(Chara ignored, Chara shop) {
         if (Throw) throw new InvalidOperationException("price error");
         return 200 + shop.c_invest * 700 - EClass.pc.Discount;
@@ -88,8 +91,8 @@ namespace ElinTogether.Net {
     public class ElinNetBase { public ElinDeltaManager Delta = new(); public bool IsHost => this is ElinNetHost; public void ReportDesync(string s) => throw new Exception(s); }
     public class ElinNetHost : ElinNetBase {
         public Dictionary<int, Chara> ActiveRemoteCharas = [];
-        public List<ShopInvestmentResultDelta> Replies = [];
-        public bool SendDeltaTo(int peer, ElinDelta d) { Replies.Add((ShopInvestmentResultDelta)d); return true; }
+        public List<InvestmentResultDelta> Replies = [];
+        public bool SendDeltaTo(int peer, ElinDelta d) { Replies.Add((InvestmentResultDelta)d); return true; }
     }
     public class ElinNetClient : ElinNetBase { }
     public class NetSession { public static NetSession Instance = new(); public ElinNetBase? Connection; }
