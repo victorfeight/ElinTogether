@@ -136,6 +136,9 @@ internal static class CharaProgressCompleteEvent
             return;
         }
 
+        EmpLog.Debug("Build request queued: owner {OwnerUid}, held {HeldUid}, parent {ParentUid}, pos {@Pos}",
+            taskBuild.owner.uid, taskBuild.held.uid, (taskBuild.held.parent as Card)?.uid,
+            taskBuild.pos);
         NetSession.Instance.Connection!.Delta.AddRemote(new CharaBuildDelta {
             Held = taskBuild.held,
             Owner = taskBuild.owner,

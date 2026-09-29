@@ -27,3 +27,20 @@ internal static class InvSortEvent
         QueuedSources = __state;
     }
 }
+
+// A previous right-click can leave this latch set until the next dirty redraw.
+// Vanilla then sorts despite Shift being held, rebinding the clicked button before
+// its queued OnClick runs. Preserve vanilla's normal sort-on-Shift-release path.
+[HarmonyPatch(typeof(UIInventory), nameof(UIInventory.CheckDirty))]
+internal static class InvQuickTransferSortGuard
+{
+    [HarmonyPrefix]
+    internal static void Before(ref bool ___firstMouseRightDown)
+    {
+        if (NetSession.Instance.Connection is not null && UnityEngine.Input.GetMouseButton(0) &&
+            (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) ||
+             UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift))) {
+            ___firstMouseRightDown = false;
+        }
+    }
+}

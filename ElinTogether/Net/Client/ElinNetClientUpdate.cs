@@ -1,3 +1,4 @@
+using System.Linq;
 using ElinTogether.Models;
 using ElinTogether.Patches;
 
@@ -26,9 +27,13 @@ internal partial class ElinNetClient
             return;
         }
 
-        Host.Send(new WorldStateDeltaList {
+        var sent = Host.Send(new WorldStateDeltaList {
             DeltaList = deltaList,
         });
+        if (deltaList.Any(d => d is CharaBuildDelta or CardAddThingDelta or ThingRequest)) {
+            EmpLog.Debug("Client item/build batch sent: success {Sent}, types {Types}",
+                sent, string.Join(",", deltaList.Select(d => d.GetType().Name)));
+        }
     }
 
     /// <summary>
@@ -98,29 +103,6 @@ internal partial class ElinNetClient
     }
 
 #region Scheduler Jobs
-
-    /// <summary>
-    ///     Subscribe all scheduler jobs and reset pause state
-    /// </summary>
-    public void StartWorldStateUpdate()
-    {
-        // 50hz delta dispatch
-        Scheduler.Subscribe(SynchronizationContext.AllowDeltaSending, 50f);
-
-        _pauseUpdate = false;
-    }
-
-    /// <summary>
-    ///     Unsubscribe all scheduler jobs and reset pause state
-    /// </summary>
-    public void StopWorldStateUpdate()
-    {
-        Scheduler.Unsubscribe(SynchronizationContext.AllowDeltaSending);
-
-        _pauseUpdate = false;
-
-        EmpLog.Debug("Stopping client state update");
-    }
 
     /// <summary>
     ///     Pause sending out deltas, *but they still accumulate*

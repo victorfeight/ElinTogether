@@ -50,7 +50,10 @@ public class CharaBuildDelta : ElinDelta
 
     private void ApplyBuild(ElinNetBase net, ref bool applied)
     {
+        EmpLog.Debug("Build request applying: host {Host}, peer {Peer}, owner {OwnerUid}, held {HeldUid}, pos {@Pos}",
+            net.IsHost, OriginPeer, Owner.Uid, Held.Uid, Pos);
         if (Owner.Find() is not Chara chara || Held.Find() is not { } held) {
+            EmpLog.Warning("Build request unresolved: owner {OwnerUid}, held {HeldUid}", Owner.Uid, Held.Uid);
             return;
         }
 
@@ -84,6 +87,9 @@ public class CharaBuildDelta : ElinDelta
 
         taskBuild.recipe._dir = Dir;
         taskBuild.OnProgressComplete();
+        EmpLog.Debug("Build request completed: owner {OwnerUid}, held {HeldUid}, target {TargetUid}, held root {RootUid}, distance {Distance}",
+            chara.uid, held.uid, taskBuild.target?.uid, held.GetRootCard()?.uid,
+            taskBuild.pos.Distance(chara.pos));
         applied = true;
 
         if (net.IsHost) {

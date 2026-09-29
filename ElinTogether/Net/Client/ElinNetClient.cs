@@ -109,7 +109,9 @@ internal partial class ElinNetClient : ElinNetBase
 
         EmpPop.Information("emp_connecting_host".lang(), Host);
 
-        this.StartDeferredCoroutine(StartWorldStateUpdate, () => core.IsGameStarted);
+        // Own this wait on the connection. The game helper shares a static coroutine
+        // handle which remains stale if a disconnect stops its owning coroutine.
+        StartCoroutine(StartWorldStateUpdateWhenReady());
 
 #if DEBUG
         if (!IsDebugGuiActive) {
