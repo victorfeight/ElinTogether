@@ -46,9 +46,13 @@ public class CardDamageHpDelta : ElinDelta
             return;
         }
 
-        using (Simulate(net.IsHost)) {
-            card.Stub_DamageHP(Dmg, Ele, EleP, AttackSource, Origin, ShowEffect, Weapon, OriginalTarget, ResistPenetrationLevel);
-        }
+        var previousReplay = FighterBountyReplayPatch.ReplayingClientDamage;
+        try {
+            FighterBountyReplayPatch.ReplayingClientDamage = previousReplay || !net.IsHost;
+            using (Simulate(net.IsHost)) {
+                card.Stub_DamageHP(Dmg, Ele, EleP, AttackSource, Origin, ShowEffect, Weapon, OriginalTarget, ResistPenetrationLevel);
+            }
+        } finally { FighterBountyReplayPatch.ReplayingClientDamage = previousReplay; }
 
         if (!net.IsHost && HpAfter is { } hpAfter && card is not Chara { isDead: true }) {
             card.hp = hpAfter;

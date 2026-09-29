@@ -8,6 +8,8 @@ namespace ElinTogether.Patches;
 [HarmonyPatch]
 internal static class PersonalMsgSayPatch
 {
+    internal static Chara? BountyReceiver { get; set; }
+
     internal static Chara? CodexCollector { get; set; }
 
     internal static ScopeExit ForCollector(Chara collector)
@@ -79,6 +81,7 @@ internal static class PersonalMsgSayPatch
         }
 
         var peerIndex = idLang switch {
+            "bounty" when BountyReceiver is { } bountyReceiver => PeerFor(host, bountyReceiver),
             "wish" when WishInteraction.Receiver is { } receiver => PeerFor(host, receiver),
             "crafted" when RemoteCraft.ProductReceiver is { } receiver =>
                 PeerFor(host, receiver),

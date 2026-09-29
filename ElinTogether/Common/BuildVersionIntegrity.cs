@@ -37,9 +37,11 @@ public class BuildVersionIntegrity : EClass
         V15 = 15,
         // Host-owned shop transfers and per-player trade settlement.
         V16 = 16,
+        // Personal fighter bounties with host-only eligibility during damage replay.
+        V17 = 17,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V16;
+    public const APIVersion APIVersionLatest = APIVersion.V17;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 
