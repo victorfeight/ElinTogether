@@ -14,6 +14,8 @@ internal static class InvTransactionEvent
             return true;
         }
 
+        if (ShopTrade.Submit(__instance, startTransaction)) return false;
+
         // ability fake card
         if (__instance.thing.trait is TraitAbility) {
             return true;

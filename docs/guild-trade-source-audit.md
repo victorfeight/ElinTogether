@@ -1,12 +1,14 @@
 # Guild trade phase: source boundary and remaining implementation
 
-Status: investigation only; no sales or karma bridge installed by this phase.
+Status: normal shop trade implementation completed in source; staged, not installed.
+See `tests/ShopTrade/README.md` for coverage, boundaries and live acceptance.
+The flow below records the pre-fix RCA and the source requirements.
 Source: local Elin 23.338.2 decompilation. Shop and town investment use the
-separate validated Investment command; trading still follows the older path.
+separate validated Investment command; normal shop trading now has its own host command; service/copy and home-resource windows remain outside this phase.
 
 ## Existing flow
 
-- `LayerInventory.Shop` constructs an `InvOwnerShop`, assigns the singleton
+- `LayerInventory.CreateBuy` constructs an `InvOwnerShop`, assigns the singleton
   `ShopTransaction.current`, and registers `OnEndTransaction` on inventory close.
 - `InvTransactionEvent` requests a host item through `ThingRequest`; the reply
   runs the original client transaction under `IsReplayingIntent`.

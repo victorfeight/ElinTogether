@@ -53,6 +53,7 @@ public class WorldStateSnapshot : EClass
 
     public static WorldStateSnapshot Create()
     {
+        ShopTrade.ApplyPendingFlags();
         CachedRemoteSnapshots.Add(CharaStateSnapshot.CreateSelf());
 
         var selfState = NetSession.Instance.Self;

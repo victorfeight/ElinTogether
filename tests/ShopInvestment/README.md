@@ -60,7 +60,9 @@ does not upgrade the NPC or award Merchant contribution. World snapshots include
 development and cumulative investment; quick-invest uses the acknowledged state.
 The cumulative investment overflow display sentinel follows vanilla behavior.
 
-Stolen-goods sales and karma handling remain separate phases. V15 required on both peers.
+Normal stolen-goods sales now have a separate host-ledger implementation; see
+`tests/ShopTrade`. Karma handling remains a separate phase. Town investment
+introduced V15; the combined trade build requires V16 on both peers.
 
 Run `dotnet run --project tests/ShopInvestment/ShopInvestment.csproj` with the
 pinned .NET 11 SDK. Production request/result, dialogue patch, progression acknowledgement, element

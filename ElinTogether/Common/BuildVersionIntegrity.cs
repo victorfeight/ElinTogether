@@ -35,9 +35,11 @@ public class BuildVersionIntegrity : EClass
         V14 = 14,
         // Shared town investment transaction and authoritative town development.
         V15 = 15,
+        // Host-owned shop transfers and per-player trade settlement.
+        V16 = 16,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V15;
+    public const APIVersion APIVersionLatest = APIVersion.V16;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

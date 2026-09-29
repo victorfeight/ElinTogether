@@ -40,11 +40,11 @@ consumed from the requesting character, not the host's inventory.
 
 This is the shared-state and guild-dialogue foundation, not a complete rewrite of
 every transaction awarding guild contribution. Host contribution changes sync.
-Client stolen-goods sales (`ShopTransaction.OnEndTransaction`) still lack host
-transaction requests. Locally awarded contribution there is not guaranteed to
-reach the host and is replaced by its next current guild snapshot. Do those sales
-on the host until their payment/item changes and guild credit commit together.
-Shop investment now has its own host transaction; see `tests/ShopInvestment`.
+Normal shop sales and buybacks now have a per-player host transaction ledger;
+see `tests/ShopTrade`. Shop/town investment shares a validated command and owner
+XP acknowledgement; see `tests/ShopInvestment`. Copy/service windows and home-
+resource transactions retain their existing paths, and karma attribution remains
+separate work.
 Do not add a generic client-supplied contribution amount: it would allow duplicate
 credits and separate credit from the transaction that earned it.
 

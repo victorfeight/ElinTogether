@@ -59,6 +59,7 @@ internal partial class ElinNetHost
             peer.Send(new SessionNewPlayerRequest());
         } else {
             // remote character exists
+            ShopTrade.Release(chara);
             SendSaveProbe(chara, peer);
         }
     }
@@ -215,6 +216,7 @@ internal partial class ElinNetHost
             .Where(c => c.GetBool("remote_chara"));
 
         foreach (var chara in currentRemoteCharas.Except(excluded)) {
+            if (Session.Connection is not ElinNetClient) ShopTrade.Release(chara);
             RemoveRemoteChara(chara);
         }
 

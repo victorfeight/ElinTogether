@@ -10,7 +10,7 @@ namespace ElinTogether.Models;
 public class ThingRequest : ElinDelta
 {
     private static readonly Dictionary<int, (Action<Thing>, Action?)> _callbackList = [];
-    private static readonly Dictionary<int, (WeakReference<Thing> thing, Card? origin, DateTime since)> _dangling = [];
+    private static readonly Dictionary<int, (WeakReference<Thing> thing, Card? origin, DateTime since, int peer)> _dangling = [];
     private static readonly TimeSpan _danglingTimeout = TimeSpan.FromSeconds(10);
 
     private static int _nextId;
@@ -62,7 +62,7 @@ public class ThingRequest : ElinDelta
         var result = thing.Split(Num);
         result.parent?.RemoveCard(result);
         CardCache.KeepAlive(result);
-        RecordDangling(result, origin);
+        RecordDangling(result, origin, OriginPeer);
 
         Thing = result;
         Respond(net, result);
@@ -111,10 +111,14 @@ public class ThingRequest : ElinDelta
         _nextId = 0;
     }
 
-    private static void RecordDangling(Thing result, Card? origin)
+    private static void RecordDangling(Thing result, Card? origin, int peer)
     {
-        _dangling[result.uid] = (new(result), origin, DateTime.Now);
+        _dangling[result.uid] = (new(result), origin, DateTime.Now, peer);
     }
+
+    internal static Card? GetDanglingOrigin(Thing thing, int peer) =>
+        _dangling.TryGetValue(thing.uid, out var entry) && entry.peer == peer &&
+        entry.thing.TryGetTarget(out var held) && held == thing ? entry.origin : null;
 
     internal static void InvalidateDangling()
     {

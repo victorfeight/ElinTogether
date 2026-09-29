@@ -53,6 +53,10 @@ public class NetSession : EClass
         ElinTogether.Models.WishInteraction.Clear();
         ElinTogether.Models.GuildStateSnapshot.Reset();
         ElinTogether.Models.Investment.Reset();
+        if (Connection is ElinNetHost tradeHost && core.IsGameStarted) {
+            foreach (var actor in tradeHost.ActiveRemoteCharas.Values) ElinTogether.Models.ShopTrade.Release(actor);
+        }
+        ElinTogether.Models.ShopTrade.Reset();
         if (Connection != null) {
             if (!Connection.IsHost && core.IsGameStarted) {
                 ui.hud?.SetDragImage(null);
