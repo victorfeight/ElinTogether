@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using ElinTogether.Models;
 using ElinTogether.Net;
 using HarmonyLib;
@@ -73,6 +74,11 @@ internal static class CardDamageHpEvent
                                     Chara originalTarget,
                                     int resistPenetrationLevel)
         {
+            // Harmony discovers this local function for the reverse snapshot.
+            // Do not depend on PatchAll registering FighterBountyPatch first.
+            static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions) =>
+                FighterBountyPatch.Transpile(instructions);
+            _ = (Func<IEnumerable<CodeInstruction>, IEnumerable<CodeInstruction>>)Transpiler;
             throw new NotImplementedException("Chara.DamageHP");
         }
     }

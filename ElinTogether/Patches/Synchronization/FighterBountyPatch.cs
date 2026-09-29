@@ -31,6 +31,11 @@ internal static class FighterBountyPatch
     internal static IEnumerable<CodeInstruction> Transpile(IEnumerable<CodeInstruction> instructions)
     {
         var code = instructions.ToList();
+        // The reverse snapshot may already contain this transpiler. Its local
+        // transpiler also runs when the snapshot was registered before this patch.
+        var routedSay = AccessTools.Method(typeof(FighterBountyPatch), nameof(Say));
+        var routedRecipient = AccessTools.Method(typeof(FighterBountyPatch), nameof(Recipient));
+        if (code.Count(c => c.Calls(routedSay)) == 1 && code.Count(c => c.Calls(routedRecipient)) == 1) return code;
         var say = AccessTools.Method(typeof(Msg), nameof(Msg.Say), [typeof(string), typeof(Card), typeof(string), typeof(string), typeof(string)]);
         var getPc = AccessTools.PropertyGetter(typeof(EClass), nameof(EClass.pc));
         var currency = AccessTools.Method(typeof(Card), nameof(Card.ModCurrency), [typeof(int), typeof(string)]);
@@ -49,10 +54,10 @@ internal static class FighterBountyPatch
         for (var i = 0; i < code.Count; i++) {
             if (i == message) {
                 result.Add(new CodeInstruction(OpCodes.Ldarg_S, (byte)5).MoveLabelsFrom(code[i]).MoveBlocksFrom(code[i]));
-                result.Add(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(FighterBountyPatch), nameof(Say))));
+                result.Add(new CodeInstruction(OpCodes.Call, routedSay));
             } else if (i == recipient) {
                 result.Add(new CodeInstruction(OpCodes.Ldarg_S, (byte)5).MoveLabelsFrom(code[i]).MoveBlocksFrom(code[i]));
-                result.Add(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(FighterBountyPatch), nameof(Recipient))));
+                result.Add(new CodeInstruction(OpCodes.Call, routedRecipient));
             } else result.Add(code[i]);
         }
         return result;

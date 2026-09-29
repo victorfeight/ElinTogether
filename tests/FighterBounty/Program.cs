@@ -34,6 +34,24 @@ NetSession.Instance.Connection=null;
 Check(FighterBountyPatch.Recipient(human)==human,"solo recipient unchanged");
 var mismatch=new List<CodeInstruction> {new(OpCodes.Ret)};
 Check(FighterBountyPatch.Transpile(mismatch).SequenceEqual(mismatch),"unrecognized IL preserved");
+// Exercise the production replay scope, including nesting and exceptional exit.
+var client=new ElinNetClient(); NetSession.Instance.Connection=client;
+var victim=new Chara {uid=9,hp=10};
+var damage=new CardDamageHpDelta {Owner=new RemoteCard(victim),Dmg=5,Ele=0,HpAfter=5};
+DamageReplayBoundary.Replay=()=> { bool allowed=true; Check(!FighterBountyReplayPatch.Before(ref allowed),"production client replay suppresses bounty"); };
+damage.Apply(client);
+Check(!FighterBountyReplayPatch.ReplayingClientDamage && victim.hp==5,"production replay restores scope and reconciles hp");
+DamageReplayBoundary.Replay=()=>throw new InvalidOperationException("replay failure");
+try {damage.Apply(client);} catch(InvalidOperationException) {}
+Check(!FighterBountyReplayPatch.ReplayingClientDamage,"production replay restores scope after exception");
+FighterBountyReplayPatch.ReplayingClientDamage=true;
+DamageReplayBoundary.Replay=()=>{}; damage.Apply(client);
+Check(FighterBountyReplayPatch.ReplayingClientDamage,"nested production replay preserves outer scope");
+FighterBountyReplayPatch.ReplayingClientDamage=false;
+NetSession.Instance.Connection=host;
+DamageReplayBoundary.Replay=()=> {bool allowed=true; Check(FighterBountyReplayPatch.Before(ref allowed),"production host execution retains bounty eligibility");};
+damage.Apply(host);
+DamageReplayBoundary.Replay=null;
 // Inspect and transform the REAL installed vanilla IL, without launching Unity.
 var game = @"C:\Program Files (x86)\Steam\steamapps\common\Elin";
 var repo = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
@@ -91,4 +109,16 @@ int Calls(List<CodeInstruction> list,string name)=>list.Count(i=>i.operand is Me
 Check(Calls(transformed,"get_pc")==Calls(original,"get_pc")-1,"all other pc references preserved");
 Check(Calls(transformed,"ModCurrency")==Calls(original,"ModCurrency"),"native currency mutations preserved");
 Check(Calls(transformed,"rndHalf")==Calls(original,"rndHalf"),"native bounty random rolls preserved");
+var repeated=((IEnumerable<CodeInstruction>)patch.GetMethod("Transpile",BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,new object[]{transformed})!).ToList();
+Check(repeated.SequenceEqual(transformed),"reverse snapshot with existing routing is not patched twice");
+var damagePatch=mod.GetType("ElinTogether.Patches.CardDamageHpEvent",true)!;
+var stub=damagePatch.GetMethod("Stub_DamageHP",BindingFlags.NonPublic|BindingFlags.Static)!;
+var findTranspiler=typeof(Harmony).Assembly.GetType("HarmonyLib.ReversePatcher",true)!.GetMethod("GetTranspiler",BindingFlags.NonPublic|BindingFlags.Static)!;
+var reverseTranspiler=(MethodInfo?)findTranspiler.Invoke(null,new object[]{stub});
+Check(reverseTranspiler!=null,"installed Harmony discovers compiled reverse snapshot transpiler");
+var reversed=((IEnumerable<CodeInstruction>)reverseTranspiler!.Invoke(null,new object[]{original})!).ToList();
+Check(reversed.Count(i=>i.operand is MethodInfo m && m.DeclaringType==patch && m.Name=="Recipient")==1,
+    "reverse snapshot routes bounty even before normal patch registration");
+var reverseAfter=((IEnumerable<CodeInstruction>)reverseTranspiler.Invoke(null,new object[]{transformed})!).ToList();
+Check(reverseAfter.SequenceEqual(transformed),"reverse snapshot preserves already patched routing");
 Console.WriteLine($"{checks} checks passed. Live two-player validation still required.");
