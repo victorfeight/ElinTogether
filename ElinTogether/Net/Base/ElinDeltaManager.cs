@@ -146,6 +146,7 @@ public class ElinDeltaManager
         _outBuffer.AddRange(_outBufferDeferred);
         _outBufferDeferred.Clear();
 
+        OwnerProgressionAwards.PrepareOutgoing(batch, _outBuffer, _outBufferDeferred, _outBufferUnrefreshed);
         return ApplyOverride(batch);
     }
 

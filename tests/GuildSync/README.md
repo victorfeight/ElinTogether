@@ -40,11 +40,11 @@ consumed from the requesting character, not the host's inventory.
 
 This is the shared-state and guild-dialogue foundation, not a complete rewrite of
 every transaction awarding guild contribution. Host contribution changes sync.
-Client stolen-goods sales (`ShopTransaction.OnEndTransaction`) and shop investment
-(a local dialogue callback in `DramaCustomSequence`) still lack host transaction
-requests. Locally awarded contribution there is not guaranteed to reach the host
-and is replaced by its next current guild snapshot. Do those transactions on the host
-until their payment/item changes and guild credit can be committed together.
+Client stolen-goods sales (`ShopTransaction.OnEndTransaction`) still lack host
+transaction requests. Locally awarded contribution there is not guaranteed to
+reach the host and is replaced by its next current guild snapshot. Do those sales
+on the host until their payment/item changes and guild credit commit together.
+Shop investment now has its own host transaction; see `tests/ShopInvestment`.
 Do not add a generic client-supplied contribution amount: it would allow duplicate
 credits and separate credit from the transaction that earned it.
 

@@ -31,9 +31,11 @@ public class BuildVersionIntegrity : EClass
         V12 = 12,
         // Host-owned unlocked cassette collection in world snapshots.
         V13 = 13,
+        // Host-validated shop investment and synchronized shop/zone results.
+        V14 = 14,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V13;
+    public const APIVersion APIVersionLatest = APIVersion.V14;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

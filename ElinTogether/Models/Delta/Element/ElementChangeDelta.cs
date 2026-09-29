@@ -26,12 +26,22 @@ public class ElementChangeDelta : ElinDelta
             net.Delta.AddRemote(this);
         }
 
+        Write(chara);
+        RefreshDerived(chara);
+    }
+
+    internal void Write(Chara chara)
+    {
         var ele = chara.elements.GetOrCreateElement(Element);
         ele.vBase = Value[0];
         ele.vExp = Value[1];
         ele.vPotential = Value[2];
         ele.vTempPotential = Value[3];
+    }
 
+    internal void RefreshDerived(Chara chara)
+    {
+        var ele = chara.elements.GetOrCreateElement(Element);
         ele.CheckLevelBonus(chara.elements);
         ele.OnChangeValue();
 

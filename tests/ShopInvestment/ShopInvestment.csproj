@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../ElinTogether/Models/Delta/Inv/ShopInvestmentDelta.cs" Link="ShopInvestmentDelta.cs" />
+    <Compile Include="../../ElinTogether/Patches/Synchronization/ShopInvestmentDialoguePatch.cs" Link="ShopInvestmentDialoguePatch.cs" />
+    <Compile Include="../../ElinTogether/Models/Delta/Element/OwnerProgressionCommitDelta.cs" Link="OwnerProgressionCommitDelta.cs" />
+    <Compile Include="../../ElinTogether/Models/Delta/Element/ElementChangeDelta.cs" Link="ElementChangeDelta.cs" />
+    <Compile Include="../../ElinTogether/Net/Base/ElinDeltaManager.cs" Link="ElinDeltaManager.cs" />
+    <Reference Include="Newtonsoft.Json"><HintPath>$(MSBuildToolsPath)\Newtonsoft.Json.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

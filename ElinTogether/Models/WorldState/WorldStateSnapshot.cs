@@ -39,6 +39,10 @@ public class WorldStateSnapshot : EClass
     [Key(7)]
     public int[]? KnownBGMs { get; init; }
 
+    [Key(8)] public int ZoneUid { get; init; }
+    [Key(9)] public int ZoneInfluence { get; init; }
+    [Key(10)] public OwnerProgressionAward[]? ProgressionAwards { get; init; }
+
     [ElinPreLoad]
     private static void ClearSweepStrikes(GameIOContext context)
     {
@@ -81,6 +85,9 @@ public class WorldStateSnapshot : EClass
             Weather = WeatherStateSnapshot.Create(),
             Guilds = GuildStateSnapshot.Capture(),
             KnownBGMs = MusicCollectionSync.Capture(),
+            ZoneUid = _zone.uid,
+            ZoneInfluence = _zone.influence,
+            ProgressionAwards = OwnerProgressionAwards.CapturePending(),
         };
     }
 
@@ -97,6 +104,8 @@ public class WorldStateSnapshot : EClass
                 Weather?.Apply();
                 Guilds?.Apply();
                 MusicCollectionSync.Apply(KnownBGMs);
+                OwnerProgressionAwards.Receive(ProgressionAwards);
+                if (_zone.uid == ZoneUid) _zone.influence = ZoneInfluence;
 
                 // 2
                 foreach (var snapshot in CharaSnapshots) {

@@ -40,6 +40,8 @@ public class CharaStateSnapshot : EClass
     [Key(9)]
     public required MinionType MinionType { get; init; }
 
+    [Key(10)] public int Investment { get; init; }
+
     public static CharaStateSnapshot Create(Chara chara)
     {
         return new() {
@@ -52,6 +54,7 @@ public class CharaStateSnapshot : EClass
             OriginalHostility = chara.c_originalHostility,
             UidMaster = chara.c_uidMaster,
             MinionType = chara.c_minionType,
+            Investment = chara.c_invest,
         };
     }
 
@@ -89,6 +92,7 @@ public class CharaStateSnapshot : EClass
         // this is received from host side
         if (remoteChara is null) {
             chara.hp = Hp;
+            if (!chara.IsPlayer) chara.c_invest = Investment;
         }
 
         if (chara.IsPC) {
