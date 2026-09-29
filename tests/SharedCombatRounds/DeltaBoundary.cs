@@ -24,3 +24,11 @@ namespace ElinTogether.Models {
  public class QuestCreateDelta { public static void ClearRecordedUids() {} }
  public class ProbeDelta(string label) : ElinDelta { public string Label => label; }
 }
+
+namespace ElinTogether.Models {
+ // Scheduler tests have no pending progression awards. The active-award send
+ // boundary is exercised against the production implementation in ShopInvestment.
+ internal static class OwnerProgressionAwards {
+  internal static void PrepareOutgoing(List<ElinDelta> batch, params List<ElinDelta>[] queued) { }
+ }
+}
