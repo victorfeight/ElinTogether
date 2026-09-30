@@ -8,14 +8,19 @@ internal class GameSaveLoad
 {
     [HarmonyPrefix]
     [HarmonyPatch(typeof(Game), nameof(Game.Save))]
-    internal static bool OnSaveRemoteGame(ref bool __result)
+    internal static bool OnSaveRemoteGame(bool isAutoSave, ref bool __result)
     {
+        if (isAutoSave && EClass.debug.ignoreAutoSave) return true;
+        if (NetSession.Instance.Connection is ElinNetHost host && !host.PreparePersonalProfilesForSave()) {
+            __result = false;
+            return false;
+        }
         if (NetSession.Instance.IsHost) {
             return true;
         }
 
+        __result = NetSession.Instance.Connection is ElinNetClient client && client.CheckpointPersonalProfile();
         EmpLog.Debug("Blocked saving game as client");
-        __result = true;
         return false;
     }
 

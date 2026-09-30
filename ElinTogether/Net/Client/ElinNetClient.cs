@@ -77,11 +77,15 @@ internal partial class ElinNetClient : ElinNetBase
         Router.RegisterHandler<SteamLobbyRequest>(OnSteamLobbyRequest);
         Router.RegisterHandler<SessionPlayersSnapshot>(OnSessionStatesUpdate);
         Router.RegisterHandler<NetSessionRules>(OnSessionRulesUpdate);
+        Router.RegisterHandler<PlayerProfileReceipt>(OnPlayerProfileReceipt);
+        Router.RegisterHandler<PlayerProfileRequest>(OnPlayerProfileRequest);
         Router.RegisterHandler<SessionReconnectRequest>(OnSessionReconnectRequest);
     }
 
     internal override void Stop()
     {
+        CheckpointPersonalProfile();
+        _profileChannel = null;
         base.Stop();
 
         if (!core.IsGameStarted) {

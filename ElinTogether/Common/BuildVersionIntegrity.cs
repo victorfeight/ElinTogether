@@ -45,9 +45,11 @@ public class BuildVersionIntegrity : EClass
         V19 = 19,
         // Resolved condition families including native serialized subclass state.
         V20 = 20,
+        // Personal player profiles with acknowledged, session-bound checkpoints.
+        V21 = 21,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V20;
+    public const APIVersion APIVersionLatest = APIVersion.V21;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

@@ -50,6 +50,7 @@ public class NetSession : EClass
 
     public void RemoveComponent()
     {
+        if (Connection is ElinNetClient profileClient) profileClient.CheckpointPersonalProfile();
         ElinTogether.Models.WishInteraction.Clear();
         ElinTogether.Models.GuildStateSnapshot.Reset();
         ElinTogether.Models.Investment.Reset();
@@ -89,6 +90,8 @@ public class NetSession : EClass
 
             Tick = 0;
             Self = null;
+            Player = null;
+            CurrentZone = null;
             CurrentPlayers.Clear();
             Lobby.LeaveLobby();
 

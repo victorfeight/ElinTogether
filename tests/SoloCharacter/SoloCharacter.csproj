@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../ElinTogether/Models/SoloPlayerProfile.cs" Link="SoloPlayerProfile.cs" />
+    <Compile Include="../../ElinTogether/Models/SessionState/PlayerProfileCheckpoint.cs" Link="PlayerProfileCheckpoint.cs" />
+    <Compile Include="../../ElinTogether/Models/SessionState/PlayerProfileSaveBarrier.cs" Link="PlayerProfileSaveBarrier.cs" />
+    <Compile Include="../../ElinTogether/Models/SessionState/PlayerProfileReplyWait.cs" Link="PlayerProfileReplyWait.cs" />
+    <Compile Include="../../ElinTogether/Net/Steam/SteamNetPacketInbox.cs" Link="SteamNetPacketInbox.cs" />
+    <Compile Include="../../ElinTogether/Models/SoloCharacterSelection.cs" Link="SoloCharacterSelection.cs" />
+    <Compile Include="../../ElinTogether/Models/PersonalFaith.cs" Link="PersonalFaith.cs" />
+    <Compile Include="../../ElinTogether/Models/Delta/Inv/InvPlaceAbilityDelta.cs" Link="InvPlaceAbilityDelta.cs" />
+    <Reference Include="Newtonsoft.Json"><HintPath>$(MSBuildToolsPath)/Newtonsoft.Json.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

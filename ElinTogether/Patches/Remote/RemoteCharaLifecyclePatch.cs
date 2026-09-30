@@ -25,7 +25,7 @@ internal static class RemoteCharaLifecyclePatch
         }
 
         foreach (var chara in EClass.game.cards.globalCharas.Values
-                     .Where(chara => chara.GetBool("remote_chara"))) {
+                     .Where(chara => !chara.IsPC && chara.GetBool("remote_chara"))) {
             ElinNetHost.DetachRemoteFromHomeBranch(chara);
         }
     }

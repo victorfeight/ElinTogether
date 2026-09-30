@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using ElinTogether.Models;
@@ -29,7 +30,7 @@ internal partial class ElinNetHost
 
     public static void RemoveRemoteChara(Chara remoteChara, bool broadcast = true)
     {
-        if (!core.IsGameStarted) {
+        if (!core.IsGameStarted || remoteChara.IsPC) {
             return;
         }
 
@@ -95,7 +96,9 @@ internal partial class ElinNetHost
         peer.Send(NetSession.Instance.Rules);
         PersonalKarma.BeginSession(chara);
         PersonalFaith.BeginSession(chara);
-        peer.Send(SaveDataProbe.Create(chara.uid));
+        var profileSession = Guid.NewGuid();
+        _profileChannels[peer.Id] = new PlayerProfileChannel(chara.uid, profileSession);
+        peer.Send(SaveDataProbe.Create(chara.uid, profileSession));
     }
 
     /// <summary>
@@ -150,6 +153,7 @@ internal partial class ElinNetHost
         }
 
         PersonalKarma.Initialize(chara, 30);
+        SoloPlayerProfile.Initialize(chara, legacy: false);
         SavedRemoteCharas[peer.User] = chara.uid;
 
         SendSaveProbe(chara, peer);
@@ -216,7 +220,7 @@ internal partial class ElinNetHost
             : [];
 
         var currentRemoteCharas = game.cards.globalCharas.Values
-            .Where(c => c.GetBool("remote_chara"));
+            .Where(c => !c.IsPC && c.GetBool("remote_chara"));
 
         foreach (var chara in currentRemoteCharas.Except(excluded)) {
             if (Session.Connection is not ElinNetClient) ShopTrade.Release(chara);

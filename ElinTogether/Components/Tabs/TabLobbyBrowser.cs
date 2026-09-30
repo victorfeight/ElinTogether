@@ -67,6 +67,7 @@ internal class TabLobbyBrowser : TabEmpBase
 
     private void DisconnectFromPanel()
     {
+        if (NetSession.Instance.Connection is ElinNetClient client && !client.CheckpointPersonalProfile()) return;
         var isClient = NetSession.Instance.Connection is ElinNetClient;
 
         NetSession.Instance.ResetSession();

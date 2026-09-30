@@ -27,12 +27,20 @@ public class InvPlaceAbilityDelta : ElinDelta
             return;
         }
 
+        StoreLayout(chara, Layout);
+
+        EmpLog.Debug("Stored ability layout of chara {OwnerUid}, {LayoutCount} entries",
+            chara.uid, Layout.Count);
+    }
+
+    internal static void StoreLayout(Chara chara, IEnumerable<AbilityTokenSlot> layout)
+    {
         var sb = new StringBuilder();
-        foreach (var slot in Layout) {
+        foreach (var slot in layout) {
             if (!sources.elements.alias.TryGetValue(slot.Alias, out var source) ||
                 !chara.HasElement(source.id)) {
-                EmpLog.Warning("Skipping layout entry from peer {PeerIndex}, chara {OwnerUid} has no element {ElementAlias}",
-                    OriginPeer, chara.uid, slot.Alias);
+                EmpLog.Warning("Skipping layout entry, chara {OwnerUid} has no element {ElementAlias}",
+                    chara.uid, slot.Alias);
                 continue;
             }
 
@@ -45,8 +53,25 @@ public class InvPlaceAbilityDelta : ElinDelta
 
         chara.SetStr(LayoutKey, sb.Length > 0 ? sb.ToString() : null);
 
-        EmpLog.Debug("Stored ability layout of chara {OwnerUid}, {LayoutCount} entries",
-            chara.uid, Layout.Count);
+    }
+
+    internal static void RestoreLayout(Chara chara)
+    {
+        foreach (var slot in Parse(chara.GetStr(LayoutKey))) {
+            if (!sources.elements.alias.TryGetValue(slot.Alias, out var source) || !chara.HasElement(source.id)) continue;
+            // A solo save may already contain these tokens. Reusing the same
+            // restore path must not add another copy on every load or switch.
+            if (chara.things.Any(t => t is { trait: TraitAbility, isDestroyed: false } &&
+                t.c_idAbility == slot.Alias && t.invX == slot.InvX && t.invY == slot.InvY)) continue;
+            CardBlueprint.SetNormalRarity();
+            var ability = ThingGen.Create("ability");
+            CardCache.UndoDestroy(ability);
+            ability.c_idAbility = slot.Alias;
+            chara.AddThing(ability, false, slot.InvX, slot.InvY);
+            ability.invX = slot.InvX;
+            ability.invY = slot.InvY;
+        }
+        WidgetCurrentTool.dirty = true;
     }
 
     internal static void InvalidateFakeAbilityCard(Chara chara)

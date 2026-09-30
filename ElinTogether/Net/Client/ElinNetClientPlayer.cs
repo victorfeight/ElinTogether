@@ -64,6 +64,21 @@ internal partial class ElinNetClient
 
         var probeGame = probe.MakeGameSave();
 
+        // Validate the saved profile before replacing the running world. A bad
+        // profile must not silently reset personal progression.
+        try {
+            var profileActor = probeGame.cards.globalCharas.Find(probe.RemoteCharaUid)
+                ?? throw new InvalidOperationException("Save probe is missing the assigned player.");
+            _ = SoloPlayerProfile.Prepare(profileActor);
+            if (probe.ProfileSession == Guid.Empty)
+                throw new InvalidOperationException("Save probe is missing its personal profile session.");
+        } catch (Exception ex) {
+            EmpLog.Warning(ex, "Cannot join with an invalid personal player profile");
+            Socket.Disconnect(Host, "Personal player profile could not be loaded. Check the session log; the saved profile was not reset.");
+            return;
+        }
+        _profileChannel = null;
+
         core.game = probeGame;
         Game.id = "world_emp";
 
@@ -71,6 +86,7 @@ internal partial class ElinNetClient
 
         player.uidChara = remoteChara.uid;
         player.chara = remoteChara;
+        SoloPlayerProfile.RestoreFor(remoteChara, player);
         PersonalKarma.Join(remoteChara);
 
         probeGame.isCloud = false;
@@ -95,17 +111,7 @@ internal partial class ElinNetClient
                 }
             }
 
-            foreach (var slot in InvPlaceAbilityDelta.Parse(remoteChara.GetStr(InvPlaceAbilityDelta.LayoutKey))) {
-                CardBlueprint.SetNormalRarity();
-                var ab = ThingGen.Create("ability");
-                CardCache.UndoDestroy(ab);
-                remoteChara.AddThing(ab, false, slot.InvX, slot.InvY);
-                ab.c_idAbility = slot.Alias;
-                ab.invX = slot.InvX;
-                ab.invY = slot.InvY;
-            }
-
-            WidgetCurrentTool.dirty = true;
+            InvPlaceAbilityDelta.RestoreLayout(remoteChara);
         } catch (Exception ex) {
             EmpLog.Warning(ex, "Failed to restore equipment or ability layout after save probe");
         }
@@ -122,6 +128,9 @@ internal partial class ElinNetClient
         EmpPop.Debug("emp_wait_zone".lang());
 
         probeGame.isLoading = false;
+        _profileChannel = new PlayerProfileChannel(remoteChara.uid, probe.ProfileSession);
+        if (SoloPlayerProfile.HasMissingHistory(remoteChara))
+            EmpPop.Information("Personal progress will now be saved for this character. Earlier personal history was not recorded and cannot be recovered; available character skills and equipment are retained.");
     }
 
     /// <summary>
@@ -146,6 +155,7 @@ internal partial class ElinNetClient
             request.LobbyId);
 
         // Disconnect triggers OnPeerDisconnected → RemoveComponent → LeaveLobby
+        if (!CheckpointPersonalProfile()) return;
         Socket.Disconnect(Host, EmpDisconnectInfo.JoinWhileConnected);
         CoroutineHelper.Deferred(() => Session.Lobby.ConnectLobby(request.LobbyId));
     }
@@ -162,6 +172,7 @@ internal partial class ElinNetClient
             lobby);
 
         // Disconnect triggers OnPeerDisconnected → RemoveComponent → LeaveLobby
+        if (!CheckpointPersonalProfile()) return;
         Socket.Disconnect(Host, EmpDisconnectInfo.HostReconnectRequest);
         CoroutineHelper.Deferred(() => Session.Lobby.ConnectLobby(lobby));
     }

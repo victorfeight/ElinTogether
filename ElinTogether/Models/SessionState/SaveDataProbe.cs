@@ -1,3 +1,4 @@
+using System;
 using MessagePack;
 
 namespace ElinTogether.Models;
@@ -14,16 +15,19 @@ public class SaveDataProbe
     [Key(1)]
     public required int RemoteCharaUid { get; init; }
 
+    [Key(2)] public Guid ProfileSession { get; init; }
+
     public Game MakeGameSave()
     {
         return Game.Decompress<Game>();
     }
 
-    public static SaveDataProbe Create(int uid)
+    public static SaveDataProbe Create(int uid, Guid profileSession)
     {
         return new() {
             Game = LZ4Bytes.Create(EClass.game),
             RemoteCharaUid = uid,
+            ProfileSession = profileSession,
         };
     }
 }

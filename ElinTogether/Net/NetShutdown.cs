@@ -38,6 +38,7 @@ internal static class NetShutdown
 
     private static bool OnWantsToQuit()
     {
+        if (NetSession.Instance.Connection is ElinNetClient client && !client.CheckpointPersonalProfile()) return false;
         Shutdown();
         return true;
     }

@@ -47,7 +47,7 @@ internal static class PersonalFaith
 
     internal static void CaptureLocal()
     {
-        if (NetSession.Instance.Connection is not ElinNetHost || FaithTransactions.Actor is not null) return;
+        if (NetSession.Instance.Connection is ElinNetClient || FaithTransactions.Actor is not null) return;
         var state = Read(EClass.pc);
         Capture(EClass.pc, state);
         Save(EClass.pc, state);

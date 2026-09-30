@@ -19,6 +19,12 @@ internal partial class ElinNetHost : ElinNetBase
         Stop();
         StopWorldStateUpdate();
 
+        if (SoloCharacterSelection.IsSoloCharacter) {
+            EmpPop.Information("Return to the original host character in Saved characters before hosting multiplayer.");
+            Session.ResetSession();
+            return;
+        }
+
         if (!core.IsGameStarted || player?.chara?.homeBranch?.owner is null) {
             EmpLog.Warning("Cannot start server: game not started or no land claimed");
             EmpPop.Debug("emp_ui_unclaimed_zone".lang());
@@ -76,6 +82,7 @@ internal partial class ElinNetHost : ElinNetBase
         Router.RegisterHandler<WorldStateRequest>(OnWorldStateRequest);
         Router.RegisterHandler<WorldStateDeltaList>(OnWorldStateDeltaResponse);
         Router.RegisterHandler<CharaStateSnapshot>(OnClientRemoteCharaSnapshot);
+        Router.RegisterHandler<PlayerProfileCheckpoint>(OnPlayerProfileCheckpoint);
 
         // source validation
         Router.RegisterHandler<SourceValidationResponse>(OnSourceValidationResponse);
@@ -106,7 +113,7 @@ internal partial class ElinNetHost : ElinNetBase
 
         // remove all left over chara
         foreach (var chara in _map.charas.ToArray()) {
-            if (chara.GetBool("remote_chara") && !ActiveRemoteCharas.Values.Contains(chara)) {
+            if (!chara.IsPC && chara.GetBool("remote_chara") && !ActiveRemoteCharas.Values.Contains(chara)) {
                 RemoveRemoteChara(chara);
             }
         }
@@ -138,6 +145,7 @@ internal partial class ElinNetHost : ElinNetBase
         EmpPop.Information("emp_player_disconnected".lang(), peer, disconnectInfo);
 
         _handshakes.Remove(peer.Id);
+        _profileChannels.Remove(peer.Id);
         WishInteraction.ReleasePeer(peer.Id);
         PendingRebind.ReleasePeer(peer.Id);
 

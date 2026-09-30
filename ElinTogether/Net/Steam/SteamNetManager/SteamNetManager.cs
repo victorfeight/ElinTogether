@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using ElinTogether.Common;
+using ElinTogether.Models;
 using ElinTogether.Helper.Steam;
 using Steamworks;
 
@@ -15,6 +16,8 @@ public partial class SteamNetManager(ISteamNetSerializer? serializer = null) : I
     private readonly List<SteamNetPeer> _peers = [];
     private readonly ISteamNetSerializer _serializer = serializer ?? new SteamNetSerializer();
 
+    private readonly SteamNetPacketInbox _receivedPackets = new();
+    private bool _waitingForPackets;
     private bool _disposed;
     private HSteamListenSocket _listenSocket;
     private ISteamNetListener? _listener;
@@ -67,7 +70,7 @@ public partial class SteamNetManager(ISteamNetSerializer? serializer = null) : I
     /// <summary>
     ///     Poll batched events on all peers
     /// </summary>
-    public void Poll()
+    public void Poll(Func<object, bool>? accept = null)
     {
         if (_pollGroup == HSteamNetPollGroup.Invalid || NetShutdown.IsQuitting) {
             return;
@@ -95,13 +98,27 @@ public partial class SteamNetManager(ISteamNetSerializer? serializer = null) : I
                 }
 
                 var packet = _serializer.Deserialize(payload, type);
-                _listener?.OnMessageReceived(packet, peer);
+                _receivedPackets.Add(packet, peer);
 
                 peer.Stat.Received(msg.m_cbSize);
             } finally {
                 SteamNetworkingMessage_t.Release(_batchedMessages[i]);
             }
         }
+
+        // Release the entire native batch before invoking handlers. A save can
+        // receive its replies recursively without overwriting native pointers.
+        _receivedPackets.Dispatch((packet, peer) => _listener?.OnMessageReceived(packet, peer), accept);
+    }
+
+    // Only invoked by a synchronous save/disconnect exchange, never a scheduler.
+    internal bool WaitForPackets(Func<object, bool> accept, Func<bool> complete, Func<bool> valid)
+    {
+        if (_waitingForPackets) return false;
+        _waitingForPackets = true;
+        try {
+            return PlayerProfileReplyWait.Run(() => Poll(accept), complete, () => valid() && !NetShutdown.IsQuitting);
+        } finally { _waitingForPackets = false; }
     }
 
 #region Connection Management
@@ -111,6 +128,7 @@ public partial class SteamNetManager(ISteamNetSerializer? serializer = null) : I
     /// </summary>
     public void Stop()
     {
+        _receivedPackets.Clear();
         foreach (var peer in Peers) {
             Disconnect(peer, EmpDisconnectInfo.HostShutdown);
         }
@@ -125,6 +143,7 @@ public partial class SteamNetManager(ISteamNetSerializer? serializer = null) : I
         }
 
         _disposed = true;
+        _receivedPackets.Clear();
 
         SteamCallback<SteamNetConnectionStatusChangedCallback_t>.Remove(HandleStatusChange);
 
