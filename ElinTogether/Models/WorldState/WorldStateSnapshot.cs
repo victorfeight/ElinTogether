@@ -55,6 +55,9 @@ public class WorldStateSnapshot : EClass
 
     public static WorldStateSnapshot Create()
     {
+        if (NetSession.Instance.Connection is ElinNetHost faithHost) {
+            foreach (var actor in faithHost.ActiveRemoteCharas.Values) PersonalFaith.AdvanceActive(actor);
+        }
         ShopTrade.ApplyPendingFlags();
         CachedRemoteSnapshots.Add(CharaStateSnapshot.CreateSelf());
 

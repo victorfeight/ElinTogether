@@ -94,6 +94,7 @@ internal partial class ElinNetHost
 
         peer.Send(NetSession.Instance.Rules);
         PersonalKarma.BeginSession(chara);
+        PersonalFaith.BeginSession(chara);
         peer.Send(SaveDataProbe.Create(chara.uid));
     }
 

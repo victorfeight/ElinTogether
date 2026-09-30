@@ -79,6 +79,8 @@ namespace ElinTogether.Models;
 [Union(616, typeof(LocalKarmaOutcomeDelta))]
 [Union(617, typeof(TrapDiscoveryDelta))]
 [Union(618, typeof(MapRevealDelta))]
+[Union(619, typeof(FaithRequestDelta))]
+[Union(620, typeof(FaithResultDelta))]
 // Inv
 [Union(700, typeof(InvOwnerOnProcessDelta))]
 [Union(701, typeof(InvRerollDelta))]

@@ -20,7 +20,7 @@ internal static class CharaFaithEvent
             return;
         }
 
-        if (ElinDelta.IsRemoteStateLanding) {
+        if (connection.IsClient || FaithTransactions.Actor is not null || ElinDelta.IsRemoteStateLanding) {
             return;
         }
 

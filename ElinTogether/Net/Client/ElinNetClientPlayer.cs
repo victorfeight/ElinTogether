@@ -77,6 +77,7 @@ internal partial class ElinNetClient
         probeGame.isLoading = true;
         probeGame.OnGameInstantiated();
         probeGame.OnLoad();
+        PersonalFaith.RestoreJoinedPlayer();
 
         // ability fake card
         try {

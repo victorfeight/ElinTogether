@@ -1,4 +1,5 @@
 using System.Linq;
+using ElinTogether.Helper;
 using ElinTogether.Models;
 using ElinTogether.Net;
 using HarmonyLib;
@@ -30,6 +31,17 @@ internal static class PersonalMsgSayPatch
         Msg.SetColor();
         Msg.alwaysVisible = false;
         return false;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(Msg), nameof(Msg.SayRaw))]
+    internal static bool OnWorshipMessage(string text, ref string __result)
+    {
+        if (FaithTransactions.Actor is not { IsRemotePlayer: true } actor ||
+            NetSession.Instance.Connection is not ElinNetHost host) return true;
+        // Vanilla has already formatted the line in the requesting player's
+        // context. Reuse the ordinary personal-message delivery boundary.
+        return Route(host, PeerFor(host, actor), text, ref __result);
     }
 
     [HarmonyPrefix]

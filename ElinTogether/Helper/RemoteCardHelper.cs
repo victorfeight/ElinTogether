@@ -52,6 +52,5 @@ internal static class RemoteCardHelper
     {
         public WeakReference<Thing> RemoteMainHand { get; set; } = new(null!, false);
         public WeakReference<Thing> RemoteOffHand { get; set; } = new(null!, false);
-        public int LastPrayedDay { get; set; } = -1;
     }
 }

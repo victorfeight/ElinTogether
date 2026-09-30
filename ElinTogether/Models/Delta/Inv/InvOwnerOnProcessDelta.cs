@@ -128,22 +128,8 @@ public class InvOwnerOnProcessDelta : ElinDelta
                 };
                 break;
             case TraitAltar altar: {
-                if (thing.GetRootCard() is not Chara { IsRemotePlayer: true } offerer) {
-                    return;
-                }
-
-                if (net is ElinNetHost offerHost) {
-                    if (!offerHost.ActiveRemoteCharas.TryGetValue(OriginPeer, out var offerSender) ||
-                        offerSender != offerer) {
-                        EmpLog.Warning("Refusing offering of {Uid} from peer {PeerIndex}",
-                            thing.uid, OriginPeer);
-                        return;
-                    }
-
-                    offerHost.Delta.AddRemote(this);
-                }
-
-                altar.OnOffer(offerer, thing);
+                // Standard offerings use FaithRequestDelta. Never run the old
+                // random/consuming operation a second time from a generic replay.
                 return;
             }
             case TraitBank:

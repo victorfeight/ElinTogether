@@ -1,4 +1,5 @@
 using ElinTogether.Helper;
+using ElinTogether.Models;
 using ElinTogether.Net;
 using HarmonyLib;
 
@@ -8,37 +9,22 @@ namespace ElinTogether.Patches;
 internal static class ActPrayEvent
 {
     [HarmonyPrefix]
-    internal static bool OnTryPray(Chara c, ref bool __result)
+    internal static bool OnTryPray(Chara c, bool passive, ref bool __result, out ScopeExit? __state)
     {
-        if (NetSession.Instance.Connection is null || !c.IsRemotePlayer) {
+        __state = default;
+        if (NetSession.Instance.Connection is null || FaithTransactions.Actor == c) {
             return true;
         }
-
+        if (NetSession.Instance.IsClient) {
+            if (c.IsPC) FaithTransactions.Submit(FaithAction.Pray, passive: passive);
+            __result = true;
+            return false;
+        }
+        if (!c.IsRemotePlayer) { __state = FaithTransactions.BeginLocal(c); return true; }
         __result = true;
-
-        if (!c.HasCondition<ConWrath>() && c.things.Find<TraitPunishBall>() is { } ball) {
-            ball.Destroy();
-            c.PlaySound("pray");
-            c.PlayEffect("revive");
-            c.Say("piety2", c);
-            return false;
-        }
-
-        var today = EClass.world.date.GetRawDay();
-        var profile = c.NetProfile;
-        if (profile.LastPrayedDay == today) {
-            return false;
-        }
-        profile.LastPrayedDay = today;
-
-        c.Say("pray2", c, c.faith.Name);
-        c.PlaySound("pray");
-        c.PlayEffect("revive");
-        c.HealHP(999999L);
-        c.mana.Mod(999999);
-        c.Cure(CureType.Prayer, 999999);
-        c.RemoveCondition<ConDeathSentense>();
-
-        return false;
+        return false; // remote prayer must arrive through a validated request
     }
+
+    [HarmonyFinalizer]
+    internal static void AfterPrayer(ScopeExit? __state) => __state?.Dispose();
 }

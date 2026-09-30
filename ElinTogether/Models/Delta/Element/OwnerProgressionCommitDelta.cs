@@ -14,6 +14,8 @@ public sealed class OwnerProgressionAward
     [Key(1)] public int OwnerUid { get; set; }
     [Key(2)] public int Skill { get; set; }
     [Key(3)] public int Amount { get; set; }
+    [Key(4)] public bool Offering { get; set; }
+    [Key(5)] public bool Contraband { get; set; }
 }
 
 // Absolute client-owned progression, acknowledged together with the award IDs.
@@ -97,7 +99,10 @@ internal sealed class OwnerProgressionAwards : EClass
             ElementIds.UnionWith(pc.elements.dict.Keys);
             // This allows ordinary client progression hooks to run. The send
             // boundary below replaces their packets with one acknowledged state.
-            using (ElinDelta.Simulate()) pc.ModExp(award.Skill, award.Amount);
+            using (ElinDelta.Simulate()) {
+                if (award.Offering) FaithOfferingProgression.Apply(pc, award.Amount, award.Contraband);
+                else pc.ModExp(award.Skill, award.Amount);
+            }
             Uncommitted.Add(award.Id);
             client.Delta.AddRemoteImmediate(new OwnerProgressionCommitDelta { Owner = pc });
         }

@@ -24,24 +24,8 @@ public class CharaFaithDelta : ElinDelta
             return;
         }
 
-        if (chara.faith == religion) {
-            return;
-        }
-
-        if (net is ElinNetHost host) {
-            if (host.ActiveRemoteCharas.TryGetValue(OriginPeer, pc) != chara) {
-                EmpLog.Warning("Rejecting religion change of {Uid} from peer {PeerIndex}",
-                    chara.uid, OriginPeer);
-                return;
-            }
-
-            using var _ = Simulate();
-            religion.JoinFaith(chara);
-            net.Delta.AddRemote(this);
-            return;
-        }
-
-        // client sim
-        religion.JoinFaith(chara);
+        // Legacy choice packets only mirror the host's local conversion.
+        // Client conversion must execute the complete validated transaction.
+        if (!net.IsHost && chara.faith != religion) religion.JoinFaith(chara);
     }
 }
