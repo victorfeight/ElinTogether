@@ -32,6 +32,12 @@ internal partial class ElinNetHost : ElinNetBase
             return;
         }
 
+        if (SoloCompanions.PrepareHosting() is { } companionReason) {
+            EmpPop.Information(companionReason);
+            Session.ResetSession();
+            return;
+        }
+
         Session.Lobby.CreateLobby();
 
         try {

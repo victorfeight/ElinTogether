@@ -72,18 +72,23 @@ internal sealed class SoloCharacterSelection : EClass
         static JToken Parse(string? json) => string.IsNullOrEmpty(json) ? JValue.CreateNull() : JToken.Parse(json);
     }
 
-    internal static void Select(Chara target)
+    internal static void Backup(Chara target)
     {
-        var reason = CannotSelect(target);
-        if (reason is not null) throw new InvalidOperationException(reason);
-        _ = SoloPlayerProfile.Prepare(target);
-        var selection = new Selection(Game.id, game.isCloud, pc.uid, target.uid);
         if (!game.Save(silent: true)) throw new IOException("The world could not be saved. No character was switched.");
         Export(pc, target);
         var index = new GameIndex().Create(game);
         index.id = Game.id;
         index.cloud = game.isCloud;
         GameIO.MakeBackup(index);
+    }
+
+    internal static void Select(Chara target)
+    {
+        var reason = CannotSelect(target);
+        if (reason is not null) throw new InvalidOperationException(reason);
+        _ = SoloPlayerProfile.Prepare(target);
+        var selection = new Selection(Game.id, game.isCloud, pc.uid, target.uid);
+        Backup(target);
         _pending = selection;
         try {
             EmpLog.Information("Solo character selection requested: {PreviousUid} -> {TargetUid}", selection.From, selection.To);
@@ -145,6 +150,7 @@ internal sealed class SoloCharacterSelection : EClass
         previous.SetBool("remote_chara", true);
         target.SetBool(CINT.IsPC, true);
         target.SetBool("remote_chara", false);
+        target.SetBool(SoloCompanions.Key, false);
         player.uidChara = target.uid;
         player.chara = target;
         player.zone = target.currentZone;

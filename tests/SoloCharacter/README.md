@@ -111,3 +111,60 @@ Unity, Harmony patch ordering or native map activation.
     a successful save. Reconnect and retry normally.
 
 Production compilation and fixture tests are not an in-game acceptance result.
+
+## Offline human companions
+
+The same panel offers **Bring as companion** and **Dismiss companion** for a
+saved human. Recruiting first saves the world, exports the two humans and creates
+a native backup. It reuses the existing global character and item identities,
+adds them to the current party, places them beside the player and lets vanilla
+`ChooseNewGoal` select ally AI. The original account-to-character mapping stays intact.
+There is no companion copy, profile polling or custom combat controller.
+
+`emp_solo_companion` explicitly records this offline role. Dormant-human cleanup
+keeps that character only while offline and still in the active player's party.
+The usual home-branch detachment remains: saved humans do not become settlement
+workers. Vanilla party membership carries companions across zones. Selecting the
+companion as the player clears the role; the outgoing human is parked as before.
+Dismissal removes AI/map/party presence but keeps the global character and inventory.
+Dead companions can be dismissed; recruitment does not revive them.
+
+Before opening a multiplayer lobby, all solo companions are parked. Mounted,
+ridden or contained companions block startup until released; validation occurs
+before any companion is changed. Joining also clears the role before normal MP
+player setup, whose existing SetAI patch hands the character to GoalRemote.
+No offline-companion cleanup exemption exists on either multiplayer peer.
+
+Companions use normal NPC combat, consumption, death and progression rules, so
+their skill/item changes persist on the human character. Their stored Player
+profile, personal karma and god gift/prayer history are not overwritten from the
+active player. NPC piety uses vanilla's NPC formula while the character is an ally;
+NPC altar prayer (`AI_Pray.Pray`) awards magic XP, not the human prayer action.
+This does not add human worship-day progression or player-only counters while
+that human is AI-controlled, nor does it add shared-XP configuration.
+
+Source checks (local Elin 23.338.2): `Chara.MakeAlly/_MakeAlly` also changes home,
+faction and minion state, so existing same-faction humans need only Party.AddMemeber.
+`Chara.MoveZone` returns immediately when currentZone already matches: direct
+`Zone.AddCard` is necessary for parked humans absent from the active map.
+`Zone.AddCard` reparents and registers the actor; `Chara.ChooseNewGoal` selects
+GoalIdle for party members; `Chara.MoveZone` moves living party followers;
+`Zone.Activate` reconstructs saved global actors. MP handoff is checked against
+StartServer, SendSaveProbe, RemoveLeftOverCharas and CharaTaskRemoteEvent.
+
+Additional manual checks:
+
+1. Offline, recruit Dinbit. Verify one roster/map entry, following, combat and
+   unchanged equipment. Change zones, save/reload, and verify they remain present.
+2. Dismiss, then recruit again. Verify earned skills and equipment changes remain
+   and no second character or inventory appears.
+3. Switch into the companion and check player control. Recruit the original host
+   as the companion, then dismiss them and switch back.
+4. On the original host, recruit the client again and start MP. Verify the AI
+   disappears before invites; join from the other machine and verify human control
+   and the same inventory. Disconnect and confirm no autonomous human remains.
+5. Mount the companion and attempt hosting/dismissal. It should ask you to dismount
+   and retain both actors unchanged; retry after dismounting.
+
+The companion fixture exercises the production role service and save/selection
+paths; it does not execute Unity's map activation, native AI or Steam handoff.

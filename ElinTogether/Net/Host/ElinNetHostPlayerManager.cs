@@ -75,6 +75,7 @@ internal partial class ElinNetHost
 
         // register before any SetAI
         ActiveRemoteCharas[peer.Id] = chara;
+        chara.SetBool(SoloCompanions.Key, false);
 
         chara.MakeAlly();
         DetachRemoteFromHomeBranch(chara);
@@ -220,7 +221,7 @@ internal partial class ElinNetHost
             : [];
 
         var currentRemoteCharas = game.cards.globalCharas.Values
-            .Where(c => !c.IsPC && c.GetBool("remote_chara"));
+            .Where(c => !c.IsPC && c.GetBool("remote_chara") && !SoloCompanions.KeepOnOfflineLoad(c));
 
         foreach (var chara in currentRemoteCharas.Except(excluded)) {
             if (Session.Connection is not ElinNetClient) ShopTrade.Release(chara);

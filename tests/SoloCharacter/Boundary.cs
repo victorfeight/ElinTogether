@@ -42,13 +42,18 @@ public static class CardBlueprint{public static void SetNormalRarity(){}}
 public static class WidgetCurrentTool{public static bool dirty;}
 public static class ThingGen{public static int Next=1000;public static Thing Create(string id)=>new(){uid=Next++,id=id,Num=1,trait=new TraitAbility()};}
 public class Sources{public SourceElements elements=new();}public class SourceElements{public Dictionary<string,ElementSource> alias=[];}public class ElementSource{public int id;}
-public class Point{public int x,z;public void Set(Point p){x=p.x;z=p.z;}}
-public class Zone{public int uid;}
+public class Point{public int x,z;public void Set(Point p){x=p.x;z=p.z;}public Point GetNearestPoint(bool allowBlock,bool allowChara,bool allowInstalled,bool ignoreCenter)=>new(){x=x+1,z=z};}
+public class CardContainer{public virtual void RemoveCard(Chara c){c.parent=null;c.currentZone=null;}}
+public class Zone:CardContainer{public int uid;[JsonIgnore]public HashSet<Chara> Active=[];
+ public void AddCard(Chara c,Point p){c.parent?.RemoveCard(c);c.parent=this;c.currentZone=this;c.pos.Set(p);Active.Add(c);}
+ public override void RemoveCard(Chara c){Active.Remove(c);base.RemoveCard(c);}}
 public class ZoneTransition{public enum EnterState{Exact}public EnterState state;public int x,z;}
 public class Global{public ZoneTransition? transition;}
 public class Chara{
  public int uid,LV=10,c_daysWithGod;public string NameSimple="player",faction="home";public bool isDead,isSale,c_wasInPcParty;
  public Chara? host,ride,parasite;public Party? party;public Zone? homeZone,currentZone;
+ public CardContainer? parent;public Chara? enemy;public bool CompanionAI;
+ public void ChooseNewGoal()=>CompanionAI=true;public void SetNoGoal()=>CompanionAI=false;
  public Global global=new();public Point pos=new();public List<Thing> things=[];public Thing? equipment;public Religion faith=new();
  public Dictionary<string,string?> Strings=[];public Dictionary<string,int> Ints=[];
  [JsonIgnore]public bool IsPC=>EClass.pc==this;
