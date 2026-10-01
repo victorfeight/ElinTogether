@@ -10,6 +10,7 @@ internal static class MsgRelayContext
 {
     private static Mode _mode;
     private static int _peerIndex;
+    private static Card? _speaker;
 
     internal static bool IsRedirecting => _mode == Mode.Redirect;
 
@@ -28,6 +29,14 @@ internal static class MsgRelayContext
     internal static ScopeExit Suppress(bool active = true)
     {
         return active ? Enter(Mode.Suppress, 0) : new();
+    }
+
+    internal static ScopeExit IncludeSpeaker(Card? speaker)
+    {
+        if (!IsRedirecting) return new();
+        var previous = _speaker;
+        _speaker = speaker;
+        return new() { OnExit = () => _speaker = previous };
     }
 
     private static ScopeExit Enter(Mode mode, int peerIndex)
@@ -51,7 +60,7 @@ internal static class MsgRelayContext
         // recipient must still receive their own confirmation when off-screen.
         if (!__result && IsRedirecting && NetSession.Instance.Connection is ElinNetHost host &&
             host.ActiveRemoteCharas.TryGetValue(_peerIndex, out var receiver) &&
-            ReferenceEquals(__instance, receiver) && !receiver.isDead) __result = true;
+            (ReferenceEquals(__instance, receiver) || ReferenceEquals(__instance, _speaker)) && !receiver.isDead) __result = true;
     }
 
     [HarmonyPrefix]

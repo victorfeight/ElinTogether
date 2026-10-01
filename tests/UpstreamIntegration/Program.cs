@@ -98,5 +98,26 @@ EClass.pc=new Chara{isDead=true,conSleep=new()};EClass.player=new();wake.Apply(c
 Check(EClass.pc.Sleeps==0&&EClass.player.Dreams==0&&EClass.pc.conSleep.Kills==0,"dead client receives no sleep rewards");
 EClass.pc.isDead=false;wake.Apply(host);
 Check(EClass.pc.Sleeps==0&&EClass.player.Dreams==0,"host does not replay client sleep reward packet");
+NetSession.Instance.Connection=host;actor.isDead=false;
+var appliance=new Card();var applianceTrait=new Trait{owner=appliance};var beforeMessages=host.Messages.Count;
+using(MsgRelayContext.RedirectTo(2)) {
+ CardToggleEvent.OnToggle(applianceTrait,out var toggleState);
+ try {
+  bool visible=false;MsgRelayContext.ShowRecipientMessage(appliance,ref visible);
+  Check(visible,"scoped appliance can explain rejection while off the host screen");
+  string ignored="";Check(!MsgRelayContext.OnSayRaw("notEnoughElectricity",ref ignored)&&host.Messages.Count==beforeMessages+1,"failed toggle explanation reaches requester exactly once");
+  CardToggleEvent.OnToggleEnd(applianceTrait,false,toggleState);
+  CardToggleEffectMessageEvent.Before(out var effectScope);
+  try {Check(!MsgRelayContext.OnSayRaw("toggle_ele",ref ignored)&&host.Messages.Count==beforeMessages+1,"successful toggle presentation is suppressed only in effect scope");}
+  finally {CardToggleEffectMessageEvent.After(effectScope);}
+  Check(MsgRelayContext.IsRedirecting,"effect scope restores outer recipient");
+ } finally {CardToggleEvent.OnToggleCleanup(toggleState);}
+ bool outside=false;MsgRelayContext.ShowRecipientMessage(appliance,ref outside);
+ Check(!outside,"appliance visibility ends with its operation");
+}
+CardToggleEffectMessageEvent.Before(out var localEffect);
+try {string ignored="";Check(MsgRelayContext.OnSayRaw("host_toggle",ref ignored),"ordinary host toggle messages stay local");}finally {CardToggleEffectMessageEvent.After(localEffect);}
+Trace.Events.Clear();TaskBuild.Build=t=>CharaProgressCompleteEvent.BuildFailed=true;Packet().Apply(host);
+Check(host.Delta.Sent.Last() is AutoActStepDelta{Reply:true,Success:false},"caught nested build exception cannot become success acknowledgement");CharaProgressCompleteEvent.BuildFailed=false;TaskBuild.Build=null;
 Console.WriteLine($"{checks} checks passed");
 class Effect(string name,bool fail=false):ElinDelta {public string Name=name;protected override void OnApply(ElinNetBase n){Trace.Events.Add(Name);if(fail)throw new Exception("side effect failure");}}

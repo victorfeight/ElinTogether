@@ -51,9 +51,11 @@ public class BuildVersionIntegrity : EClass
         V22 = 22,
         // Bundled build results alongside AutoAct completion identifiers.
         V23 = 23,
+        // Failed progress results must never replay native completion.
+        V24 = 24,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V23;
+    public const APIVersion APIVersionLatest = APIVersion.V24;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

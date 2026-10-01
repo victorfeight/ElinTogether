@@ -10,5 +10,6 @@
 <Compile Include="../../ElinTogether/Models/Delta/Task/TaskMineArgs.cs" Link="TaskMineArgs.cs" />
 <Compile Include="../../ElinTogether/Patches/DeltaEvents/Chara/CharaProgressCompleteEvent.cs" Link="CharaProgressCompleteEvent.cs" />
 <Compile Include="../../ElinTogether/Models/Delta/DeltaReplay.cs" Link="DeltaReplay.cs" />
+<Compile Include="../../ElinTogether/Models/Pending/ProgressFailure.cs" Link="ProgressFailure.cs" />
 </ItemGroup>
 </Project>

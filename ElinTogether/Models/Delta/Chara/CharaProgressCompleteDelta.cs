@@ -20,6 +20,8 @@ public class CharaProgressCompleteDelta : ElinDelta
     [Key(2)]
     public required List<ElinDelta> DeltaList { get; init; }
 
+    [Key(3)] public bool Failed { get; init; }
+
     public static CharaProgressCompleteDelta? Current { get; private set; }
 
     // progress replay, client local sim
@@ -51,6 +53,8 @@ public class CharaProgressCompleteDelta : ElinDelta
                     ai = ai.parent;
                 }
 
+                if (ai is not null) autoAct = AutoActTaskBridge.FindController(chara, ai);
+                if (Failed) return; // Results and cancellation are handled in finally.
                 var progress = ai as DelegateProgress ?? ai?.child;
                 if (progress is null) {
                     EmpLog.Debug("Completed child {ActType} no longer running for {Uid}; applying {Count} results",
@@ -58,7 +62,6 @@ public class CharaProgressCompleteDelta : ElinDelta
                     return;
                 }
 
-                autoAct = AutoActTaskBridge.FindController(chara, ai!);
                 progress.OnProgressComplete();
                 progress.Success();
                 completed = true;
@@ -71,6 +74,8 @@ public class CharaProgressCompleteDelta : ElinDelta
                 var resultsApplied = DeltaReplay.ApplyResults(net, DeltaList, Owner.Uid);
                 if (autoAct is not null && (!completed || !resultsApplied)) {
                     AutoActTaskBridge.Stop(chara!, autoAct);
+                } else if (Failed && ai is not null && chara is not null && ReferenceEquals(chara.ai, root)) {
+                    ProgressFailure.StopTask(chara, ai);
                 }
             }
 

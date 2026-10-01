@@ -10,7 +10,7 @@ internal static class CardToggleEvent
     [HarmonyPrefix]
     internal static void OnToggle(Trait __instance, out (bool wasOn, ScopeExit r) __state)
     {
-        __state = (__instance.owner?.isOn ?? false, MsgRelayContext.Suppress(MsgRelayContext.IsRedirecting));
+        __state = (__instance.owner?.isOn ?? false, MsgRelayContext.IncludeSpeaker(__instance.owner));
     }
 
     [HarmonyPostfix]
@@ -48,4 +48,16 @@ internal static class CardToggleEvent
     {
         __state.r?.Dispose();
     }
+}
+// Failure checks in Toggle must keep their recipient routing. Only the successful
+// presentation is duplicated by the authoritative CardToggleDelta on receivers.
+[HarmonyPatch(typeof(Trait), nameof(Trait.PlayToggleEffect))]
+internal static class CardToggleEffectMessageEvent
+{
+    [HarmonyPrefix]
+    internal static void Before(out ScopeExit __state) =>
+        __state = MsgRelayContext.Suppress(MsgRelayContext.IsRedirecting);
+
+    [HarmonyFinalizer]
+    internal static void After(ScopeExit? __state) => __state?.Dispose();
 }

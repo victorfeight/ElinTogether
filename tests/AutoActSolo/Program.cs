@@ -92,13 +92,13 @@ Check(landed&&owner.ai is NoGoal,"late completion lands results without restarti
 NetSession.Instance.Connection=host;
 foreach(var human in new[]{false,true}) {
  var builder=new Chara{IsPC=human};var build=new TaskBuild{owner=builder};host.Delta.Items.Clear();
- CharaProgressCompleteEvent.OnProgressComplete(build);CharaProgressCompleteEvent.Pack(new Callback(()=>{}));CharaProgressCompleteEvent.OnProgressCompleteEnd(build);
+ CharaProgressCompleteEvent.OnProgressComplete(build,out var buildCapture);CharaProgressCompleteEvent.Pack(new Callback(()=>{}));CharaProgressCompleteEvent.OnProgressCompleteCleanup(null,buildCapture);
  Check(host.Delta.Items.Single() is CharaBuildDelta {Results.Count:1},"host "+(human?"player":"AI companion")+" publishes terrain build and captured results together");
 }
 var remoteBuild=new TaskBuild{owner=new Chara{IsRemotePlayer=true}};host.Delta.Items.Clear();
 var collected=new List<ElinDelta>();
 using(CharaProgressCompleteEvent.CollectBuildSideEffects(collected)) {
- CharaProgressCompleteEvent.OnProgressComplete(remoteBuild);CharaProgressCompleteEvent.Pack(new Callback(()=>{}));CharaProgressCompleteEvent.OnProgressCompleteEnd(remoteBuild);
+ CharaProgressCompleteEvent.OnProgressComplete(remoteBuild,out var remoteCapture);CharaProgressCompleteEvent.Pack(new Callback(()=>{}));CharaProgressCompleteEvent.OnProgressCompleteCleanup(null,remoteCapture);
 }
 Check(collected.Count==1&&host.Delta.Items.Count==0,"requested build collects results without publishing a duplicate build");
 NetSession.Instance.Connection=client;
@@ -132,5 +132,48 @@ new CharaProgressCompleteDelta{Owner=owner,CompletedActId=1,DeltaList=[new Callb
 results=0;var absent=new RemoteCard(owner){Missing=true};
 new CharaProgressCompleteDelta{Owner=absent,CompletedActId=1,DeltaList=[new Callback(()=>results++)]}.Apply(client);
 Check(results==1&&!CharaProgressCompleteDelta.IsReplaying,"missing owner still drains authoritative results and restores scope");
+// Host failure publishes state, never the native action or deferred pickup intent.
+NetSession.Instance.Connection=host;host.Delta.Items.Clear();owner.ai=task=new TaskHarvest{owner=owner};progress=Progress(task);
+var product=new Thing{uid=901};var alreadyMoved=new Thing{uid=902,parent=new Chara{uid=903}};
+var changes=new List<string>();
+CharaProgressCompleteEvent.OnProgressComplete(progress,out var failedCapture);
+CharaProgressCompleteEvent.Pack(new Callback(()=>changes.Add("committed")));
+CharaProgressCompleteEvent.Pack(new CharaPickThingDelta{Thing=product});
+CharaProgressCompleteEvent.Pack(new ZoneAddCardDelta{Card=alreadyMoved,Pos=new(7,7)});
+CharaProgressCompleteEvent.OnProgressCompleteCleanup(new Exception("after mutation"),failedCapture);
+var failure=(CharaProgressCompleteDelta)host.Delta.Items.Single();
+Check(failure.Failed&&task.Cancels==1&&!CharaProgressCompleteEvent.IsHappening,"host failure publishes explicit failure and stops attached task");
+Check(failure.DeltaList.All(d=>d is not CharaPickThingDelta and not ThingDelta)&&product.parent==EClass._zone,"deferred pickup becomes recoverable ground state, never an extra pickup");
+Check(failure.DeltaList.OfType<CardAddThingDelta>().Single().Parent.Uid==903&&!failure.DeltaList.OfType<ZoneAddCardDelta>().Any(d=>d.Card.Uid==902),"interrupted placement reconciles actual inventory parent instead of intended ground");
+NetSession.Instance.Connection=client;owner.IsPC=true;owner.ai=controller=new AutoActHarvestMine{owner=owner};task=Harvest();progress=Progress(task);var callbacks=0;progress.Complete=()=>callbacks++;
+failure.Apply(client);
+Check(callbacks==0&&changes.SequenceEqual(new[]{"committed"})&&controller.Cancels==1,"failure delivers committed results before stopping client without native replay");
+Check(owner.ai is NoGoal&&!CharaProgressCompleteDelta.IsReplaying,"failure exits controller and restores replay guard");
+var unrelated=new AutoActOther{owner=owner};owner.ai=unrelated;failure.Apply(client);
+Check(owner.ai==unrelated&&unrelated.Cancels==0,"late failure cannot cancel an unrelated replacement task");
+NetSession.Instance.Connection=host;host.Delta.Items.Clear();owner.ai=task=new TaskHarvest{owner=owner};progress=Progress(task);
+CharaProgressCompleteEvent.OnProgressComplete(progress,out var outerCapture);CharaProgressCompleteEvent.Pack(new Callback(()=>changes.Add("outer")));
+var nested=new AIProgress{owner=owner,parent=task};CharaProgressCompleteEvent.OnProgressComplete(nested,out var innerCapture);CharaProgressCompleteEvent.Pack(new Callback(()=>changes.Add("inner")));
+CharaProgressCompleteEvent.OnProgressCompleteCleanup(new Exception("nested failure caught by native caller"),innerCapture);
+Check(CharaProgressCompleteEvent.Action==progress&&host.Delta.Items.Count==0,"nested completion restores outer capture without early delivery");
+CharaProgressCompleteEvent.OnProgressCompleteCleanup(null,outerCapture);
+Check(host.Delta.Items.Single() is CharaProgressCompleteDelta{Failed:true,DeltaList.Count:2},"caught nested exception still produces one failure bundle with both scopes' results");
+var gone=new Thing{uid=904,isDestroyed=true};var reconciled=ProgressFailure.CaptureResults(owner,new TaskBuild{held=gone,target=gone},[]);
+Check(reconciled.Count==1&&reconciled[0] is CardModNumDelta{Num:0},"destroyed build item is reconciled once and never resurrected");
+NetSession.Instance.Connection=client;owner.ai=regular=new TaskHarvest{owner=owner};progress=Progress(regular);progress.Complete=()=>callbacks++;
+new CharaProgressCompleteDelta{Owner=owner,CompletedActId=1,Failed=true,DeltaList=[new Callback(()=>Check(regular.Cancels==0,"failed ordinary task receives results before cancellation"))]}.Apply(client);
+Check(regular.Cancels==1&&callbacks==0,"failed ordinary task is canceled without success or completion callback");
+NetSession.Instance.Connection=host;host.Delta.Items.Clear();var capturedBuild=new List<ElinDelta>();
+using(CharaProgressCompleteEvent.CollectBuildSideEffects(capturedBuild)) {
+ var failedBuild=new TaskBuild{owner=owner,held=null};CharaProgressCompleteEvent.OnProgressComplete(failedBuild,out var state);
+ CharaProgressCompleteEvent.Pack(new Callback(()=>{}));CharaProgressCompleteEvent.OnProgressCompleteCleanup(new Exception("build failure"),state);
+ Check(CharaProgressCompleteEvent.BuildFailed&&capturedBuild.Count==0&&host.Delta.Items.Single() is CharaProgressCompleteDelta{Failed:true},"build collector marks failure and sends results without successful build replay");
+}
+Check(!CharaProgressCompleteEvent.BuildFailed,"build failure scope restores previous state");
+owner.IsRemotePlayer=true;owner.IsPC=false;var heldTool=new Thing{uid=910,parent=owner};owner.held=heldTool;
+owner.ai=regular=new TaskHarvest{owner=owner};regular.OnCancelTest=()=>Check(owner.held is null,"remote cancellation cannot run PickHeld on human's selected tool");
+ProgressFailure.StopTask(owner,regular);
+Check(owner.held==heldTool&&heldTool.GetRootCard()==owner,"remote failure cancellation preserves valid held selection without recreating renderer");
+owner.IsRemotePlayer=false;
 Console.WriteLine($"{passed} checks passed. Fake Unity/network boundary; live two-peer acceptance remains required.");
 class Callback(Action action):ElinDelta{protected override void OnApply(ElinNetBase net)=>action();}

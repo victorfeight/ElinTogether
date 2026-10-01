@@ -115,6 +115,7 @@ public class CharaBuildDelta : ElinDelta
             DeltaList = [];
             using (CharaProgressCompleteEvent.CollectBuildSideEffects(DeltaList)) {
                 taskBuild.OnProgressComplete();
+                if (CharaProgressCompleteEvent.BuildFailed) return;
             }
         } else {
             taskBuild.OnProgressComplete();

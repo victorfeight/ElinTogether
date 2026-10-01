@@ -5,10 +5,10 @@ public class EClass {public static Chara pc=new();public static Player player=ne
 public class SleepCondition {public int Kills;public void Kill()=>Kills++;}
 public class Player {public int Dreams;public void DreamSpell()=>Dreams++;}
 public class Zone { public int uid=1; }
-public class Card {public bool ShouldShowMsg=>true; public int LV,exp,feat;public void AddExp(){}public void LevelUp(){}public int uid,Num=1; public bool isDestroyed; public object? parent; public Trait trait=new(); public Card GetRootCard()=>parent is Card c?c.GetRootCard():this; }
+public class Card {public bool isOn;public bool ShouldShowMsg=>true; public int LV,exp,feat;public void AddExp(){}public void LevelUp(){}public int uid,Num=1; public bool isDestroyed; public object? parent; public Trait trait=new(); public Card GetRootCard()=>parent is Card c?c.GetRootCard():this; }
 public class Thing:Card {}
 public class Chara:Card {public bool isDead;public int Sleeps;public SleepCondition? conSleep;public void OnSleep(int power,int days,bool sun)=>Sleeps++; public bool IsPC,IsRemotePlayer; public Card? held; public Position pos=new(); public void HoldCard(Card c){Trace.Events.Add("hold");held=c;} }
-public class Trait { public Recipe GetRecipe()=>new(); }
+public class Trait {public Card? owner;public void Toggle(bool on,bool silent=false){}public void PlayToggleEffect(bool silent){} public Recipe GetRecipe()=>new(); }
 public class Recipe { public int _dir; }
 public class AIAct {}
 public class AI_Eat:AIAct { public Thing? target; public bool cook; }
@@ -19,7 +19,7 @@ public struct Color {public float r,g,b,a;}
 public static class Msg {public static Color currentColor;public static bool ignoreAll,alwaysVisible;public static void SetColor()=>currentColor=default;public static void SayRaw(){} }
 public static class EmpLog {public static void Debug(string s,params object?[] a){}public static void Warning(string s,params object?[] a){}public static void Error(Exception e,string s,params object?[] a){} }
 namespace MessagePack { public class MessagePackObjectAttribute:Attribute{}public class KeyAttribute(int key):Attribute{public int Key=key;} }
-namespace HarmonyLib { [AttributeUsage(AttributeTargets.All,AllowMultiple=true)] public class HarmonyPatch:Attribute{public HarmonyPatch(){}public HarmonyPatch(Type t,string n){}public HarmonyPatch(Type t,string n,MethodType m){}}public class HarmonyPrefix:Attribute{}public class HarmonyPostfix:Attribute{}public enum MethodType{Setter,Getter}public static class AccessTools {public static System.Reflection.MethodInfo PropertySetter(Type t,string n)=>typeof(object).GetMethod("ToString")!;} }
+namespace HarmonyLib { [AttributeUsage(AttributeTargets.All,AllowMultiple=true)] public class HarmonyPatch:Attribute{public HarmonyPatch(){}public HarmonyPatch(Type t,string n){}public HarmonyPatch(Type t,string n,MethodType m){}}public class HarmonyFinalizer:Attribute{}public class HarmonyPrefix:Attribute{}public class HarmonyPostfix:Attribute{}public enum MethodType{Setter,Getter}public static class AccessTools {public static System.Reflection.MethodInfo PropertySetter(Type t,string n)=>typeof(object).GetMethod("ToString")!;} }
 namespace ElinTogether.Helper {}
 namespace ElinTogether {
  public class ScopeExit:IDisposable {public Action? OnExit;public void Dispose()=>OnExit?.Invoke();}
@@ -46,12 +46,12 @@ namespace ElinTogether.Models {
  public class SaveDataProbe{}
  public abstract class TaskArgsBase {public abstract AIAct CreateSubAct();}
  public static class PendingUid {public static bool IsPending(int uid)=>uid<0;}
- public static class CardCache {public static Dictionary<int,Card> Cards=[];public static Card? Find(int id)=>Cards.GetValueOrDefault(id);public static void DelayDestroy(Card c)=>c.isDestroyed=true;public static bool ThrowRebind;public static void Rebind(Card c,int id){if(ThrowRebind)throw new Exception("rebind failure");c.uid=id;Trace.Events.Add("rebind");}}
+ public static class CardCache {public static bool Contains(Card c)=>true;public static Dictionary<int,Card> Cards=[];public static Card? Find(int id)=>Cards.GetValueOrDefault(id);public static void DelayDestroy(Card c)=>c.isDestroyed=true;public static bool ThrowRebind;public static void Rebind(Card c,int id){if(ThrowRebind)throw new Exception("rebind failure");c.uid=id;Trace.Events.Add("rebind");}}
 }
 namespace ElinTogether.Patches {
  public static class SleepSynchronizationContext {public static int Closed;public static void CloseSleepLayerIfOpen()=>Closed++;}
  public static class RemoteHeldItem {public static bool TrySelect(Chara c,Card item){c.held=item;Trace.Events.Add("select");return true;}}
- public static class CharaProgressCompleteEvent {public static List<ElinDelta>? Into;public static ScopeExit CollectBuildSideEffects(List<ElinDelta> list){Into=list;return new(){OnExit=()=>Into=null};}}
+ public static class CharaProgressCompleteEvent {public static bool BuildFailed;public static List<ElinDelta>? Into;public static ScopeExit CollectBuildSideEffects(List<ElinDelta> list){Into=list;return new(){OnExit=()=>Into=null};}}
  public static class AutoActTaskBridge {public static bool Active;public static object? FindController(Chara c,TaskBuild t)=>Active?new object():null;}
  public static class AutoActCustomActions {public static Guid BeginBuild(TaskBuild t)=>Guid.NewGuid();public static void Complete(Guid id,bool ok)=>Trace.Events.Add("ack:"+ok);}
 }
@@ -60,3 +60,5 @@ namespace ElinTogether.Models {
  public class CharaLevelDelta:ElinDelta {public RemoteCard Owner=null!;public int Level,Exp;protected override void OnApply(ElinNetBase n){} }
  public class CharaFeatPointDelta:ElinDelta {public RemoteCard Owner=null!;public int Feat;protected override void OnApply(ElinNetBase n){} }
 }
+
+namespace ElinTogether.Models {public class CardToggleDelta:ElinDelta {public RemoteCard Card=null!;public bool IsOn,Silent;protected override void OnApply(ElinNetBase n){} }}
