@@ -15,5 +15,6 @@
 <Compile Include="../../ElinTogether/Models/Delta/Task/AI/AIOpenLockArgs.cs" Link="AIOpenLockArgs.cs" />
 <Compile Include="../../ElinTogether/Models/Delta/Task/AI/AIFuckArgs.cs" Link="AIFuckArgs.cs" />
 <Compile Include="../../ElinTogether/Models/Delta/Task/AI/AIPracticeDummyArgs.cs" Link="AIPracticeDummyArgs.cs" />
+<Compile Include="../../ElinTogether/Patches/Synchronization/MsgRelayContext.cs" Link="MsgRelayContext.cs" />
 </ItemGroup>
 </Project>

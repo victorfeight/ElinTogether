@@ -207,3 +207,10 @@ var allyGuard = mod.GetType("ElinTogether.Patches.AutoActAllyGuard",true)!;
 var assignments = ((IEnumerable<MethodBase>)allyGuard.GetMethod("TargetMethods",BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,null)!).ToArray();
 Check(assignments.Any(m=>m.Name=="TrySetAutoActHarvestMine") && assignments.Any(m=>m.Name=="TrySetAutoActBuild"),
  "Ally Expansion assignment guard resolves installed harvest and construction entry points");
+
+var cardType=vanilla.GetType("Card",true)!;
+Check(cardType.GetProperty("ShouldShowMsg")?.GetGetMethod() is {IsStatic:false},
+ "personal message visibility hook resolves installed Card getter");
+var buildType=vanilla.GetType("TaskBuild",true)!;
+Check(buildType.GetField("lastPos")?.FieldType==vanilla.GetType("Point"),
+ "build completion outcome uses installed per-task lastPos field");

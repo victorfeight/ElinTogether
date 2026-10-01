@@ -8,5 +8,7 @@
 <Compile Include="../../ElinTogether/Models/Delta/Chara/CharaTaskCancelDelta.cs" Link="CharaTaskCancelDelta.cs" />
 <Compile Include="../../ElinTogether/Models/Delta/Task/TaskHarvestArgs.cs" Link="TaskHarvestArgs.cs" />
 <Compile Include="../../ElinTogether/Models/Delta/Task/TaskMineArgs.cs" Link="TaskMineArgs.cs" />
+<Compile Include="../../ElinTogether/Patches/DeltaEvents/Chara/CharaProgressCompleteEvent.cs" Link="CharaProgressCompleteEvent.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/DeltaReplay.cs" Link="DeltaReplay.cs" />
 </ItemGroup>
 </Project>

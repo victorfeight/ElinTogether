@@ -19,6 +19,13 @@ public class CharaSleepDelta : ElinDelta
             return;
         }
 
+        // A watching/resuming client is a mirror. The host's party sleep already
+        // handles its companion; local rewards here would never reach that profile.
+        if (net is ElinNetClient { ControlMode: not PlayerControlMode.Human }) {
+            SleepSynchronizationContext.CloseSleepLayerIfOpen();
+            return;
+        }
+
         if (pc.isDead) {
             return;
         }

@@ -27,6 +27,24 @@ Check(host.Delta.Sent.Count==1&&packet.DeltaList.Count==1&&((Effect)packet.Delta
 Check(!Trace.Events.Contains("captured")&&!Trace.Events.Contains("hold"),"host does not replay captured results or invoke remote HoldCard");
 Trace.Events.Clear();packet.Held.Value=null;packet.Apply(host);
 Check(host.Delta.Sent.Last() is AutoActStepDelta{Reply:true,Success:false},"host rejection answers AutoAct instead of leaving it waiting");
+TaskBuild.Build=null;
+Trace.Events.Clear();TaskBuild.Reject=true;Packet(new Effect("result")).Apply(client);TaskBuild.Reject=false;
+Check(Trace.Events.SequenceEqual(new[]{"build","result","ack:False"}),"silent native rejection cannot acknowledge build success");
+Trace.Events.Clear();TaskBuild.Reject=true;Packet().Apply(host);TaskBuild.Reject=false;
+Check(host.Delta.Sent.Last() is AutoActStepDelta{Reply:true,Success:false},"silent host build rejection returns explicit failure reply");
+Trace.Events.Clear();TaskBuild.Rotate=true;Packet().Apply(client);TaskBuild.Rotate=false;
+Check(Trace.Events.Last()=="ack:True","native early block rotation remains a successful build");
+foreach(var invalid in new[]{"distance","bounds","destroyed","foreign item","foreign actor"}) {
+ Trace.Events.Clear();var bad=Packet(new Effect("result"));
+ if(invalid=="distance")bad.Pos.Range=2;
+ if(invalid=="bounds")bad.Pos.IsInActiveMapBounds=false;
+ if(invalid=="destroyed")item.isDestroyed=true;
+ if(invalid=="foreign item")item.parent=new Chara();
+ if(invalid=="foreign actor")bad.OriginPeer=99;
+ bad.Apply(invalid=="foreign actor"?host:client);
+ Check(!Trace.Events.Contains("build")&&!Trace.Events.Contains("select")&&!Trace.Events.Contains("hold"),"reject "+invalid+" before native build or held mutation");
+ item.isDestroyed=false;item.parent=actor;
+}
 TaskBuild.Build=null;NetSession.Instance.Connection=client;actor.IsPC=true;AutoActTaskBridge.Active=true;
 Check(CharaBuildDelta.Create(new(){owner=actor,held=item}).AutoActRequestId!=Guid.Empty,"client AutoAct build carries a completion identifier");NetSession.Instance.Connection=host;
 Check(CharaBuildDelta.Create(new(){owner=actor,held=item}).AutoActRequestId==Guid.Empty,"host builds do not allocate client completion tickets");
@@ -35,6 +53,12 @@ Check(keys.Distinct().Count()==keys.Length&&typeof(CharaBuildDelta).GetProperty(
 string output="";
 host.ActiveRemoteCharas[2]=actor;Msg.currentColor=new(){r=.7f};
 using(MsgRelayContext.RedirectTo(actor)) {
+ bool visible=false;MsgRelayContext.ShowRecipientMessage(actor,ref visible);
+ Check(visible,"personal recipient can speak while off the host screen");
+ visible=false;MsgRelayContext.ShowRecipientMessage(new Chara(),ref visible);
+ Check(!visible,"personal relay does not expose unrelated hidden actor messages");
+ actor.isDead=true;visible=false;MsgRelayContext.ShowRecipientMessage(actor,ref visible);actor.isDead=false;
+ Check(!visible,"personal relay preserves dead actor message suppression");
  Check(!MsgRelayContext.OnSayRaw("craft",ref output)&&host.Messages.Last().Peer==2&&host.Messages.Last().Message.R==.7f,"personal relay preserves recipient and color");
  using(MsgRelayContext.Suppress())Check(!MsgRelayContext.OnSayRaw("toggle",ref output)&&host.Messages.Count==1,"nested replay suppression sends no duplicate");
  using(MsgRelayContext.RedirectTo(0))Check(MsgRelayContext.OnSayRaw("host",ref output),"nested host operation stays local");
@@ -62,5 +86,17 @@ CharaLevelEvent.OnSetLevelEnd(remoteActor,(4,0));CharaFeatPointEvent.OnSetFeatEn
 CharaLevelEvent.OnSetLevelEnd(actor,(5,12));CharaFeatPointEvent.OnSetFeatEnd(actor,3);
 Check(client.Delta.Sent.Count==2,"remote actor updates and unchanged values do not echo progression");
 Check(!CardAddExpMirrorGuard.OnAddExp(remoteActor)&&!CardLevelUpMirrorGuard.OnLevelUp(remoteActor),"remote mirror cannot calculate a second XP or level award");
+var wake=new CharaSleepDelta{Power=10,Days=1};
+foreach(var mode in new[]{PlayerControlMode.Companion,PlayerControlMode.Resuming,PlayerControlMode.Human}) {
+ client.ControlMode=mode;EClass.pc=new Chara{conSleep=new()};EClass.player=new();var closed=SleepSynchronizationContext.Closed;
+ wake.Apply(client);
+ bool human=mode==PlayerControlMode.Human;
+ Check(EClass.pc.Sleeps==(human?1:0)&&EClass.player.Dreams==(human?1:0)&&EClass.pc.conSleep.Kills==(human?1:0),"sleep ownership for "+mode+": only human client simulates personal recovery/rewards");
+ Check(SleepSynchronizationContext.Closed==closed+1,"wake closes sleep presentation for "+mode);
+}
+EClass.pc=new Chara{isDead=true,conSleep=new()};EClass.player=new();wake.Apply(client);
+Check(EClass.pc.Sleeps==0&&EClass.player.Dreams==0&&EClass.pc.conSleep.Kills==0,"dead client receives no sleep rewards");
+EClass.pc.isDead=false;wake.Apply(host);
+Check(EClass.pc.Sleeps==0&&EClass.player.Dreams==0,"host does not replay client sleep reward packet");
 Console.WriteLine($"{checks} checks passed");
 class Effect(string name,bool fail=false):ElinDelta {public string Name=name;protected override void OnApply(ElinNetBase n){Trace.Events.Add(Name);if(fail)throw new Exception("side effect failure");}}

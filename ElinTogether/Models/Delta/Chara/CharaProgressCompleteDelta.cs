@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using ElinTogether.API.SourceValidation;
 using ElinTogether.Elements;
@@ -26,82 +27,69 @@ public class CharaProgressCompleteDelta : ElinDelta
 
     protected override void OnApply(ElinNetBase net)
     {
-        if (net.IsHost) {
-            return;
-        }
+        if (net.IsHost) return;
 
-        if (Owner.Find() is not Chara chara) {
-            return;
-        }
-
-        // complete remote tasks because we assigned them max value to prevent randomness
-        var type = ActMappingValidator.Default.IdToActMapping[CompletedActId];
-        var ai = chara.ai.Current;
-        while (ai is not null && ai.GetType() != type && !DelegateProgress.Represents(ai, type)) {
-            ai = ai.parent;
-        }
-
-        // prevent dangling item
-        if (ai is null) {
-            EmpLog.Debug("CharaProgressCompleteDelta: child not running, {ActType} of chara {Uid} replaying {ReplayCount}",
-                type.Name, Owner.Uid, DeltaList.Count);
-            ReplayDeltaList(net);
-            return;
-        }
-
-        var progress = ai as DelegateProgress ?? ai.child;
-        if (progress is null) {
-            EmpLog.Debug("CharaProgressCompleteDelta: child not running, {ActType} of chara {Uid} replaying {ReplayCount}",
-                type.Name, Owner.Uid, DeltaList.Count);
-            ReplayDeltaList(net);
-            return;
-        }
-
-        EmpLog.Debug("Replaying progress complete {ActType} of chara {Uid}, {ReplayCount} deltas",
-            type.Name, Owner.Uid, DeltaList.Count);
-
-        var autoAct = AutoActTaskBridge.FindController(chara, ai);
+        var previous = Current;
         Current = this;
+        Chara? chara = null;
+        AIAct? ai = null;
+        AIAct? autoAct = null;
+        AIAct? root = null;
+        var completed = false;
         try {
-            progress.OnProgressComplete();
-            progress.Success();
+            try {
+                chara = Owner.Find() as Chara;
+                if (chara is null) return;
+                if (!ActMappingValidator.Default.IdToActMapping.TryGetValue(CompletedActId, out var type)) {
+                    net.ReportDesync($"Unknown completed action {CompletedActId} for {Owner.Uid}");
+                    return;
+                }
 
-            // Its next normal tick resumes the child/controller after all results land.
-            // Ticking here can clear Auto Act or choose a target from stale world state.
-            if (ai != progress && autoAct is null) {
-                ai.Tick();
-                if (ai.status != AIAct.Status.Running) {
+                root = chara.ai;
+                ai = root.Current;
+                while (ai is not null && ai.GetType() != type && !DelegateProgress.Represents(ai, type)) {
+                    ai = ai.parent;
+                }
+
+                var progress = ai as DelegateProgress ?? ai?.child;
+                if (progress is null) {
+                    EmpLog.Debug("Completed child {ActType} no longer running for {Uid}; applying {Count} results",
+                        type.Name, Owner.Uid, DeltaList.Count);
+                    return;
+                }
+
+                autoAct = AutoActTaskBridge.FindController(chara, ai!);
+                progress.OnProgressComplete();
+                progress.Success();
+                completed = true;
+            } catch (Exception ex) {
+                EmpLog.Error(ex, "Progress replay failed for {OwnerUid}, action {ActId}", Owner.Uid, CompletedActId);
+                net.ReportDesync(ex.ToString());
+            } finally {
+                // Even missing/finished tasks and failed native callbacks must receive
+                // the host's results. Keep Current set for all result replay guards.
+                var resultsApplied = DeltaReplay.ApplyResults(net, DeltaList, Owner.Uid);
+                if (autoAct is not null && (!completed || !resultsApplied)) {
+                    AutoActTaskBridge.Stop(chara!, autoAct);
+                }
+            }
+
+            if (!completed || chara is null || !ReferenceEquals(chara.ai, root)) return;
+
+            // Continue only after results land. Auto Act resumes on its normal tick;
+            // a late result must never replace a newly selected task/controller.
+            if (autoAct is null && ai is not DelegateProgress) {
+                ai!.Tick();
+                if (ai.status != AIAct.Status.Running && ReferenceEquals(chara.ai, root)) {
                     chara.SetNoGoal();
                 }
             }
 
-            DeltaList.ForEach(action => action.Apply(net));
+            if (chara.IsPC || chara.ai is not GoalRemote remote) return;
+            remote.InsertAction(null);
+            if (chara.held is { } held && held.GetRootCard() == chara) chara.held = null;
         } finally {
-            Current = null;
-        }
-
-        if (chara.IsPC) {
-            return;
-        }
-
-        if (chara.ai is not GoalRemote remote) {
-            return;
-        }
-
-        remote.InsertAction(null);
-
-        if (chara.held is { } held && held.GetRootCard() == chara) {
-            chara.held = null;
-        }
-    }
-
-    private void ReplayDeltaList(ElinNetBase net)
-    {
-        Current = this;
-        try {
-            DeltaList.ForEach(action => action.Apply(net));
-        } finally {
-            Current = null;
+            Current = previous;
         }
     }
 }

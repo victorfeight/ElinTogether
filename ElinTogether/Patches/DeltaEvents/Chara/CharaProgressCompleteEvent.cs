@@ -98,7 +98,7 @@ internal static class CharaProgressCompleteEvent
                 return;
             }
 
-            if (taskBuild.owner.IsPC && taskBuild.held is not null && !ElinDelta.IsApplying) {
+            if (!taskBuild.owner.IsRemotePlayer && taskBuild.held is not null && !ElinDelta.IsApplying) {
                 buildHost.Delta.AddRemote(CharaBuildDelta.Create(taskBuild, captured));
                 return;
             }

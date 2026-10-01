@@ -89,5 +89,48 @@ Check(hostOwner.ai==hostRoot&&hostOwner.Resets==0,"cancellation preserves host r
 owner.ai=new NoGoal();landed=false;
 new CharaProgressCompleteDelta{Owner=owner,CompletedActId=1,DeltaList=[new Callback(()=>landed=true)]}.Apply(client);
 Check(landed&&owner.ai is NoGoal,"late completion lands results without restarting automation");
+NetSession.Instance.Connection=host;
+foreach(var human in new[]{false,true}) {
+ var builder=new Chara{IsPC=human};var build=new TaskBuild{owner=builder};host.Delta.Items.Clear();
+ CharaProgressCompleteEvent.OnProgressComplete(build);CharaProgressCompleteEvent.Pack(new Callback(()=>{}));CharaProgressCompleteEvent.OnProgressCompleteEnd(build);
+ Check(host.Delta.Items.Single() is CharaBuildDelta {Results.Count:1},"host "+(human?"player":"AI companion")+" publishes terrain build and captured results together");
+}
+var remoteBuild=new TaskBuild{owner=new Chara{IsRemotePlayer=true}};host.Delta.Items.Clear();
+var collected=new List<ElinDelta>();
+using(CharaProgressCompleteEvent.CollectBuildSideEffects(collected)) {
+ CharaProgressCompleteEvent.OnProgressComplete(remoteBuild);CharaProgressCompleteEvent.Pack(new Callback(()=>{}));CharaProgressCompleteEvent.OnProgressCompleteEnd(remoteBuild);
+}
+Check(collected.Count==1&&host.Delta.Items.Count==0,"requested build collects results without publishing a duplicate build");
+NetSession.Instance.Connection=client;
+// Failure isolation: native replay and each result can fail independently.
+owner.IsPC=true;controller=new AutoActHarvestMine{owner=owner};owner.ai=controller;task=Harvest();progress=Progress(task);
+progress.Complete=()=>throw new InvalidOperationException("native replay failed");
+int results=0;var failures=client.Desyncs;
+new CharaProgressCompleteDelta{Owner=owner,CompletedActId=1,DeltaList=[new Callback(()=>{
+ Check(CharaProgressCompleteDelta.IsReplaying,"replay guard stays active after native failure");results++;
+})]}.Apply(client);
+Check(results==1&&client.Desyncs==failures+1&&owner.ai is NoGoal&&controller.Cancels==1,"native failure lands results then stops Auto Act without retry");
+Check(!CharaProgressCompleteDelta.IsReplaying,"native failure restores replay context");
+owner.ai=controller=new AutoActHarvestMine{owner=owner};task=Harvest();Progress(task);
+results=0;failures=client.Desyncs;
+new CharaProgressCompleteDelta{Owner=owner,CompletedActId=1,DeltaList=[new Callback(()=>throw new Exception("bad result")),new Callback(()=>results++)]}.Apply(client);
+Check(results==1&&client.Desyncs==failures+1&&owner.ai is NoGoal,"failed result cannot skip later results and stops current automation");
+var later=new AutoActHarvestMine{owner=owner};owner.ai=later;results=0;
+new CharaProgressCompleteDelta{Owner=owner,CompletedActId=1,DeltaList=[new Callback(()=>throw new Exception("late bad result")),new Callback(()=>results++)]}.Apply(client);
+Check(results==1&&owner.ai==later&&later.Cancels==0,"late failed result drains bundle without canceling replacement automation");
+results=0;
+new CharaProgressCompleteDelta{Owner=owner,CompletedActId=999,DeltaList=[new Callback(()=>results++)]}.Apply(client);
+Check(results==1&&owner.ai==later,"unknown task mapping still applies authoritative results");
+new CharaProgressCompleteDelta{Owner=owner,CompletedActId=1,DeltaList=[new Callback(()=>{
+ var outer=CharaProgressCompleteDelta.Current;
+ new CharaProgressCompleteDelta{Owner=owner,CompletedActId=1,DeltaList=[]}.Apply(client);
+ Check(CharaProgressCompleteDelta.Current==outer,"nested completion restores outer replay context");
+})]}.Apply(client);
+Check(!CharaProgressCompleteDelta.IsReplaying,"completion releases outer replay context");
+regular=new TaskHarvest{owner=owner};owner.ai=regular;Progress(regular);
+new CharaProgressCompleteDelta{Owner=owner,CompletedActId=1,DeltaList=[new Callback(()=>Check(regular.Ticks==0,"ordinary task also waits for results before continuation"))]}.Apply(client);
+results=0;var absent=new RemoteCard(owner){Missing=true};
+new CharaProgressCompleteDelta{Owner=absent,CompletedActId=1,DeltaList=[new Callback(()=>results++)]}.Apply(client);
+Check(results==1&&!CharaProgressCompleteDelta.IsReplaying,"missing owner still drains authoritative results and restores scope");
 Console.WriteLine($"{passed} checks passed. Fake Unity/network boundary; live two-peer acceptance remains required.");
 class Callback(Action action):ElinDelta{protected override void OnApply(ElinNetBase net)=>action();}

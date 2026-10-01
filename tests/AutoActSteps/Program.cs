@@ -8,17 +8,21 @@ var actor=new Chara{uid=719,IsPC=false,pos=new(1,1)};host.ActiveRemoteCharas[1]=
 int checks=0;void Check(bool ok,string label){if(!ok)throw new Exception(label);Console.WriteLine("PASS "+label);checks++;}
 Card Tool(Trait trait,int charges=5){var c=new Card{uid=123,trait=trait,root=actor,c_charges=charges};trait.owner=c;actor.held=c;return c;}
 AutoActStepDelta Request(AutoActStepDelta.Step kind,Point? p=null,Card? target=null)=>new(){RequestId=Guid.NewGuid(),Owner=new(actor),Tool=actor.held,Kind=kind,Pos=p??new(2,1),Target=target,ZoneUid=7};
+NetSession.Instance.Connection=host;
 var broom=Tool(new TraitBroom());var clean=Request(AutoActStepDelta.Step.Clean);clean.Apply(host);
+Check(host.Messages.Last() is (1,{Text:"clean"}),"offscreen clean confirmation routed to requesting peer");
 Check(clean.Success&&actor.stamina.value==49&&new Point(2,1).cell.decal==0,"host runs installed custom clean and records stamina cost");
 new AutoActStepDelta{RequestId=clean.RequestId,Owner=clean.Owner,Tool=clean.Tool,Kind=clean.Kind,Pos=clean.Pos,ZoneUid=7}.Apply(host);
 Check(actor.stamina.value==49,"fresh duplicate packet does not repeat effect");
 actor.IsPC=true;actor.stamina.value=50;new Point(2,1).cell.decal=2;clean.Apply(client);
 Check(new Point(2,1).cell.decal==0&&actor.stamina.value==49,"reply applies authoritative tile and client cost");actor.IsPC=false;
 Tool(new TraitToolWaterCan());var water=Request(AutoActStepDelta.Step.Water);water.Apply(host);
+Check(host.Messages.Last() is (1,{Text:"water_farm"}),"offscreen water confirmation routed to requesting peer");
 Check(water.Success&&water.Charges==4&&water.Tiles.Count==1&&water.Tiles[0].Watered,"custom water returns authoritative charge and tile changes");
 new Point(2,1).cell.isWatered=false;actor.held!.c_charges=5;water.Apply(client);
 Check(new Point(2,1).cell.isWatered&&actor.held.c_charges==4,"water reply reconciles local can and terrain");
 var refill=Request(AutoActStepDelta.Step.Refill);refill.Apply(host);Check(refill.Success&&actor.held.c_charges==20,"refill checks source and refills host can");
+Check(host.Messages.Last() is (1,{Text:"water_draw"}),"refill confirmation routed to requesting peer");
 var badSource=Request(AutoActStepDelta.Step.Refill,new(1,1));badSource.Apply(host);Check(!badSource.Success,"refill without water source rejected");
 var other=new Chara{uid=9};var wrong=Request(AutoActStepDelta.Step.Refill);wrong.OriginPeer=9;wrong.Apply(host);Check(!wrong.Success,"unknown sender rejected");
 actor.held.c_charges=7;wrong.Apply(client);Check(actor.held.c_charges==7,"rejection cannot zero local tool charges");
@@ -31,6 +35,7 @@ var dead=Request(AutoActStepDelta.Step.Refill);actor.isDead=true;dead.Apply(host
 var stale=Request(AutoActStepDelta.Step.Refill);EClass._zone.uid=8;stale.Apply(host);EClass._zone.uid=7;Check(!stale.Success,"stale zone rejected");
 var trapCard=new Card{uid=500,pos=new(2,1)};var trap=new TraitTrap{owner=trapCard};trapCard.trait=trap;
 var disarm=Request(AutoActStepDelta.Step.Disarm,target:trapCard);var pc=EClass.game.player.chara;disarm.Apply(host);
+Check(Msg.Local.Contains("trap")&&!host.Messages.Any(m=>m.Message.Text=="trap"),"disarm world messages retain normal routing");
 Check(disarm.Success&&TraitTrap.Attempts==1&&EClass.game.player.chara==pc,"disarm runs once with requester context and restores host PC");
 var npc=new Chara{uid=600,pos=new(2,1)};var chat=Request(AutoActStepDelta.Step.Chat,target:npc);var affinity=Affinity.CC;chat.Apply(host);
 Check(chat.Success&&npc.interest==40&&npc._affinity==1&&EClass.game.player.chara==pc&&Affinity.CC==affinity,"chat resolves host affinity and restores global context");
@@ -73,4 +78,7 @@ Check(((AI_Steal)AIStealArgs.Create(new(){target=npc}).CreateSubAct()).target==n
 Check(((AI_OpenLock)AIOpenLockArgs.Create(new(){target=npc}).CreateSubAct()).target==npc,"unlock serializer preserves target");
 Check(AIFuckArgs.Create(new AI_TendAnimal{target=npc}).CreateSubAct() is AI_TendAnimal {target:var t}&&t==npc,"brushing preserves tame subtype");
 Check(new AIPracticeDummyArgs().CreateSubAct() is ElinTogether.Elements.DelegateProgress {ActType:var typ}&&typ==typeof(AI_PracticeDummy),"training uses progress proxy to avoid duplicate host attacks");
+NetSession.Instance.Connection=host;actor.IsPC=false;Tool(new TraitBroom());new Point(2,1).cell.decal=2;AutoActClean.Throw=true;
+var throws=Request(AutoActStepDelta.Step.Clean);throws.Apply(host);AutoActClean.Throw=false;
+Check(!throws.Success&&!MsgRelayContext.IsRedirecting,"throwing custom task restores message routing and returns failure");
 Console.WriteLine($"{checks} checks passed; simulated game/mod boundary, not Unity acceptance.");

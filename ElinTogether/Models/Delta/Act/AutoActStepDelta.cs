@@ -107,18 +107,22 @@ public class AutoActStepDelta : ElinDelta
                 if (tool?.trait is not TraitToolWaterCan can || !ActDrawWater.HasWaterSource(pos)) return false;
                 tool.SetCharge(can.MaxCharge);
                 owner.PlaySound("water_draw");
-                owner.Say("water_draw", owner, tool);
+                using (MsgRelayContext.RedirectTo(owner)) owner.Say("water_draw", owner, tool);
                 return true;
             case Step.Clean:
                 if (tool?.trait is not TraitBroom || !TaskClean.CanClean(pos)) return false;
-                RunCustom("AutoActMod.Actions.AutoActClean+SubActClean", owner, pos, "pos");
+                using (MsgRelayContext.RedirectTo(owner)) {
+                    RunCustom("AutoActMod.Actions.AutoActClean+SubActClean", owner, pos, "pos");
+                }
                 Tiles.Add(Tile.Capture(pos));
                 return true;
             case Step.Water:
                 if (tool?.trait is not TraitToolWaterCan || tool.c_charges <= 0 || !TaskWater.ShouldWater(pos)) return false;
                 var range = tool.Evalue(770);
                 range = range <= 0 ? 1 : Math.Min(tool.c_charges, 2 + range / 10);
-                RunCustom("AutoActMod.Actions.AutoActWater+SubActWater", owner, pos, "dest");
+                using (MsgRelayContext.RedirectTo(owner)) {
+                    RunCustom("AutoActMod.Actions.AutoActWater+SubActWater", owner, pos, "dest");
+                }
                 foreach (var p in _map.ListPointsInSquare(pos, range - 1, false, false)) Tiles.Add(Tile.Capture(p));
                 return true;
             case Step.Chat:

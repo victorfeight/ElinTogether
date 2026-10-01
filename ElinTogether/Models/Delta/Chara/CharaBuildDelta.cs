@@ -44,14 +44,7 @@ public class CharaBuildDelta : ElinDelta
             try {
                 // Native replay can fail or return early; authoritative results still land.
                 if (net.IsClient) {
-                    foreach (var delta in DeltaList) {
-                        try { delta.Apply(net); }
-                        catch (Exception ex) {
-                            applied = false;
-                            EmpLog.Error(ex, "Build side effect failed for {OwnerUid}: {DeltaType}", Owner.Uid, delta.GetType().Name);
-                            net.ReportDesync(ex.ToString());
-                        }
-                    }
+                    if (!DeltaReplay.ApplyResults(net, DeltaList, Owner.Uid)) applied = false;
                 }
             } finally {
                 // Release AutoAct only after the entire result bundle has been processed.
@@ -74,6 +67,18 @@ public class CharaBuildDelta : ElinDelta
             EmpLog.Warning("Build request unresolved: owner {OwnerUid}, held {HeldUid}", Owner.Uid, Held.Uid);
             return;
         }
+
+        // Recheck native held-build prerequisites before selecting anything. A stale
+        // request must not take another actor's item or move it while out of reach.
+        if (held.isDestroyed || held.GetRootCard() != chara || !Pos.IsInActiveMapBounds ||
+            chara.pos.Distance(Pos) > 1) {
+            EmpLog.Warning("Refusing invalid build for {OwnerUid}, held {HeldUid}, pos {@Pos}",
+                chara.uid, held.uid, Pos);
+            return;
+        }
+
+        if (net is ElinNetHost host && OriginPeer != 0 &&
+            (!host.ActiveRemoteCharas.TryGetValue(OriginPeer, out var requester) || requester != chara)) return;
 
         // relay to clients
         if (held.parent is not Card) {
@@ -104,6 +109,8 @@ public class CharaBuildDelta : ElinDelta
         }
 
         taskBuild.recipe._dir = Dir;
+        var blockDir = taskBuild.pos.cell.blockDir;
+        var roofDir = taskBuild.pos.cell._roofBlockDir;
         if (net.IsHost) {
             DeltaList = [];
             using (CharaProgressCompleteEvent.CollectBuildSideEffects(DeltaList)) {
@@ -115,6 +122,17 @@ public class CharaBuildDelta : ElinDelta
         EmpLog.Debug("Build request completed: owner {OwnerUid}, held {HeldUid}, target {TargetUid}, held root {RootUid}, distance {Distance}",
             chara.uid, held.uid, taskBuild.target?.uid, held.GetRootCard()?.uid,
             taskBuild.pos.Distance(chara.pos));
+        // This is a fresh TaskBuild. Vanilla sets lastPos after its rejection
+        // checks; early block rotation succeeds before that assignment.
+        applied = taskBuild.lastPos is not null || taskBuild.pos.cell.blockDir != blockDir ||
+            taskBuild.pos.cell._roofBlockDir != roofDir;
+        if (!applied) {
+            EmpLog.Warning("Build returned without completion for {OwnerUid}, held {HeldUid}, pos {@Pos}",
+                chara.uid, held.uid, Pos);
+            return;
+        }
+        // Keep acknowledgement false if UID reconciliation or publishing throws.
+        applied = false;
         if (net.IsHost) {
             TargetUid = (taskBuild.target?.uid).GetValueOrDefault();
             net.Delta.AddRemote(this);

@@ -43,6 +43,17 @@ internal static class MsgRelayContext
         };
     }
 
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(Card), nameof(Card.ShouldShowMsg), MethodType.Getter)]
+    internal static void ShowRecipientMessage(Card __instance, ref bool __result)
+    {
+        // Card.Say checks host visibility before reaching Msg.SayRaw. A personal
+        // recipient must still receive their own confirmation when off-screen.
+        if (!__result && IsRedirecting && NetSession.Instance.Connection is ElinNetHost host &&
+            host.ActiveRemoteCharas.TryGetValue(_peerIndex, out var receiver) &&
+            ReferenceEquals(__instance, receiver) && !receiver.isDead) __result = true;
+    }
+
     [HarmonyPrefix]
     [HarmonyPatch(typeof(Msg), nameof(Msg.SayRaw))]
     internal static bool OnSayRaw(string text, ref string __result)

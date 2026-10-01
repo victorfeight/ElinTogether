@@ -14,7 +14,7 @@ public class AIProgress:AIAct { public int progress; public int MaxProgress=>7; 
 public class NoGoal:AIAct{}
 public class Card { public Card GetRootCard()=>this; }
 public class Chara:Card {
- public bool IsPC; public int uid=719; public AIAct ai=new NoGoal(); public Position pos=new(1,1); public Card? held; public int Resets;
+ public bool IsPC,IsRemotePlayer; public int uid=719; public AIAct ai=new NoGoal(); public Position pos=new(1,1); public Card? held; public int Resets;
  public void SetNoGoal(){Resets++;ai=new NoGoal();NetSession.Instance.Connection?.Delta.AddRemote(new CharaTaskDelta{Owner=this});}
 }
 public class BaseTaskHarvest:AIAct { public enum HarvestType{Normal,Seed} public Position pos=new(2,3); public RemoteCard target=new(new Chara()); }
@@ -29,7 +29,7 @@ namespace HarmonyLib {
  [AttributeUsage(AttributeTargets.Method)] public class HarmonyPrefix:Attribute{}
 }
 namespace MessagePack { public class MessagePackObjectAttribute:Attribute{} public class KeyAttribute(int key):Attribute{public int Key=key;} }
-namespace ElinTogether { public static class EmpLog {public static void Debug(string s,params object?[] a){} public static void Warning(string s,params object?[] a){} } }
+namespace ElinTogether { public static class EmpLog {public static void Debug(string s,params object?[] a){} public static void Warning(string s,params object?[] a){}public static void Error(Exception e,string s,params object?[] a){} } }
 namespace ElinTogether.Helper { public static class OverrideMethodComparer {public static IEnumerable<MethodBase> FindAllOverrides(Type t,string name)=>[];} }
 namespace ElinTogether.API.SourceValidation {
  public class ActMappingValidator {
@@ -45,7 +45,7 @@ namespace ElinTogether.Elements {
 }
 namespace ElinTogether.Models {
  public class Position(int x,int z) { public int X=x,Z=z; }
- public class RemoteCard(Chara c) {public int Uid=>c.uid;public Chara Find()=>c;public static implicit operator RemoteCard(Chara c)=>new(c);}
+ public class RemoteCard(Chara c) {public int Uid=>c.uid;public bool Missing;public Chara? Find()=>Missing?null:c;public static implicit operator RemoteCard(Chara c)=>new(c);}
  public abstract class ElinDelta {
  public static bool IsApplying; protected virtual void OnApply(ElinNetBase net){}
  public void Apply(ElinNetBase net){var old=IsApplying;IsApplying=true;try{OnApply(net);}finally{IsApplying=old;}}
@@ -57,7 +57,7 @@ namespace ElinTogether.Models {
 }
 namespace ElinTogether.Net {
  public class Buffer {public List<ElinDelta> Items=[];public void AddRemote(ElinDelta d)=>Items.Add(d);}
- public class ElinNetBase {public bool IsHost=>this is ElinNetHost;public bool IsClient=>this is ElinNetClient;public Buffer Delta=new();}
+ public class ElinNetBase {public int Desyncs;public void ReportDesync(string s)=>Desyncs++;public bool IsHost=>this is ElinNetHost;public bool IsClient=>this is ElinNetClient;public Buffer Delta=new();}
  public class ElinNetClient:ElinNetBase{} public class ElinNetHost:ElinNetBase{public Dictionary<int,Chara> ActiveRemoteCharas=[]; public HashSet<Chara> Companions=[]; public bool IsCompanionControlled(Chara actor)=>Companions.Contains(actor);}
  public class NetSession {public static NetSession Instance=new();public ElinNetBase? Connection;}
 }
@@ -69,3 +69,8 @@ namespace ElinTogether.Patches {
  }
  public static class ReverseCancel {public static void Stub_Cancel(this AIAct a)=>a.Cancel();}
 }
+
+public class TaskBuild:AIAct {public Card? held=new();}
+namespace HarmonyLib {public class HarmonyPostfix:Attribute{}public class HarmonyFinalizer:Attribute{}}
+namespace ElinTogether {public class ScopeExit:IDisposable {public Action? OnExit;public void Dispose()=>OnExit?.Invoke();}}
+namespace ElinTogether.Models {public class CharaBuildDelta:ElinDelta {public List<ElinDelta> Results=[];public static CharaBuildDelta Create(TaskBuild t,List<ElinDelta>? deltas=null)=>new(){Results=deltas??[]};}}

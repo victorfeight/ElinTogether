@@ -7,7 +7,7 @@ public class EClass {
 public class Zone{public int uid=7;}
 public class Game{public Player player=new();}public class Player{public Chara chara=new();}
 public class GameIOContext{} public class ElinPreLoadAttribute:Attribute{}
-public class Card {
+public class Card {public bool ShouldShowMsg=>false;
  public int uid,c_charges;public bool isDestroyed;public Point pos=new(1,1);public Trait? trait; public Card? root;
  public Card GetRootCard()=>root??this;public int Area;public int Evalue(int id)=>Area;public void SetCharge(int n)=>c_charges=n;
  private readonly Dictionary<int,int> ints=[];public void SetInt(int k,int v)=>ints[k]=v;public int GetInt(int k)=>ints.GetValueOrDefault(k);
@@ -17,13 +17,13 @@ public class Chara:Card {
  public AIAct ai=new();public Affinity affinity {get{Affinity.CC=this;return new();}}
  public Renderer renderer=new();public void LookAt(Point p){}
  public int Dist(Point p)=>pos.Distance(p);public bool IsHostile(Chara c)=>Hostile;public bool HasElement(int id)=>true;
- public void PlaySound(string s){}public void Say(string s,params object?[] a){}
+ public void PlaySound(string s){}public void Say(string s,params object?[] a){bool show=ShouldShowMsg;ElinTogether.Patches.MsgRelayContext.ShowRecipientMessage(this,ref show);if(show){string result="";if(ElinTogether.Patches.MsgRelayContext.OnSayRaw(s,ref result))Msg.Local.Add(s);}}
 }
 public class Renderer{public void NextFrame(){}}
 public class Stat{public int value=50;public void Mod(int n)=>value+=n;}
 public class Trait{public Card owner=null!;}public class TraitBroom:Trait{}public class TraitToolWaterCan:Trait{public int MaxCharge=20;}
 public class TraitToolWaterPot:Trait{}
-public class TraitTrap:Trait{public bool CanDisarmTrap=true;public static int Attempts;public bool TryDisarmTrap(Chara c){Attempts++;owner.SetInt(60,owner.GetInt(60)+1);return true;}public void ActivateTrap(Chara c){}}
+public class TraitTrap:Trait{public bool CanDisarmTrap=true;public static int Attempts;public bool TryDisarmTrap(Chara c){string result="";if(ElinTogether.Patches.MsgRelayContext.OnSayRaw("trap",ref result))Msg.Local.Add("trap");Attempts++;owner.SetInt(60,owner.GetInt(60)+1);return true;}public void ActivateTrap(Chara c){}}
 public class Affinity{public static Chara? CC;public void OnTalkRumor(){CC!.interest-=10;CC._affinity++;}}
 public class Point(int x,int z){public int x=x,z=z;public Point Copy()=>new(x,z);public Cell cell=>EClass._map.Cells[x,z];public int Distance(Point p)=>Math.Max(Math.Abs(x-p.x),Math.Abs(z-p.z));}
 public class Cell{public bool isWatered;public byte decal=2;public CellEffect? effect;public bool HasLiquid=>effect!=null;}
@@ -42,16 +42,17 @@ public static class TaskClean{public static bool CanClean(Point p)=>p.cell.decal
 public static class TaskWater{public static bool ShouldWater(Point p)=>!p.cell.isWatered;}
 public static class ActDrawWater{public static bool HasWaterSource(Point p)=>p.x==2;}
 namespace AutoActMod.Actions {
- public class AutoActClean{public class SubActClean:AIAct{public Point pos=null!;public override IEnumerable<Status> Run(){pos.cell.decal=0;pos.cell.effect=null;owner.stamina.Mod(-1);yield return Status.Running;}}}
+ public class AutoActClean{public static bool Throw;public class SubActClean:AIAct{public Point pos=null!;public override IEnumerable<Status> Run(){owner.Say("clean");if(Throw)throw new Exception("custom clean failed");pos.cell.decal=0;pos.cell.effect=null;owner.stamina.Mod(-1);yield return Status.Running;}}}
  public class AutoActWater(Point p):AIAct {
  public TraitToolWaterCan waterCan=null!;
- public class SubActWater:AIAct{public Point dest=null!;public override IEnumerable<Status> Run(){dest.cell.isWatered=true;dest.cell.effect=new(){ints=[1,2],strs=["water"]};owner.held!.c_charges--;yield break;}}
+ public class SubActWater:AIAct{public Point dest=null!;public override IEnumerable<Status> Run(){owner.Say("water_farm");dest.cell.isWatered=true;dest.cell.effect=new(){ints=[1,2],strs=["water"]};owner.held!.c_charges--;yield break;}}
  }
  public class AutoActPourWater {public class SubActPourWater:TaskPourWater{public int targetCount;}}
 }
 namespace MessagePack{public class MessagePackObjectAttribute:Attribute{}public class KeyAttribute(int n):Attribute{public int N=n;}}
 namespace HarmonyLib{
- public class HarmonyPatch:Attribute{public HarmonyPatch(){}public HarmonyPatch(Type t,string n){}}public class HarmonyPrefix:Attribute{}public class HarmonyPostfix:Attribute{}public class HarmonyPrepare:Attribute{}
+ [AttributeUsage(AttributeTargets.Class|AttributeTargets.Method,AllowMultiple=true)] public class HarmonyPatch:Attribute{public HarmonyPatch(Type t,string n,MethodType m){}public HarmonyPatch(){}public HarmonyPatch(Type t,string n){}}public enum MethodType{Getter}
+ public class HarmonyPrefix:Attribute{}public class HarmonyPostfix:Attribute{}public class HarmonyPrepare:Attribute{}
  public static class AccessTools{public static Type? TypeByName(string n)=>typeof(AccessTools).Assembly.GetType(n);public static FieldInfo Field(Type t,string n)=>t.GetField(n)!;public static MethodInfo Method(Type t,string n)=>t.GetMethod(n)!;}
 }
 namespace ElinTogether.Helper{}
@@ -68,7 +69,7 @@ namespace ElinTogether.Models {
 namespace ElinTogether.Net{
  public class Buffer{public List<ElinDelta> Items=[];public void AddRemote(ElinDelta d)=>Items.Add(d);}
  public class ElinNetBase{public Buffer Delta=new();}public class ElinNetClient:ElinNetBase{}
- public class ElinNetHost:ElinNetBase{public bool IsCompanionControlled(Chara c)=>false;public Dictionary<int,Chara> ActiveRemoteCharas=[];}
+ public class ElinNetHost:ElinNetBase{public List<(int Peer,MsgSayDelta Message)> Messages=[];public bool SendDeltaTo(int peer,MsgSayDelta d){Messages.Add((peer,d));return true;}public bool IsCompanionControlled(Chara c)=>false;public Dictionary<int,Chara> ActiveRemoteCharas=[];}
  public class NetSession{public static NetSession Instance=new();public ElinNetBase? Connection;}
 }
 namespace ElinTogether.Patches{public static class AutoActTaskBridge{
@@ -90,3 +91,8 @@ public class AI_Fuck:AIAct{public enum FuckType{fuck,tame}public virtual FuckTyp
 public class AI_TendAnimal:AI_Fuck{public override FuckType Type=>FuckType.tame;}
 public class AI_PracticeDummy:AIAct{}
 namespace ElinTogether.Elements {public class DelegateProgress:AIAct{public Type ActType=null!;public static DelegateProgress Create(Type t)=>new(){ActType=t};}}
+
+public struct Color {public float r,g,b,a;}
+public static class Msg {public static List<string> Local=[];public static Color currentColor;public static bool ignoreAll,alwaysVisible;public static void SetColor()=>currentColor=default;public static void SayRaw(){}}
+namespace ElinTogether {public class ScopeExit:IDisposable {public Action? OnExit;public void Dispose()=>OnExit?.Invoke();}}
+namespace ElinTogether.Models {public class MsgSayDelta {public string Text="";public float R,G,B,A;}}
