@@ -94,6 +94,19 @@ internal partial class EmpConfig
             "Players take turns in combat\n" +
             "战斗中玩家轮流行动");
 
+        Server.DisconnectedPlayerAI = config.Bind(
+            "Server", "DisconnectedPlayerAI", false,
+            "Let fully joined players become AI companions when they leave or lose connection. " +
+            "Their real equipment and skill changes persist, and normal companion death rules apply. " +
+            "Human control resumes on reconnect. Kicks, resyncs and host shutdowns do not enable AI. " +
+            "Turning this off parks existing disconnected companions.");
+
+        Server.AllowMoongateTheft = config.Bind(
+            "Server", "AllowMoongateTheft", false,
+            "Allow normal stealing in player-made Moongate maps. " +
+            "Normal skill, weight, witness, karma and item restrictions still apply. " +
+            "The host controls this setting for everyone.");
+
         Reload();
     }
 
@@ -115,5 +128,7 @@ internal partial class EmpConfig
         internal static ConfigEntry<bool> StrictValidationMode { get; set; } = null!;
         internal static ConfigEntry<bool> SharedAverageSpeed { get; set; } = null!;
         internal static ConfigEntry<bool> TurnBasedCombat { get; set; } = null!;
+        internal static ConfigEntry<bool> AllowMoongateTheft { get; set; } = null!;
+        internal static ConfigEntry<bool> DisconnectedPlayerAI { get; set; } = null!;
     }
 }

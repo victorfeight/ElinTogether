@@ -43,6 +43,9 @@ public class CharaActPerformDelta : ElinDelta
     [Key(5)] public Guid ZapId { get; init; }
     [Key(6)] public int ZoneUid { get; init; }
 
+    // Diagnostics only. Carry the sender's runtime type when the ID cannot identify it.
+    [Key(7)] public string? DiagnosticActType { get; init; }
+
     public static CharaActPerformDelta Create(Act act)
     {
         ApplyBuiltInMapping();
@@ -55,12 +58,18 @@ public class CharaActPerformDelta : ElinDelta
             Wand = (act as ActZap)?.trait?.owner,
             ZapId = act is ActZap ? Guid.NewGuid() : Guid.Empty,
             ZoneUid = EClass._zone.uid,
+            DiagnosticActType = act.id == 0 ? act.GetType().FullName : null,
         };
     }
 
     protected override void OnApply(ElinNetBase net)
     {
         ApplyBuiltInMapping();
+
+        if (ActId == 0) {
+            EmpLog.Warning("ActionTrace receiving zero-ID action: origin {OriginPeer}, actor {ActorUid}, target {TargetUid}, senderType {SenderType}, zone {ZoneUid}",
+                OriginPeer, Owner.Uid, TargetCard?.Uid, DiagnosticActType ?? "unreported", ZoneUid);
+        }
 
         if (ActId == ABILITY.ActZap) {
             ApplyZap(net);

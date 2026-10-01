@@ -138,7 +138,8 @@ public class ActionModeCombat
             return;
         }
 
-        var players = NetSession.Instance.CurrentPlayers.ToList();
+        var players = NetSession.Instance.CurrentPlayers
+            .Where(p => p.Index == 0 || p.Control == PlayerControlMode.Human).ToList();
         var keysToRemove = EnemyVisibility
             .Where(kv => players.All(p => p.CharaUid != kv.Key))
             .Select(kv => kv.Key)
@@ -184,8 +185,18 @@ public class ActionModeCombat
         });
     }
 
+    internal static void ClearControlInput()
+    {
+        _pendingAi = null;
+        _applyPendingQueued = false;
+        _cancelRequested = false;
+    }
+
     private static void UpdatePendingDecision(ElinNetBase net)
     {
+        if (net is ElinNetClient { ControlInputBlocked: true }) return;
+        if (net is ElinNetHost host && host.IsCompanionControlled(EClass.pc) &&
+            (EClass.pc.HasNoGoal || !EClass.pc.ai.IsRunning)) PlayerControlPatch.ChooseHostGoal();
         // Run in both time modes, even with the game clock paused. Finishing a
         // goal must release vanilla input without consuming another character tick.
         _finishingManualStep = true;

@@ -53,7 +53,8 @@ public class Chara{
  public int uid,LV=10,c_daysWithGod;public string NameSimple="player",faction="home";public bool isDead,isSale,c_wasInPcParty;
  public Chara? host,ride,parasite;public Party? party;public Zone? homeZone,currentZone;
  public CardContainer? parent;public Chara? enemy;public bool CompanionAI;
- public void ChooseNewGoal()=>CompanionAI=true;public void SetNoGoal()=>CompanionAI=false;
+ public AIAct ai=new();
+ public void ChooseNewGoal(){CompanionAI=true;ai=new();}public void SetNoGoal(){CompanionAI=false;ai=new();}
  public Global global=new();public Point pos=new();public List<Thing> things=[];public Thing? equipment;public Religion faith=new();
  public Dictionary<string,string?> Strings=[];public Dictionary<string,int> Ints=[];
  [JsonIgnore]public bool IsPC=>EClass.pc==this;
@@ -66,6 +67,22 @@ public class Chara{
  public HashSet<int> Elements=[];public bool HasElement(int id)=>Elements.Contains(id);public void AddThing(Thing t,bool stack,int x,int y){t.invX=x;t.invY=y;things.Add(t);}
 }
 public static class CINT{public const int IsPC=56;}
+public class AIAct{}
+public static class ActRide{
+ public static void Unride(Chara host,Chara mount,bool talk)=>Unride(host,host.parasite==mount,talk);
+ public static void Unride(Chara host,bool parasite,bool talk){var mount=parasite?host.parasite:host.ride;if(mount!=null)mount.host=null;if(parasite)host.parasite=null;else host.ride=null;}
+}
+namespace ElinTogether.Elements {
+ public class GoalRemote:AIAct{public object? PendingHeld;public bool Halted;public void HaltChildAct(){Halted=true;}}
+}
+namespace ElinTogether.Common {
+ public static class EmpDisconnectInfo {
+  public const string HostShutdown="emp_dc_host_shutdown",HostKick="emp_dc_host_kick",
+   HostReconnectRequest="emp_dc_reconnect_request",JoinWhileConnected="emp_dc_new_join_while_connected",
+   NetSessionInitialize="emp_dc_net_session_initialize",NewHost="emp_dc_new_host",InvalidSource="emp_dc_invalid_source",
+   InvalidZone="emp_dc_invalid_zone",VersionMismatch="emp_dc_version_mismatch",ActMappingMismatch="emp_dc_act_mismatch";
+ }
+}
 public class Party{
  public static bool RejectLiveChanges;
  public Chara? leader;public List<int> uidMembers=[];

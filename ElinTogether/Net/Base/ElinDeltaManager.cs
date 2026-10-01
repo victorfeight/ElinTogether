@@ -115,6 +115,10 @@ public class ElinDeltaManager
                 if (delta is null) {
                     continue;
                 }
+                // A save/disconnect callback can revoke ownership while this
+                // batch is already being applied. Buffered input is not authority.
+                if (net is ElinNetHost host && delta.OriginPeer != 0 &&
+                    !host.AcceptsPlayerInput(delta.OriginPeer)) continue;
 
                 if (gameStarted || !delta.RequiresGameStarted) {
                     delta.Apply(net);
@@ -198,6 +202,12 @@ public class ElinDeltaManager
     {
         _inBuffer.Clear();
         _inBufferDeferred.Clear();
+    }
+
+    internal void DiscardIncomingPeer(int peer)
+    {
+        _inBuffer.RemoveAll(d => d.OriginPeer == peer);
+        _inBufferDeferred.RemoveAll(d => d.OriginPeer == peer);
     }
 
     public void UpdateAverages()

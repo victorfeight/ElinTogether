@@ -28,7 +28,7 @@ internal static class AutoActAllyGuard
     {
         return NetSession.Instance.Connection switch {
             ElinNetClient => false, // NPC simulation belongs to host; local player's Auto Act is separate.
-            ElinNetHost host => !host.ActiveRemoteCharas.Values.Contains(chara),
+            ElinNetHost host => !host.ActiveRemoteCharas.Values.Contains(chara) || host.IsCompanionControlled(chara),
             _ => true,
         };
     }

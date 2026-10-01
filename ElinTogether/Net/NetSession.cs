@@ -50,6 +50,7 @@ public class NetSession : EClass
 
     public void RemoveComponent()
     {
+        if (Connection is ElinNetHost controlHost && core.IsGameStarted) controlHost.EndLocalControl();
         if (Connection is ElinNetClient profileClient) profileClient.CheckpointPersonalProfile();
         ElinTogether.Models.WishInteraction.Clear();
         ElinTogether.Models.GuildStateSnapshot.Reset();

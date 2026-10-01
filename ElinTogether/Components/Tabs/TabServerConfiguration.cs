@@ -57,5 +57,16 @@ internal class TabServerConfiguration : TabEmpBase
         modes.Toggle("emp_ui_sv_cfg_turn_combat", EmpConfig.Server.TurnBasedCombat.Value,
                 value => EmpConfig.Server.TurnBasedCombat.Value = value)
             .SetTooltipLang(EmpConfig.Server.TurnBasedCombat.Description.Description);
+
+        modes.Toggle("Allow stealing in Moongate maps", EmpConfig.Server.AllowMoongateTheft.Value,
+                value => {
+                    EmpConfig.Server.AllowMoongateTheft.Value = value;
+                    if (NetSession.Instance.Connection is ElinNetHost host) host.UpdateRemoteSessionRules();
+                })
+            .SetTooltipLang(EmpConfig.Server.AllowMoongateTheft.Description.Description);
+
+        modes.Toggle("AI controls disconnected players", EmpConfig.Server.DisconnectedPlayerAI.Value,
+                value => EmpConfig.Server.DisconnectedPlayerAI.Value = value)
+            .SetTooltipLang(EmpConfig.Server.DisconnectedPlayerAI.Description.Description);
     }
 }

@@ -79,6 +79,7 @@ internal partial class ElinNetClient : ElinNetBase
         Router.RegisterHandler<NetSessionRules>(OnSessionRulesUpdate);
         Router.RegisterHandler<PlayerProfileReceipt>(OnPlayerProfileReceipt);
         Router.RegisterHandler<PlayerProfileRequest>(OnPlayerProfileRequest);
+        Router.RegisterHandler<PlayerControlReply>(OnPlayerControlReply);
         Router.RegisterHandler<SessionReconnectRequest>(OnSessionReconnectRequest);
     }
 

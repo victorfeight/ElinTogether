@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ElinTogether.Models;
+using ElinTogether.Elements;
 using ElinTogether.Net.Steam;
 using UnityEngine;
 
@@ -34,6 +35,7 @@ internal partial class ElinNetHost
             return;
         }
 
+        DisconnectedPlayerCompanions.Dismount(remoteChara);
         remoteChara.SetNoGoal();
 
         pc.party.RemoveMember(remoteChara);
@@ -68,14 +70,22 @@ internal partial class ElinNetHost
     /// <summary>
     ///     Send a save snapshot for replication
     /// </summary>
-    public void SendSaveProbe(Chara chara, ISteamNetPeer peer)
+    public void SendSaveProbe(Chara chara, ISteamNetPeer peer, Guid controlResume = default)
     {
+        if (ActiveRemoteCharas.Any(p => p.Key != peer.Id && p.Value == chara)) {
+            Socket.Disconnect(peer, "This saved character already has a connected player.");
+            return;
+        }
+        // Stop autonomous actions before serializing or assigning a new owner.
+        _disconnectedCompanions.Release(chara);
+        _readyRemotePeers.Remove(peer.Id);
         EmpLog.Information("Sending save probe to player {@Peer} for replication",
             peer);
 
         // register before any SetAI
         ActiveRemoteCharas[peer.Id] = chara;
         chara.SetBool(SoloCompanions.Key, false);
+        chara.SetAI(GoalRemote.Default);
 
         chara.MakeAlly();
         DetachRemoteFromHomeBranch(chara);
@@ -87,19 +97,22 @@ internal partial class ElinNetHost
             Index = peer.Id,
             User = peer.User,
             CharaUid = chara.uid,
+            Control = controlResume == Guid.Empty ? PlayerControlMode.Human : PlayerControlMode.Resuming,
         };
 
         CardCache.Add(chara);
         CardCache.CacheContainer(chara.things);
 
+        Session.CurrentPlayers.RemoveAll(s => s.Index == peer.Id);
         Session.CurrentPlayers.Add(state);
 
         peer.Send(NetSession.Instance.Rules);
         PersonalKarma.BeginSession(chara);
         PersonalFaith.BeginSession(chara);
+        chara.RefreshFaithElement();
         var profileSession = Guid.NewGuid();
         _profileChannels[peer.Id] = new PlayerProfileChannel(chara.uid, profileSession);
-        peer.Send(SaveDataProbe.Create(chara.uid, profileSession));
+        peer.Send(SaveDataProbe.Create(chara.uid, profileSession, controlResume));
     }
 
     /// <summary>
@@ -217,7 +230,7 @@ internal partial class ElinNetHost
     private static void RemoveLeftOverCharas(GameIOContext? context)
     {
         IEnumerable<Chara> excluded = Session.Connection is ElinNetHost host
-            ? host.ActiveRemoteCharas.Values
+            ? host.ActiveRemoteCharas.Values.Concat(host._disconnectedCompanions.Actors)
             : [];
 
         var currentRemoteCharas = game.cards.globalCharas.Values

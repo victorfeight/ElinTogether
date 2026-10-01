@@ -117,6 +117,7 @@ internal partial class ElinNetHost
     /// </summary>
     private void OnClientRemoteCharaSnapshot(CharaStateSnapshot response, ISteamNetPeer peer)
     {
+        if (!AcceptsPlayerInput(peer.Id)) return;
         if (!States.TryGetValue(peer.Id, out var state)) {
             EmpLog.Warning("Received invalid remote character from player {@Peer}",
                 peer);

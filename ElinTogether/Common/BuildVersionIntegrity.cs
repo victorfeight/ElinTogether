@@ -47,9 +47,11 @@ public class BuildVersionIntegrity : EClass
         V20 = 20,
         // Personal player profiles with acknowledged, session-bound checkpoints.
         V21 = 21,
+        // Connected spectator/AI control handoff and acknowledged character resync.
+        V22 = 22,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V21;
+    public const APIVersion APIVersionLatest = APIVersion.V22;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

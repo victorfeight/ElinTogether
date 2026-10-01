@@ -168,3 +168,88 @@ Additional manual checks:
 
 The companion fixture exercises the production role service and save/selection
 paths; it does not execute Unity's map activation, native AI or Steam handoff.
+
+## Host setting: AI controls disconnected players
+
+`Server.DisconnectedPlayerAI` defaults to false and appears in the host settings
+panel. With it enabled, a fully joined living player leaving or losing transport
+can remain in the host party as a normal AI companion. The character must be in
+the host's zone, attached to a zone, and unmounted/uncontained. Kicks, explicit
+resyncs, incomplete joins and host shutdown never initiate takeover.
+
+Disconnect removes network ownership/session state before selecting vanilla AI.
+Immediate and deferred incoming deltas from that peer are discarded; the delta
+executor also rechecks ownership during a batch. Cached client snapshots and
+pending held-tool commands are discarded, and the remote child action is halted.
+The combat timeline already synchronizes its participants from connected humans;
+companions use the existing NPC advancement path. Shared-speed calculation drops
+the disconnected player as well. The existing one-second cleanup job preserves
+only the host connection's explicitly tracked companions; turning the option off
+parks them on that job's next pass. No new scheduler or capture timer is added.
+
+Rejoin stops companion AI before assigning peer ownership and serializing the save
+probe. An already-owned character cannot be claimed by a second connection. Normal
+GoalRemote control is explicitly restored even when MoveZone is a same-zone no-op.
+Riders acquired during AI mode are detached through vanilla Unride before handoff.
+Normal skill/equipment changes remain on the original character; stored personal
+profiles and human prayer/gift/karma records are not replaced by the host profile.
+As with offline companions, NPC actions do not synthesize player-only counters.
+An abrupt disconnect can retain only the last state received by the host.
+
+Host saves include the AI character and its offline-companion marker. Loading that
+save offline keeps it as a companion. Starting another MP session follows the
+existing solo-companion rule: park it first; this setting enables takeover on a
+subsequent real player departure, not automatic recruitment of all saved humans.
+
+In-game acceptance:
+
+1. With the setting off, disconnect a joined client: their character should vanish
+   as before. With it on, repeat: exactly one companion should remain and act.
+2. Disconnect during harvesting and during a shared combat turn. The old task/tool
+   command must stop; remaining humans must not wait for the departed player's turn.
+3. Gain companion skill XP or change their gear, save, then reconnect that owner.
+   Verify retained changes, one character entry, and immediate human control.
+4. Turn the setting off while an AI companion is present: it should be parked.
+   Kick a connected player or request resync: no AI takeover should occur.
+5. Save with a retained AI, reload offline, and check companion persistence.
+   Return to hosting, rejoin the owner, and check normal ownership again.
+6. Repeat with another human still connected, checking their view of AI movement,
+   combat, disappearance and rejoin. Unity/Steam handoff is not fixture-tested.
+
+
+## Connected breaks and Ally Expansion
+
+The Session tab has an own-character **Take a break / Take control** action.
+The host owns a resting client's AI while its connection remains alive. Incoming
+client actions and character/profile snapshots are rejected until an acknowledged
+save/zone resynchronization completes. No periodic personal-profile capture is added.
+The host's own break uses native PC goals without changing the active player.
+
+Ally Expansion's host assignment entry points accept connected characters only
+while they are explicitly AI-controlled. AutoAct child publication uses the same
+ownership rule, preserving the existing terrain-completion synchronization.
+Start/restart the host's AutoAct after entering a break; the extension distributes
+orders on that event, not by periodically enrolling new companions. Its enable,
+tool, riding, action-support and pickup settings still apply. This does not forward
+a client's AutoAct orders to the host's companions.
+
+Automated coverage: `tests/PlayerControl` links the production host/client handoff;
+`tests/AutoActSolo` covers assignment and task publishing at both ownership states;
+`tests/SharedCombatRounds` checks input revocation and installed Elin/Ally Expansion
+patch targets. Fixtures cannot establish Unity/Steam playability.
+
+Live acceptance (same V22 build on both peers):
+1. Client takes a break while idle, then while harvesting/in combat. Confirm one
+   character, host AI movement, no local movement/inventory actions, accessible menu.
+2. Host restarts AutoAct harvesting/mining with Ally Expansion enabled. Confirm the
+   resting client joins when equipped appropriately and sees terrain disappear.
+3. Take control during work. Confirm task cancellation, brief character/map reload,
+   same position, retained gear/skills/hotbar, and immediate return of human input.
+4. Change zones and save while the client watches. Confirm AI survives the zone ACK,
+   save succeeds without asking the spectator for its stale personal profile, and
+   taking control uses the current host character state.
+5. Test host break following/combat, client-initiated party sleep with the host on
+   break, and normal host sleep with a watching client. Human participants must not
+   wait for spectator votes.
+6. Test death, disconnect/reconnect, and mounted handoff rejection. This feature
+   must not revive characters or leave both human and AI simulation active.

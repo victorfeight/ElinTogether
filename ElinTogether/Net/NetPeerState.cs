@@ -1,5 +1,6 @@
 using HeathenEngineering.SteamworksIntegration;
 using MessagePack;
+using ElinTogether.Models;
 
 namespace ElinTogether.Net;
 
@@ -35,6 +36,7 @@ public class NetPeerState
 
     [Key(9)]
     public float ConnectionQualityRemote { get; set; }
+    [Key(10)] public PlayerControlMode Control { get; set; }
 
     public Chara? FindChara()
     {

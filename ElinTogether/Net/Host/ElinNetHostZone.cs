@@ -93,8 +93,17 @@ internal partial class ElinNetHost
         // we only move their characters to zone when they are ready
         Delta.AddRemote(CardGenDelta.Create(chara));
 
+        // A watching peer acknowledges replication, not a human handoff.
+        if (IsCompanionControlled(chara) && chara.IsInActiveMap && _map.charas.Contains(chara)) {
+            peer.Send(new ZoneActivateResponse { ZoneUid = _zone.uid, Pos = chara.pos.Copy() });
+            _readyRemotePeers.Add(peer.Id);
+            return;
+        }
+
         // move instead of add
-        var pos = pc.pos.GetNearestPoint(allowChara: false, allowInstalled: false) ?? pc.pos.Copy();
+        var pos = _controlResumes.ContainsKey(peer.Id) && chara.IsInActiveMap && _map.charas.Contains(chara)
+            ? chara.pos.Copy()
+            : pc.pos.GetNearestPoint(allowChara: false, allowInstalled: false) ?? pc.pos.Copy();
         if (chara.IsInActiveMap && _map.charas.Contains(chara)) {
             if (chara.Stub_Move(pos, Card.MoveType.Force) != Card.MoveResult.Success) {
                 pos = chara.pos.Copy();
@@ -107,7 +116,9 @@ internal partial class ElinNetHost
             _zone.AddCard(chara, pos);
         }
 
-        if (chara.ai is not GoalRemote) {
+        if (IsCompanionControlled(chara)) {
+            if (chara.ai is GoalRemote) chara.ChooseNewGoal();
+        } else if (chara.ai is not GoalRemote) {
             chara.SetAI(GoalRemote.Default);
         }
 
@@ -121,6 +132,7 @@ internal partial class ElinNetHost
             ZoneUid = _zone.uid,
             Pos = pos,
         });
+        _readyRemotePeers.Add(peer.Id);
 
         RemoveLeftOverCharas(null);
     }

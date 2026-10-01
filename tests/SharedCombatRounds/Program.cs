@@ -110,11 +110,38 @@ deltas.AddRemote(new ProbeDelta("next grant")); deltas.RefreshBuffer();
 Check(deltas.FlushOutBuffer().Cast<ProbeDelta>().Select(d=>d.Label).SequenceEqual(new[]{"death","next grant"}),
     "authoritative death precedes the next player's execution grant on the wire");
 
+var input=new ElinTogether.Net.ElinDeltaManager();
+var inputHost=new ElinTogether.Net.ElinNetHost();inputHost.ActiveRemoteCharas[2]=new();inputHost.ActiveRemoteCharas[3]=new();
+var applied=new List<int>();
+input.AddLocal(new CallbackDelta(()=>applied.Add(2)){OriginPeer=2});
+input.DeferLocal(new CallbackDelta(()=>applied.Add(2)){OriginPeer=2});
+input.AddLocal(new CallbackDelta(()=>applied.Add(3)){OriginPeer=3});
+input.DiscardIncomingPeer(2);input.ProcessLocalBatch(inputHost);input.ProcessLocalBatch(inputHost);
+Check(applied.SequenceEqual(new[]{3}),"disconnect discards immediate and deferred input only for departed peer");
+applied.Clear();
+input.AddLocal(new CallbackDelta(()=>inputHost.ActiveRemoteCharas.Remove(2)));
+input.AddLocal(new CallbackDelta(()=>applied.Add(2)){OriginPeer=2});
+input.AddLocal(new CallbackDelta(()=>applied.Add(3)){OriginPeer=3});
+input.ProcessLocalBatch(inputHost);
+Check(applied.SequenceEqual(new[]{3}),"ownership revoked during batch blocks remaining departed-player input");
+
+inputHost.ActiveRemoteCharas[2]=new();
+inputHost.Watching.Add(2);applied.Clear();
+input.AddLocal(new CallbackDelta(()=>applied.Add(2)){OriginPeer=2});
+input.DeferLocal(new CallbackDelta(()=>applied.Add(2)){OriginPeer=2});
+input.AddLocal(new CallbackDelta(()=>applied.Add(3)){OriginPeer=3});
+input.ProcessLocalBatch(inputHost);input.ProcessLocalBatch(inputHost);
+Check(applied.SequenceEqual(new[]{3}),"watching peer remains connected but cannot replay input, including deferred input");
+inputHost.Watching.Remove(2);applied.Clear();
+input.AddLocal(new CallbackDelta(()=>applied.Add(2)){OriginPeer=2});input.ProcessLocalBatch(inputHost);
+Check(applied.SequenceEqual(new[]{2}),"human handoff restores input without reconnecting peer");
+
 // Inspect and transform the REAL installed vanilla IL, without launching Unity.
 var game = @"C:\Program Files (x86)\Steam\steamapps\common\Elin";
 var repo = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
-var build = Path.Combine(repo, "build/shared-rounds");
-var roots = new[] { build, Path.Combine(game,"Elin_Data/Managed"), Path.Combine(game,"BepInEx/core"),
+var build = args.Length > 0 ? Path.GetFullPath(args[0]) : Path.Combine(repo, "build/shared-rounds");
+var roots = new[] { @"C:\Program Files (x86)\Steam\steamapps\workshop\content\2135150\3396025367",
+    @"C:\Program Files (x86)\Steam\steamapps\workshop\content\2135150\3370686923", build, Path.Combine(game,"Elin_Data/Managed"), Path.Combine(game,"BepInEx/core"),
     Path.Combine(game,"Package/Mod_ElinTogether"), Path.Combine(game,"Package/_ModdingKit"), Path.Combine(game,"Package/Mod_ElinModdingKit") };
 AssemblyLoadContext.Default.Resolving += (context, name) => {
     foreach (var dir in roots) {
@@ -169,3 +196,14 @@ var loop = transformed.FindIndex(i => i.opcode == OpCodes.Ldfld && Equals(i.oper
 Check(loop >= 2 && transformed[loop-2].opcode == OpCodes.Call,
       "round gate replaces loop-condition read, not subtraction read");
 Console.WriteLine("Actual vanilla IL transformation validated; Unity runtime/two-player tests still required.");
+
+var controlPatch = mod.GetType("ElinTogether.Patches.PlayerControlInputPatch", true)!;
+var targets = ((IEnumerable<MethodBase>)controlPatch.GetMethod("TargetMethods", BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,null)!).ToArray();
+Check(targets.Length > 4 && targets.All(m => m is not null && !m.IsAbstract), "control input hooks resolve concrete installed Elin methods");
+Check(targets.Any(m=>m.DeclaringType!.Name=="InvOwnerHotbar" && m.Name=="OnClick"), "input guard covers overridden hotbar input as well as base inventory");
+
+Assembly.LoadFrom(Path.Combine(roots[0], "AutoActAllyExpansion.dll"));
+var allyGuard = mod.GetType("ElinTogether.Patches.AutoActAllyGuard",true)!;
+var assignments = ((IEnumerable<MethodBase>)allyGuard.GetMethod("TargetMethods",BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,null)!).ToArray();
+Check(assignments.Any(m=>m.Name=="TrySetAutoActHarvestMine") && assignments.Any(m=>m.Name=="TrySetAutoActBuild"),
+ "Ally Expansion assignment guard resolves installed harvest and construction entry points");

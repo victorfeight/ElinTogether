@@ -1,0 +1,44 @@
+using ElinTogether.Models;
+using ElinTogether.Net;
+using ElinTogether.Net.Steam;
+int checks=0;
+void Check(bool value,string label){if(!value)throw new Exception(label);checks++;Console.WriteLine("PASS "+label);}
+var host=new ElinNetHost();var peer=new Peer();var actor=new Chara();var state=new NetPeerState{CharaUid=actor.uid};
+host.ActiveRemoteCharas[peer.Id]=actor;host.States[peer.Id]=state;NetSession.Instance.Connection=host;
+var enter=new PlayerControlRequest{Id=Guid.NewGuid(),TakeBreak=true};
+host.Request(enter,peer);Check(state.Control==PlayerControlMode.Human,"incomplete join cannot give AI control");
+host.MarkReady(peer.Id);OwnerProgressionAwards.Pending.Add(1);host.Request(enter,peer);
+Check(state.Control==PlayerControlMode.Human,"unsettled progression blocks takeover");OwnerProgressionAwards.Pending.Clear();
+actor.ride=new();host.Request(enter,peer);Check(state.Control==PlayerControlMode.Human,"mounted owner must dismount first");actor.ride=null;
+host.Request(enter,peer);Check(state.Control==PlayerControlMode.Companion&&actor.Goals==1,"explicit request grants host AI ownership");
+Check(!host.AcceptsPlayerInput(peer.Id)&&host.ActiveRemoteCharas.ContainsKey(peer.Id),"AI owner stays connected without input authority");
+host.Request(enter,peer);Check(actor.Goals==1,"duplicate break request does not restart AI");
+var resume=new PlayerControlRequest{Id=Guid.NewGuid()};host.Request(resume,peer);
+Check(state.Control==PlayerControlMode.Resuming&&host.Probes==1&&!host.AcceptsPlayerInput(peer.Id),"resume stops AI and requests authoritative save before input");
+host.Ready(new(){Id=resume.Id},peer);Check(state.Control==PlayerControlMode.Resuming,"ready before zone load cannot grant control");
+host.MarkReady(peer.Id);host.Ready(new(){Id=Guid.NewGuid()},peer);Check(state.Control==PlayerControlMode.Resuming,"wrong handoff token cannot grant control");
+host.Ready(new(){Id=resume.Id},peer);Check(state.Control==PlayerControlMode.Human&&host.AcceptsPlayerInput(peer.Id),"matching completed zone handoff restores human input");
+var client=new ElinNetClient();NetSession.Instance.Connection=client;client.CanCheckpoint=false;client.TogglePlayerControl();Check(client.Host.Sent.Count==0,"profile checkpoint failure leaves human control intact");
+client.CanCheckpoint=true;client.TogglePlayerControl();var request=(PlayerControlRequest)client.Host.Sent.Last();
+Check(client.ControlInputBlocked,"input stops while takeover is in flight");
+client.Reply(new(){Id=Guid.NewGuid(),Mode=PlayerControlMode.Companion});Check(client.ControlRequestPending,"unrelated reply cannot complete handoff");
+client.Reply(new(){Id=request.Id,Mode=PlayerControlMode.Companion});Check(PlayerControl.WatchingOwnCharacter&&client.ControlInputBlocked,"accepted break watches host simulation");
+client.TogglePlayerControl();request=(PlayerControlRequest)client.Host.Sent.Last();client.Reply(new(){Id=request.Id,Mode=PlayerControlMode.Resuming});
+Check(client.ControlInputBlocked&&!PlayerControl.WatchingOwnCharacter,"resume remains blocked during full character reload");
+client.Finish();Check(client.Host.Sent.Last() is PlayerControlReady ready&&ready.Id==request.Id,"zone completion acknowledges original handoff token");
+client.Reply(new(){Id=request.Id,Mode=PlayerControlMode.Human});Check(!client.ControlInputBlocked,"only host confirmation restores local input");
+client.Reply(new(){Id=Guid.Empty,Mode=PlayerControlMode.Companion});Check(!client.ControlInputBlocked,"empty unsolicited token cannot steal restored control");
+Console.WriteLine($"{checks} control-handoff checks passed; fake Unity/transport boundary.");
+
+var localGame=EClass.core.game!;
+bool Identity(Chara c){bool result=true;Check(!ElinTogether.Patches.PlayerIdentityPatch.Resolve(c,ref result),"identity resolves without calling unsafe vanilla getter");return result;}
+EClass.core.game=null;Check(!Identity(actor),"title-screen save probe with no core.game has no local player");
+EClass.core.game=localGame;var localPlayer=localGame.player!;localGame.player=null;
+Check(!Identity(actor),"partially hydrated game with no player is safe");localGame.player=localPlayer;
+localPlayer.chara=null;Check(!Identity(actor),"partially hydrated player with no chara is safe");
+localPlayer.chara=actor;Check(Identity(actor)&&!Identity(new Chara()),"loaded game preserves vanilla reference identity");
+client.TogglePlayerControl();request=(PlayerControlRequest)client.Host.Sent.Last();client.Reply(new(){Id=request.Id,Mode=PlayerControlMode.Companion});
+Check(Identity(actor),"watching preserves local identity for camera and UI");
+ElinDelta.IsApplying=true;Check(!Identity(actor),"incoming spectator replay treats watched actor as remote");ElinDelta.IsApplying=false;
+Check(Identity(actor),"identity restores after replay without modifying saved player");
+Console.WriteLine($"{checks} checks passed including save-probe identity regression.");

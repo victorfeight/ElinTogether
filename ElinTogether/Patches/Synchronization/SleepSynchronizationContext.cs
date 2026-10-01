@@ -41,6 +41,7 @@ internal class SleepSynchronizationContext : SynchronizationContext
         _ready.Clear();
         var alive = 0;
         foreach (var netPlayer in NetSession.Instance.CurrentPlayers) {
+            if (netPlayer.Control != PlayerControlMode.Human) continue;
             var chara = netPlayer.CharaUid == pc.uid ? pc : netPlayer.FindChara();
             // 死是凉爽的夏夜，可供人无忧的安眠
             if (chara is null or { isDead: true }) {
@@ -54,6 +55,9 @@ internal class SleepSynchronizationContext : SynchronizationContext
         }
 
         AllPlayersReady = _ready.Count >= alive;
+        // A resting host still owns the native party sleep sequence.
+        if (AllPlayersReady && alive > 0 && host.IsCompanionControlled(pc) &&
+            !pc.isDead && pc.conSleep is null && ui.GetLayer<LayerSleep>() is null) pc.Sleep();
 
         if (_sleepStarted || alive < 2) {
             if (_sleepStarted && _ready.Count == 0) {

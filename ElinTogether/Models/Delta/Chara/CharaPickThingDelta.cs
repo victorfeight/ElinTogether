@@ -1,5 +1,6 @@
 using ElinTogether.Helper;
 using ElinTogether.Net;
+using ElinTogether.Patches;
 using MessagePack;
 
 namespace ElinTogether.Models;
@@ -37,6 +38,10 @@ public class CharaPickThingDelta : ElinDelta
             TaskCache.CancelClientAct(net, this, Thing);
             return;
         }
+
+        EmpLog.Debug("PickupTrace packet: origin {OriginPeer}, type {PickType}, actor {ActorUid}, item {ItemUid}, state {State}, progressReplay {ProgressReplay}",
+            OriginPeer, Type, chara.uid, thing.uid, QuickTransferTrace.Item(thing),
+            CharaProgressCompleteDelta.IsReplaying);
 
         // realign
         if (net.IsHost && thing.GetRootCard() is Chara holder && holder != chara && holder.IsPlayer) {

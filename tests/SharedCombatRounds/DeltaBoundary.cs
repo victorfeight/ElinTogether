@@ -10,9 +10,11 @@ namespace ElinTogether {
 }
 namespace ElinTogether.Net {
  public class ElinNetBase { public void ReportDesync(string text) {} }
+ public class ElinNetHost:ElinNetBase { public Dictionary<int,object> ActiveRemoteCharas=[]; public HashSet<int> Watching=[]; public bool AcceptsPlayerInput(int peer) => ActiveRemoteCharas.ContainsKey(peer) && !Watching.Contains(peer); }
 }
 namespace ElinTogether.Models {
  public class ElinDelta {
+  public int OriginPeer;
   public int DeferCount;
   public enum OverrideOrder { Stack, First, Last }
   public virtual OverrideOrder Order => OverrideOrder.Stack;
@@ -23,6 +25,7 @@ namespace ElinTogether.Models {
  public class CardGenDelta { public static void ClearRecordedUids() {} }
  public class QuestCreateDelta { public static void ClearRecordedUids() {} }
  public class ProbeDelta(string label) : ElinDelta { public string Label => label; }
+ public class CallbackDelta(Action action):ElinDelta {public override void Apply(ElinTogether.Net.ElinNetBase net)=>action();}
 }
 
 namespace ElinTogether.Models {

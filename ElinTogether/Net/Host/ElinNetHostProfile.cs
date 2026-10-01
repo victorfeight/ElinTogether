@@ -14,13 +14,14 @@ internal partial class ElinNetHost
     internal bool PreparePersonalProfilesForSave()
     {
         if (_profileSave is not null) return false;
-        if (ActiveRemoteCharas.Count == 0) return true;
+        var controlledCount = ActiveRemoteCharas.Keys.Count(AcceptsPlayerInput);
+        if (controlledCount == 0) return true;
         var savedGame = game;
-        var peers = Socket.Peers.Where(p => ActiveRemoteCharas.ContainsKey(p.Id)).ToArray();
+        var peers = Socket.Peers.Where(p => AcceptsPlayerInput(p.Id)).ToArray();
         var barrier = new PlayerProfileSaveBarrier();
         _profileSave = barrier;
         try {
-            if (peers.Length != ActiveRemoteCharas.Count) return SaveFailed();
+            if (peers.Length != controlledCount) return SaveFailed();
             foreach (var peer in peers) {
                 if (!peer.IsConnected || !_profileChannels.TryGetValue(peer.Id, out var channel)) return SaveFailed();
                 var request = barrier.Add(peer.Id, channel.OwnerUid, channel.Session);
@@ -47,6 +48,7 @@ internal partial class ElinNetHost
 
     private void OnPlayerProfileCheckpoint(PlayerProfileCheckpoint checkpoint, ISteamNetPeer peer)
     {
+        if (!AcceptsPlayerInput(peer.Id)) return;
         if (!ActiveRemoteCharas.TryGetValue(peer.Id, out var actor) || actor.IsPC ||
             !_profileChannels.TryGetValue(peer.Id, out var channel)) return;
         try {

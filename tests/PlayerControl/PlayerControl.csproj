@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+<PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+<ItemGroup>
+<Compile Include="../../ElinTogether/Patches/PlayerIdentityPatch.cs" Link="PlayerIdentityPatch.cs" />
+<Compile Include="../../ElinTogether/Models/SessionState/PlayerControl.cs" Link="PlayerControl.cs" />
+<Compile Include="../../ElinTogether/Net/Host/ElinNetHostControl.cs" Link="HostControl.cs" />
+<Compile Include="../../ElinTogether/Net/Client/ElinNetClientControl.cs" Link="ClientControl.cs" />
+</ItemGroup>
+</Project>

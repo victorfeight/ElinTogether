@@ -21,7 +21,7 @@ internal static class CharaTaskRemoteEvent
         // propagate every host event and client player event
         switch (connection) {
             // we are host, assign all active client charas as remote
-            case ElinNetHost host when host.ActiveRemoteCharas.Values.Contains(__instance):
+            case ElinNetHost host when host.ActiveRemoteCharas.Values.Contains(__instance) && !host.IsCompanionControlled(__instance):
                 if (__instance.ai is not GoalRemote) {
                     EmpLog.Debug("Reset remote on {Uid}, was {ActType}, requested {RequestedActType}",
                         __instance.uid, __instance.ai.GetType().Name, g.GetType().Name);
@@ -30,7 +30,7 @@ internal static class CharaTaskRemoteEvent
                 g = GoalRemote.Default;
                 break;
             // we are client, assign all other charas as remote
-            case ElinNetClient when !__instance.IsPC:
+            case ElinNetClient when !__instance.IsPC || PlayerControl.WatchingOwnCharacter:
                 g = GoalRemote.Default;
                 break;
         }

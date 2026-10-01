@@ -175,6 +175,7 @@ internal partial class ElinNetClient
 
             if (pc.isDead) {
                 PutHimRightEr(fresh ? response.Pos : null);
+                if (fresh) FinishControlResume();
                 return;
             }
 
@@ -186,6 +187,7 @@ internal partial class ElinNetClient
 
             pc.Stub_Move(response.Pos, Card.MoveType.Force);
             pc.SetDir(pc.dir);
+            FinishControlResume();
         });
     }
 

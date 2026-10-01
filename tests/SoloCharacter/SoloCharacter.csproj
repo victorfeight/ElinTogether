@@ -8,6 +8,7 @@
     <Compile Include="../../ElinTogether/Net/Steam/SteamNetPacketInbox.cs" Link="SteamNetPacketInbox.cs" />
     <Compile Include="../../ElinTogether/Models/SoloCharacterSelection.cs" Link="SoloCharacterSelection.cs" />
     <Compile Include="../../ElinTogether/Models/SoloCompanions.cs" Link="SoloCompanions.cs" />
+    <Compile Include="../../ElinTogether/Models/DisconnectedPlayerCompanions.cs" Link="DisconnectedPlayerCompanions.cs" />
     <Compile Include="../../ElinTogether/Models/PersonalFaith.cs" Link="PersonalFaith.cs" />
     <Compile Include="../../ElinTogether/Models/Delta/Inv/InvPlaceAbilityDelta.cs" Link="InvPlaceAbilityDelta.cs" />
     <Reference Include="Newtonsoft.Json"><HintPath>$(MSBuildToolsPath)/Newtonsoft.Json.dll</HintPath></Reference>

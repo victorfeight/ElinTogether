@@ -41,6 +41,12 @@ public class CharaTaskDelta : ElinDelta
             return;
         }
 
+        // Enforce host policy even when the requesting client has stale UI.
+        if (net.IsHost && act is AI_Steal && MoongateTheftPatch.IsTheftBlocked(EClass._zone)) {
+            TaskCache.RequestCancel(net, Owner, act);
+            return;
+        }
+
         var taskTool = Tool?.Find();
         if (act is BaseTaskHarvest && Tool is not null &&
             (taskTool is not Thing || taskTool.isDestroyed || taskTool.GetRootCard() != chara)) {

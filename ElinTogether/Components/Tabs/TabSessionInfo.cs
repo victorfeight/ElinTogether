@@ -2,6 +2,7 @@ using ElinTogether.Common;
 using ElinTogether.Helper;
 using ElinTogether.LangMod;
 using ElinTogether.Net;
+using ElinTogether.Models;
 using UnityEngine;
 using UnityEngine.UI;
 using YKF;
@@ -29,7 +30,7 @@ internal class TabSessionInfo : TabEmpBase
         var list = Grid()
             .WithConstraintCount(2);
         list.Fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-        list.Layout.cellSize = new(_refSize.width / 2.2f, _refSize.width * 0.2f);
+        list.Layout.cellSize = new(_refSize.width / 2.2f, _refSize.width * 0.28f);
         var players = NetSession.Instance.CurrentPlayers;
         foreach (var player in players) {
             BuildPlayerCard(list, player);
@@ -77,6 +78,21 @@ internal class TabSessionInfo : TabEmpBase
         infoGroup.TextFlavor(player.User.Name.TagColor(PeerColorizer.GetColor(player.Index)));
         infoGroup.TextMedium(chara.Name);
         infoGroup.Text(BuildPingStat(player));
+
+        var control = player.User.IsMe && NetSession.Instance.Connection is ElinNetClient localClient
+            ? localClient.ControlMode : player.Control;
+        if (control != PlayerControlMode.Human)
+            infoGroup.Text(control == PlayerControlMode.Companion ? "AI controlled" : "Restoring control...");
+        if (player.User.IsMe) {
+            var button = card.Button(control == PlayerControlMode.Human ? "Take a break" : "Take control", () => {
+                switch (NetSession.Instance.Connection) {
+                    case ElinNetHost host: host.ToggleHostControl(); LayerElinTogether.Instance?.Reopen(); break;
+                    case ElinNetClient client: client.TogglePlayerControl(); break;
+                }
+            });
+            button.interactable = control != PlayerControlMode.Resuming &&
+                NetSession.Instance.Connection is not ElinNetClient { ControlRequestPending: true };
+        }
 
         // action buttons: only show for non-host players
         if (NetSession.Instance.IsHost ^ player.User.IsMe) {

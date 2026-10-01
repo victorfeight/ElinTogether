@@ -23,6 +23,8 @@ public class TaskMine:BaseTaskHarvest {public int id;}
 public static class ABILITY { public const int TaskHarvest=1,TaskMine=2; }
 namespace AutoActMod.Actions { public class AutoAct:AIAct{} public class AutoActHarvestMine:AutoAct{} public class AutoActOther:AutoAct{} }
 namespace HarmonyLib {
+ [AttributeUsage(AttributeTargets.Method)] public class HarmonyPrepare:Attribute{}
+ public static class AccessTools {public static Type? TypeByName(string name)=>null;}
  [AttributeUsage(AttributeTargets.Class|AttributeTargets.Method)] public class HarmonyPatch:Attribute{}
  [AttributeUsage(AttributeTargets.Method)] public class HarmonyPrefix:Attribute{}
 }
@@ -56,7 +58,7 @@ namespace ElinTogether.Models {
 namespace ElinTogether.Net {
  public class Buffer {public List<ElinDelta> Items=[];public void AddRemote(ElinDelta d)=>Items.Add(d);}
  public class ElinNetBase {public bool IsHost=>this is ElinNetHost;public bool IsClient=>this is ElinNetClient;public Buffer Delta=new();}
- public class ElinNetClient:ElinNetBase{} public class ElinNetHost:ElinNetBase{public Dictionary<int,Chara> ActiveRemoteCharas=[];}
+ public class ElinNetClient:ElinNetBase{} public class ElinNetHost:ElinNetBase{public Dictionary<int,Chara> ActiveRemoteCharas=[]; public HashSet<Chara> Companions=[]; public bool IsCompanionControlled(Chara actor)=>Companions.Contains(actor);}
  public class NetSession {public static NetSession Instance=new();public ElinNetBase? Connection;}
 }
 namespace ElinTogether.Patches {

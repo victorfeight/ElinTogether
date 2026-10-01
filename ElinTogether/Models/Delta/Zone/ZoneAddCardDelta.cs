@@ -51,9 +51,13 @@ public class ZoneAddCardDelta : ElinDelta
 
         // do not update it again if same position
         // we derive all other state changes to sub deltas
+        var before = QuickTransferTrace.Item(card);
         if (card.parent != zone || card.pos != Pos) {
             zone.AddCard(card, Pos.X, Pos.Z);
             EmpLog.Debug("Zone add card {Uid} at {@Pos}", card.uid, Pos);
         }
+        EmpLog.Debug("PickupTrace ground-result: origin {OriginPeer}, item {ItemUid}, zone {ZoneUid}, requestedPos {@Pos}, before {Before}, after {After}, matchesGround {MatchesGround}",
+            OriginPeer, card.uid, ZoneUid, Pos, before, QuickTransferTrace.Item(card),
+            card.parent == zone && card.pos == Pos);
     }
 }

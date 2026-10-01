@@ -14,6 +14,7 @@ internal partial class ElinNetClient
     /// </summary>
     internal void WorldStateDeltaUpdate()
     {
+        if (ControlInputBlocked) { Delta.ClearOut(); return; }
         if (_pauseUpdate) {
             return;
         }
@@ -72,7 +73,7 @@ internal partial class ElinNetClient
         snapshot.ApplyReconciliation();
 
         // send back client state
-        Host.Send(CharaStateSnapshot.CreateSelf());
+        if (!ControlInputBlocked) Host.Send(CharaStateSnapshot.CreateSelf());
     }
 
     /// <summary>

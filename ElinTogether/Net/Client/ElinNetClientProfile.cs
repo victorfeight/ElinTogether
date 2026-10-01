@@ -9,6 +9,7 @@ internal partial class ElinNetClient
     // Explicit save/lifecycle call only. No polling, debounce or retry timer.
     internal bool CheckpointPersonalProfile()
     {
+        if (ControlMode != PlayerControlMode.Human) return true;
         if (_profileChannel is null || !IsConnected || core.game is null || game.isLoading ||
             !core.IsGameStarted || Session.Player != pc || pc.uid != _profileChannel.OwnerUid ||
             FaithTransactions.Actor is not null) return _profileChannel is null || !IsConnected;
@@ -30,6 +31,7 @@ internal partial class ElinNetClient
 
     private void OnPlayerProfileRequest(PlayerProfileRequest request)
     {
+        if (ControlMode != PlayerControlMode.Human) return;
         if (_profileChannel is not { } channel || request.Session != channel.Session ||
             request.OwnerUid != channel.OwnerUid || request.RequestId == Guid.Empty ||
             core.game is null || game.isLoading || Session.Player != pc || !core.IsGameStarted ||

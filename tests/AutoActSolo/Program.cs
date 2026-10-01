@@ -6,6 +6,7 @@ using ElinTogether.Elements;
 int passed=0;
 void Check(bool ok,string name){if(!ok)throw new Exception(name);passed++;Console.WriteLine("PASS "+name);}
 var client=new ElinNetClient();NetSession.Instance.Connection=client;
+Check(!AutoActAllyGuard.Before(new Chara()),"watching clients cannot run their own Ally Expansion assignments");
 var owner=new Chara{IsPC=true};
 var controller=new AutoActHarvestMine{owner=owner}; owner.ai=controller;
 TaskHarvest Harvest(){var t=new TaskHarvest{owner=owner,parent=controller};controller.child=t;return t;}
@@ -47,6 +48,16 @@ foreach(var isPc in new[]{true,false}) {
 publishingHost.ActiveRemoteCharas[1]=owner;publishingHost.Delta.Items.Clear();
 AutoActTaskBridge.PublishChild(owner,mine);
 Check(publishingHost.Delta.Items.Count==0,"host cannot publish a remote human's stale Auto Act controller");
+Check(!AutoActAllyGuard.Before(owner),"Ally Expansion cannot assign work to a connected human");
+publishingHost.Companions.Add(owner);
+Check(AutoActAllyGuard.Before(owner),"host Ally Expansion may assign work during an explicit break");
+AutoActTaskBridge.PublishChild(owner,mine);
+Check(publishingHost.Delta.Items.Count==1 && publishingHost.Delta.Items[0] is CharaTaskDelta,
+ "connected AI companion publishes Auto Act steps through normal host terrain synchronization");
+publishingHost.Companions.Remove(owner);publishingHost.Delta.Items.Clear();
+Check(!AutoActAllyGuard.Before(owner),"taking control immediately revokes Ally Expansion assignment");
+AutoActTaskBridge.PublishChild(owner,mine);
+Check(publishingHost.Delta.Items.Count==0,"taking control back revokes host Auto Act publishing immediately");
 publishingHost.ActiveRemoteCharas.Clear();owner.IsPC=true;
 NetSession.Instance.Connection=null;Check(AutoActTaskBridge.FindController(owner,mine)==null,"single player untouched");AutoActTaskBridge.PublishChild(owner,mine);NetSession.Instance.Connection=client;
 owner.IsPC=false;client.Delta.Items.Clear();AutoActTaskBridge.PublishChild(owner,mine);

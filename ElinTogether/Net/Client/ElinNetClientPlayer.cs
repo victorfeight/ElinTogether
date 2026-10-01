@@ -49,17 +49,32 @@ internal partial class ElinNetClient
     private void OnSaveDataProbe(SaveDataProbe probe)
     {
         EmpLog.Information("Received save data from host");
+        var resumingControl = probe.ControlResume != Guid.Empty;
+        if (resumingControl) {
+            ControlMode = PlayerControlMode.Resuming;
+            _controlResume = probe.ControlResume;
+            Delta.ClearIn();
+            Delta.ClearOut();
+        }
 
         // PreparePlayerJoin
         AdvanceHandshake(NetHandshakePhase.Joined);
 
         var equipped = new List<(int uid, int elementId)>();
-        if (Session.Player is { } previous && core.game is not null) {
+        if (!resumingControl && Session.Player is { } previous && core.game is not null) {
             foreach (var slot in previous.body.slots) {
                 if (slot.thing is { } worn && !PendingUid.IsPending(worn.uid)) {
                     equipped.Add((worn.uid, slot.elementId));
                 }
             }
+        }
+
+        // A control handoff replaces a live world, unlike the initial title-screen
+        // join. Tear down its widgets/renderers while the old map still exists.
+        // None keeps the Steam session; Title would reset the connection.
+        if (resumingControl && core.IsGameStarted) {
+            scene.Init(Scene.Mode.None);
+            ui.ShowCover();
         }
 
         var probeGame = probe.MakeGameSave();

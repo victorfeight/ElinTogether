@@ -11,6 +11,8 @@ namespace ElinTogether.Net;
 internal partial class ElinNetHost : ElinNetBase
 {
     internal readonly Dictionary<int, NetPeerState> States = [];
+    private readonly HashSet<int> _readyRemotePeers = [];
+    private readonly DisconnectedPlayerCompanions _disconnectedCompanions = new();
 
     public override bool IsHost => true;
 
@@ -89,6 +91,8 @@ internal partial class ElinNetHost : ElinNetBase
         Router.RegisterHandler<WorldStateDeltaList>(OnWorldStateDeltaResponse);
         Router.RegisterHandler<CharaStateSnapshot>(OnClientRemoteCharaSnapshot);
         Router.RegisterHandler<PlayerProfileCheckpoint>(OnPlayerProfileCheckpoint);
+        Router.RegisterHandler<PlayerControlRequest>(OnPlayerControlRequest);
+        Router.RegisterHandler<PlayerControlReady>(OnPlayerControlReady);
 
         // source validation
         Router.RegisterHandler<SourceValidationResponse>(OnSourceValidationResponse);
@@ -118,8 +122,14 @@ internal partial class ElinNetHost : ElinNetBase
         }
 
         // remove all left over chara
+        foreach (var actor in _disconnectedCompanions.Actors.ToArray()) {
+            if (EmpConfig.Server.DisconnectedPlayerAI.Value && actor.party == pc.party) continue;
+            _disconnectedCompanions.Release(actor);
+            RemoveRemoteChara(actor);
+        }
         foreach (var chara in _map.charas.ToArray()) {
-            if (!chara.IsPC && chara.GetBool("remote_chara") && !ActiveRemoteCharas.Values.Contains(chara)) {
+            if (!chara.IsPC && chara.GetBool("remote_chara") && !ActiveRemoteCharas.Values.Contains(chara) &&
+                !_disconnectedCompanions.Contains(chara)) {
                 RemoveRemoteChara(chara);
             }
         }
@@ -152,26 +162,35 @@ internal partial class ElinNetHost : ElinNetBase
 
         _handshakes.Remove(peer.Id);
         _profileChannels.Remove(peer.Id);
+        _controlResumes.Remove(peer.Id);
+        var ready = _readyRemotePeers.Remove(peer.Id);
+        _idleReports.Remove(peer.Id);
+        Delta.DiscardIncomingPeer(peer.Id);
         WishInteraction.ReleasePeer(peer.Id);
         PendingRebind.ReleasePeer(peer.Id);
 
         if (States.Remove(peer.Id, out var state)) {
-            // Fully remove remote chara from the map (saved chara remains via ElinGameIOProperty)
+            Session.CurrentPlayers.Remove(state);
             if (ActiveRemoteCharas.Remove(peer.Id, out var remoteChara)) {
+                WorldStateSnapshot.CachedRemoteSnapshots.RemoveAll(s => s.Owner.Uid == remoteChara.uid);
                 ShopTrade.Release(remoteChara);
-                RemoveRemoteChara(remoteChara);
-                EmpLog.Information("Player {PlayerName} remote chara {Uid} removed from map. " +
-                                   "Saved chara retained for future new connections.",
-                    state.User.Name, remoteChara.uid);
+                var keepAI = DisconnectedPlayerCompanions.AllowsTakeover(
+                    EmpConfig.Server.DisconnectedPlayerAI.Value, ready,
+                    Session.Connection == this && core.IsGameStarted && !game.isLoading && !NetShutdown.IsQuitting,
+                    disconnectInfo);
+                if (!keepAI || !_disconnectedCompanions.TryBegin(remoteChara)) {
+                    RemoveRemoteChara(remoteChara);
+                    EmpLog.Information("Player {PlayerName} remote chara {Uid} parked for reconnect", state.User.Name, remoteChara.uid);
+                }
             }
 
-            Session.CurrentPlayers.Remove(state);
             _zone.RefreshCriminal();
         }
 
         EmpLog.Debug("Player {PlayerName} disconnected. {Remaining} players remaining",
             state?.User.Name ?? "unknown", States.Count);
 
+        Session.SharedSpeed = Session.Rules.UseSharedSpeed && States.Count > 0 ? SharedSpeed : -1;
         Broadcast(SessionPlayersSnapshot.Create());
 
         // keep ticking but no update

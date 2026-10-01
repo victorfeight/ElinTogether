@@ -91,6 +91,7 @@ namespace ElinTogether.Net {
     public class ElinNetBase { public ElinDeltaManager Delta = new(); public bool IsHost => this is ElinNetHost; public void ReportDesync(string s) => throw new Exception(s); }
     public class ElinNetHost : ElinNetBase {
         public Dictionary<int, Chara> ActiveRemoteCharas = [];
+        public bool AcceptsPlayerInput(int peer) => ActiveRemoteCharas.ContainsKey(peer);
         public List<InvestmentResultDelta> Replies = [];
         public bool SendDeltaTo(int peer, ElinDelta d) { Replies.Add((InvestmentResultDelta)d); return true; }
     }

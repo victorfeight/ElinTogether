@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using ElinTogether.Helper;
 using ElinTogether.Net;
+using ElinTogether.Patches;
 using MessagePack;
 
 namespace ElinTogether.Models;
@@ -50,6 +51,7 @@ public class CardAddThingDelta : ElinDelta
             net.Delta.AddRemote(this);
         }
 
+        var before = QuickTransferTrace.Item(thing);
         if (thing.parent != parent) {
             var added = parent.AddThing(thing, TryStack, DestInvX, DestInvY);
             if (added == thing) {
@@ -67,6 +69,10 @@ public class CardAddThingDelta : ElinDelta
 
             EmpLog.Debug("Add thing {Uid} into parent {ParentUid}", thing.uid, parent.uid);
         }
+
+        EmpLog.Debug("PickupTrace transfer-result: origin {OriginPeer}, item {ItemUid}, requestedParent {ParentUid}, before {Before}, after {After}, matchesParent {MatchesParent}, consumed {Consumed}",
+            OriginPeer, Thing.Uid, Parent.Uid, before, QuickTransferTrace.Item(thing),
+            thing.parent == parent, thing.isDestroyed);
     }
 
     internal static void Rebind(ElinNetBase net, RemoteCard remote, Thing thing)

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using ElinTogether.Helper;
@@ -47,6 +48,16 @@ internal static class CharaActPerformEvent
         // clients only propagate self
         if (connection.IsHost || Act.CC.IsPC) {
             var delta = CharaActPerformDelta.Create(__instance);
+            if (delta.ActId == 0) {
+                // Only anomalous actions pay for a caller trace. Do not read act.source:
+                // it is lazy and the diagnostic must not change action initialization.
+                var route = string.Join(" <- ", (new StackTrace(1, false).GetFrames() ?? [])
+                    .Take(10).Select(frame => frame.GetMethod())
+                    .Select(method => $"{method?.DeclaringType?.FullName}.{method?.Name}"));
+                EmpLog.Warning("ActionTrace sending zero-ID action: type {ActType}, actor {ActorUid}, target {TargetUid}, applying {Applying}, route {Route}",
+                    delta.DiagnosticActType, delta.Owner.Uid, delta.TargetCard?.Uid,
+                    ElinDelta.IsApplying, route);
+            }
             connection.Delta.AddRemote(delta);
             EmpLog.Debug("Act {ActId} by chara {OwnerUid} at {@Pos}, target {TargetUid}",
                 delta.ActId, delta.Owner.Uid, delta.Pos, delta.TargetCard?.Uid);

@@ -31,7 +31,7 @@ internal static class RemoteCardHelper
         {
             get {
                 return NetSession.Instance.Connection switch {
-                    ElinNetHost host => host.ActiveRemoteCharas.ContainsValue(chara),
+                    ElinNetHost host => host.ActiveRemoteCharas.ContainsValue(chara) && !host.IsCompanionControlled(chara),
                     ElinNetClient => !chara.IsPC && NetSession.Instance.CurrentPlayers.Any(n => n.CharaUid == chara.uid),
                     _ => false,
                 };
@@ -43,7 +43,7 @@ internal static class RemoteCardHelper
         internal bool IsInActiveMap => chara.currentZone == EClass._zone && chara.pos is { IsValid: true };
 
         internal bool IsActiveRemoteChara => NetSession.Instance.Connection is ElinNetHost host &&
-                                             host.ActiveRemoteCharas.ContainsValue(chara);
+                                             host.ActiveRemoteCharas.ContainsValue(chara) && !host.IsCompanionControlled(chara);
 
         internal NetPeerState? RemoteState => NetSession.Instance.CurrentPlayers.FirstOrDefault(n => n.CharaUid == chara.uid);
     }

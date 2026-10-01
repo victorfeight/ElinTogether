@@ -16,18 +16,20 @@ public class SaveDataProbe
     public required int RemoteCharaUid { get; init; }
 
     [Key(2)] public Guid ProfileSession { get; init; }
+    [Key(3)] public Guid ControlResume { get; init; }
 
     public Game MakeGameSave()
     {
         return Game.Decompress<Game>();
     }
 
-    public static SaveDataProbe Create(int uid, Guid profileSession)
+    public static SaveDataProbe Create(int uid, Guid profileSession, Guid controlResume = default)
     {
         return new() {
             Game = LZ4Bytes.Create(EClass.game),
             RemoteCharaUid = uid,
             ProfileSession = profileSession,
+            ControlResume = controlResume,
         };
     }
 }

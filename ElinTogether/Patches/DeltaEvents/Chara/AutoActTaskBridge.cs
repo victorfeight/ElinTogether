@@ -42,7 +42,7 @@ internal static class AutoActTaskBridge
         // Remote humans remain client-controlled even if their host AI is stale.
         var canPublish = NetSession.Instance.Connection switch {
             ElinNetClient => owner.IsPC,
-            ElinNetHost host => !host.ActiveRemoteCharas.Values.Contains(owner),
+            ElinNetHost host => !host.ActiveRemoteCharas.Values.Contains(owner) || host.IsCompanionControlled(owner),
             _ => false,
         };
         if (!canPublish) return;
