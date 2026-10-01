@@ -49,9 +49,11 @@ public class BuildVersionIntegrity : EClass
         V21 = 21,
         // Connected spectator/AI control handoff and acknowledged character resync.
         V22 = 22,
+        // Bundled build results alongside AutoAct completion identifiers.
+        V23 = 23,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V22;
+    public const APIVersion APIVersionLatest = APIVersion.V23;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

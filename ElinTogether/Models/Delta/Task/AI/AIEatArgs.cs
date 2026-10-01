@@ -6,7 +6,7 @@ namespace ElinTogether.Models.AI;
 public class AIEatArgs : TaskArgsBase
 {
     [Key(0)]
-    public required RemoteCard Target { get; init; }
+    public required RemoteCard? Target { get; init; }
 
     [Key(1)]
     public required bool Cook { get; init; }
@@ -14,9 +14,7 @@ public class AIEatArgs : TaskArgsBase
     public static AIEatArgs Create(AI_Eat ai, Chara owner)
     {
         return new() {
-            // Held-item self actions leave target null and let AI_Eat resolve it
-            // on its first tick. Resolve it before crossing the network instead.
-            Target = ai.target ?? owner.held,
+            Target = PendingSplit.Split(ai.target ?? owner.held),
             Cook = ai.cook,
         };
     }

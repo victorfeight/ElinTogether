@@ -198,6 +198,7 @@ public class InvOwnerOnProcessDelta : ElinDelta
         }
 
         using var _ = Simulate(net.IsHost);
+        using var __ = MsgRelayContext.Suppress(net.IsHost);
 
         var actRef = EffectRefId is null ? default : new ActRef { n1 = EffectRefId };
         var power = Mathf.Clamp(EffectPower, 1, 1000);
@@ -236,13 +237,9 @@ public class InvOwnerOnProcessDelta : ElinDelta
 
         // InvOwnerRefuel._OnProcess
         var fuel = thing.Split(num);
-        var previousPeer = PersonalMsgSayPatch.RefuelPeer;
-        PersonalMsgSayPatch.RefuelPeer = OriginPeer;
-        try {
-            trait.Refuel(fuel);
-        } finally {
-            PersonalMsgSayPatch.RefuelPeer = previousPeer;
-        }
+        // fueled
+        using var __ = MsgRelayContext.RedirectTo(OriginPeer);
+        trait.Refuel(fuel);
     }
 
     private void ApplyRecycle(ElinNetHost host, TraitRecycle recycle, Thing thing)
@@ -250,6 +247,7 @@ public class InvOwnerOnProcessDelta : ElinDelta
         using var _ = Simulate();
 
         var receiver = ResolveReceiver(host);
+        using var __ = MsgRelayContext.RedirectTo(OriginPeer);
         SE.Play("trash");
         Msg.Say("dump", thing, recycle.owner.Name);
 

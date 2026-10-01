@@ -14,7 +14,8 @@ namespace ElinTogether.Patches;
 [HarmonyPatch]
 internal static class CharaProgressCompleteEvent
 {
-    private static List<ElinDelta> DeltaList = [];
+    private static List<ElinDelta> _deltaList = [];
+    private static List<ElinDelta>? _sideDeltaList;
     internal static Chara? Chara { get; private set; }
     internal static bool IsHappening { get; private set; }
     internal static AIAct? Action { get; private set; }
@@ -32,7 +33,16 @@ internal static class CharaProgressCompleteEvent
 
     internal static void Pack(ElinDelta delta)
     {
-        DeltaList.Add(delta);
+        _deltaList.Add(delta);
+    }
+
+    internal static ScopeExit CollectBuildSideEffects(List<ElinDelta> into)
+    {
+        var previous = _sideDeltaList;
+        _sideDeltaList = into;
+        return new() {
+            OnExit = () => _sideDeltaList = previous,
+        };
     }
 
     internal static IEnumerable<MethodBase> TargetMethods()
@@ -57,8 +67,8 @@ internal static class CharaProgressCompleteEvent
             return true;
         }
 
-        if (Chara.IsPC && !ElinDelta.IsApplying) {
-            SendCharaBuildDelta(taskBuild);
+        if (connection.IsClient && Chara.IsPC && !ElinDelta.IsApplying && taskBuild.held is not null) {
+            connection.Delta.AddRemote(CharaBuildDelta.Create(taskBuild));
         }
 
         return connection.IsHost || ElinDelta.IsApplying;
@@ -71,25 +81,30 @@ internal static class CharaProgressCompleteEvent
         Action = null;
         IsHappening = false;
 
-        var captured = DeltaList;
-        DeltaList = [];
+        var captured = _deltaList;
+        _deltaList = [];
 
         if (__instance.owner is null) {
             return;
         }
 
         if (__instance is TaskBuild taskBuild) {
-            if (NetSession.Instance.Connection is ElinNetHost buildHost) {
-                foreach (var delta in captured) {
-                    // The client must replay the build while the held card is still in its inventory.
-                    // A zone-add for the target before CharaBuildDelta makes that replay fail.
-                    if (taskBuild.owner.IsRemotePlayer && delta is ZoneAddCardDelta added &&
-                        added.Card.Uid == taskBuild.target?.uid) {
-                        buildHost.Delta.DeferRemote(delta);
-                    } else {
-                        buildHost.Delta.AddRemote(delta);
-                    }
-                }
+            if (NetSession.Instance.Connection is not ElinNetHost buildHost) {
+                return;
+            }
+
+            if (_sideDeltaList is { } collector) {
+                collector.AddRange(captured);
+                return;
+            }
+
+            if (taskBuild.owner.IsPC && taskBuild.held is not null && !ElinDelta.IsApplying) {
+                buildHost.Delta.AddRemote(CharaBuildDelta.Create(taskBuild, captured));
+                return;
+            }
+
+            foreach (var delta in captured) {
+                buildHost.Delta.AddRemote(delta);
             }
 
             return;
@@ -122,32 +137,11 @@ internal static class CharaProgressCompleteEvent
         }
 
         EmpLog.Warning("Progress complete of {OwnerUid} threw, discarding {ReplayCount} packed deltas",
-            Chara?.uid ?? -1, DeltaList.Count);
+            Chara?.uid ?? -1, _deltaList.Count);
 
         Chara = null;
         Action = null;
         IsHappening = false;
-        DeltaList = [];
-    }
-
-    internal static void SendCharaBuildDelta(TaskBuild taskBuild)
-    {
-        if (taskBuild.held is null) {
-            return;
-        }
-
-        EmpLog.Debug("Build request queued: owner {OwnerUid}, held {HeldUid}, parent {ParentUid}, pos {@Pos}",
-            taskBuild.owner.uid, taskBuild.held.uid, (taskBuild.held.parent as Card)?.uid,
-            taskBuild.pos);
-        NetSession.Instance.Connection!.Delta.AddRemote(new CharaBuildDelta {
-            Held = taskBuild.held,
-            Owner = taskBuild.owner,
-            Pos = taskBuild.pos,
-            Dir = taskBuild.recipe._dir,
-            Altitude = taskBuild.altitude,
-            BridgeHeight = taskBuild.bridgeHeight,
-            AutoActRequestId = AutoActTaskBridge.FindController(taskBuild.owner, taskBuild) is not null
-                ? AutoActCustomActions.BeginBuild(taskBuild) : Guid.Empty,
-        });
+        _deltaList = [];
     }
 }

@@ -17,7 +17,8 @@ internal static class CharaFeatPointEvent
     internal static void OnSetFeatEnd(Card __instance, int __state)
     {
         // client only
-        if (NetSession.Instance.Connection is not ElinNetClient client || ElinDelta.IsRemoteStateLanding) {
+        // Host-approved replay can award real local progression; remote actors are excluded below.
+        if (NetSession.Instance.Connection is not ElinNetClient client) {
             return;
         }
 

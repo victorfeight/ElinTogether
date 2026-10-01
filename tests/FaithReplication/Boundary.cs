@@ -94,3 +94,5 @@ namespace ElinTogether.Models{
  public static class PersonalKarma{public static IDisposable For(Chara c)=>new ElinDelta.Scope();}
  public static class OwnerProgressionAwards{public static Dictionary<Chara,List<int>> Pending=[];public static List<int> Read(Chara c)=>Pending.GetValueOrDefault(c)??[];}
 }
+
+namespace ElinTogether.Patches { public static class MsgRelayContext { public static ElinTogether.ScopeExit RedirectTo(Chara actor) => new(); } }

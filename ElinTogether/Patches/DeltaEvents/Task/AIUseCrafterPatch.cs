@@ -210,7 +210,10 @@ internal static class AIUseCrafterPatch
             }
 
             if (!crafter.IsFuelEnough(act.num, targets)) {
-                Msg.Say("notEnoughFuel");
+                using (MsgRelayContext.RedirectTo(act.owner)) {
+                    Msg.Say("notEnoughFuel");
+                }
+
                 NotifyClientCancel(act);
                 yield return act.Success();
             }
@@ -301,6 +304,7 @@ internal static class AIUseCrafterPatch
                     if (act.recipe is { } recipe) {
                         RemoteCraft.ProductReceiver = act.owner;
                         try {
+                            using var _ = MsgRelayContext.RedirectTo(act.owner);
                             for (var i = 0; i < act.num; i++) {
                                 var held = EClass.pc.held;
                                 EmpLog.Debug("Remote craft output begin recipe {RecipeId}, receiver {ReceiverUid}, host held {HeldUid} ({HeldId}) num {HeldNum}",
@@ -321,15 +325,15 @@ internal static class AIUseCrafterPatch
                             .SetParticleColor(recipe.GetColorMaterial().GetColor())
                             .Emit(10 + EClass.rnd(10));
                         act.owner.renderer.PlayAnime(AnimeID.JumpSmall);
-                        var previousReceiver = PersonalMsgSayPatch.FirstTimeCraftReceiver;
-                        PersonalMsgSayPatch.FirstTimeCraftReceiver = act.owner;
-                        try {
+                        using (MsgRelayContext.RedirectTo(act.owner)) {
                             recipe.TryGetFirstTimeBonus();
-                        } finally {
-                            PersonalMsgSayPatch.FirstTimeCraftReceiver = previousReceiver;
                         }
                     } else {
-                        var t = crafter.Craft(act);
+                        Thing? t;
+                        using (MsgRelayContext.RedirectTo(act.owner)) {
+                            t = crafter.Craft(act);
+                        }
+
                         if (t is not null) {
                             if (t.category.ignoreBless == 0) {
                                 t.SetBlessedState(blessed);

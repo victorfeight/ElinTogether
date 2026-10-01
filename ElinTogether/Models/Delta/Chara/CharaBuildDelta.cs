@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using ElinTogether.Patches;
 using ElinTogether.Helper;
 using ElinTogether.Net;
@@ -32,18 +33,35 @@ public class CharaBuildDelta : ElinDelta
 
     [Key(7)] public Guid AutoActRequestId { get; init; }
 
+    [Key(8)] public List<ElinDelta> DeltaList { get; set; } = [];
+
     protected override void OnApply(ElinNetBase net)
     {
         var applied = false;
         try {
             ApplyBuild(net, ref applied);
         } finally {
-            if (AutoActRequestId != Guid.Empty) {
-                if (net.IsClient) AutoActCustomActions.Complete(AutoActRequestId, applied);
-                else if (!applied) net.Delta.AddRemote(new AutoActStepDelta {
-                    RequestId = AutoActRequestId, Owner = Owner, Pos = Pos,
-                    ZoneUid = _zone.uid, Reply = true, Success = false,
-                });
+            try {
+                // Native replay can fail or return early; authoritative results still land.
+                if (net.IsClient) {
+                    foreach (var delta in DeltaList) {
+                        try { delta.Apply(net); }
+                        catch (Exception ex) {
+                            applied = false;
+                            EmpLog.Error(ex, "Build side effect failed for {OwnerUid}: {DeltaType}", Owner.Uid, delta.GetType().Name);
+                            net.ReportDesync(ex.ToString());
+                        }
+                    }
+                }
+            } finally {
+                // Release AutoAct only after the entire result bundle has been processed.
+                if (AutoActRequestId != Guid.Empty) {
+                    if (net.IsClient) AutoActCustomActions.Complete(AutoActRequestId, applied);
+                    else if (!applied) net.Delta.AddRemote(new AutoActStepDelta {
+                        RequestId = AutoActRequestId, Owner = Owner, Pos = Pos,
+                        ZoneUid = _zone.uid, Reply = true, Success = false,
+                    });
+                }
             }
         }
     }
@@ -86,18 +104,20 @@ public class CharaBuildDelta : ElinDelta
         }
 
         taskBuild.recipe._dir = Dir;
-        taskBuild.OnProgressComplete();
+        if (net.IsHost) {
+            DeltaList = [];
+            using (CharaProgressCompleteEvent.CollectBuildSideEffects(DeltaList)) {
+                taskBuild.OnProgressComplete();
+            }
+        } else {
+            taskBuild.OnProgressComplete();
+        }
         EmpLog.Debug("Build request completed: owner {OwnerUid}, held {HeldUid}, target {TargetUid}, held root {RootUid}, distance {Distance}",
             chara.uid, held.uid, taskBuild.target?.uid, held.GetRootCard()?.uid,
             taskBuild.pos.Distance(chara.pos));
-        applied = true;
-
         if (net.IsHost) {
             TargetUid = (taskBuild.target?.uid).GetValueOrDefault();
-            // The client must replay the build against its pre-build held stack.
-            // Host-side count changes are queued during OnProgressComplete, so
-            // relay the build before those counts are refreshed into the batch.
-            net.Delta.AddRemoteImmediate(this);
+            net.Delta.AddRemote(this);
         } else if (TargetUid > 0 && taskBuild.target is { isDestroyed: false } target && target.uid != TargetUid) {
             if (CardCache.Find(TargetUid) is { } orphan && orphan != target) {
                 CardCache.DelayDestroy(orphan);
@@ -107,5 +127,23 @@ public class CharaBuildDelta : ElinDelta
             EmpLog.Debug("Rebound built target of chara {OwnerUid} to host uid {Uid}",
                 chara.uid, TargetUid);
         }
+        applied = true;
+    }
+
+    internal static CharaBuildDelta Create(TaskBuild taskBuild, List<ElinDelta>? deltaList = null)
+    {
+        return new() {
+            Held = taskBuild.held,
+            Owner = taskBuild.owner,
+            Pos = taskBuild.pos,
+            Dir = taskBuild.recipe._dir,
+            Altitude = taskBuild.altitude,
+            BridgeHeight = taskBuild.bridgeHeight,
+            TargetUid = (taskBuild.target?.uid).GetValueOrDefault(),
+            DeltaList = deltaList ?? [],
+            AutoActRequestId = NetSession.Instance.Connection is ElinNetClient && taskBuild.owner.IsPC &&
+                !ElinDelta.IsApplying && AutoActTaskBridge.FindController(taskBuild.owner, taskBuild) is not null
+                ? AutoActCustomActions.BeginBuild(taskBuild) : Guid.Empty,
+        };
     }
 }

@@ -68,7 +68,7 @@ namespace ElinTogether.Models {
 namespace ElinTogether.Net{
  public class Buffer{public List<ElinDelta> Items=[];public void AddRemote(ElinDelta d)=>Items.Add(d);}
  public class ElinNetBase{public Buffer Delta=new();}public class ElinNetClient:ElinNetBase{}
- public class ElinNetHost:ElinNetBase{public Dictionary<int,Chara> ActiveRemoteCharas=[];}
+ public class ElinNetHost:ElinNetBase{public bool IsCompanionControlled(Chara c)=>false;public Dictionary<int,Chara> ActiveRemoteCharas=[];}
  public class NetSession{public static NetSession Instance=new();public ElinNetBase? Connection;}
 }
 namespace ElinTogether.Patches{public static class AutoActTaskBridge{

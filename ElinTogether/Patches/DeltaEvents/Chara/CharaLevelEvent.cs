@@ -28,7 +28,8 @@ internal static class CharaLevelEvent
     [HarmonyPostfix]
     internal static void OnSetLevelEnd(Card __instance, (int Lv, int Exp) __state)
     {
-        if (NetSession.Instance.Connection is not ElinNetClient client || ElinDelta.IsRemoteStateLanding) {
+        // Host-approved replay can award real local progression; remote actors are excluded below.
+        if (NetSession.Instance.Connection is not ElinNetClient client) {
             return;
         }
 

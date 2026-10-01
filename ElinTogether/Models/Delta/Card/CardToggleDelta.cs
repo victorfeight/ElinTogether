@@ -28,13 +28,8 @@ public class CardToggleDelta : ElinDelta
 
         if (net.IsHost) {
             using var _ = Simulate();
-            var previousReplay = PersonalMsgSayPatch.RemoteToggleReplay;
-            PersonalMsgSayPatch.RemoteToggleReplay = true;
-            try {
-                card.trait.Toggle(IsOn, Silent);
-            } finally {
-                PersonalMsgSayPatch.RemoteToggleReplay = previousReplay;
-            }
+            using var __ = MsgRelayContext.Suppress();
+            card.trait.Toggle(IsOn, Silent);
             if (card.isOn != IsOn) {
                 net.Delta.AddRemote(new CardToggleDelta {
                     Card = Card,

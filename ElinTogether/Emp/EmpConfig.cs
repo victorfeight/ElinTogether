@@ -107,7 +107,21 @@ internal partial class EmpConfig
             "Normal skill, weight, witness, karma and item restrictions still apply. " +
             "The host controls this setting for everyone.");
 
+        Dev.Listener = config.Bind(
+            "Dev",
+            "Listener",
+            false,
+            "Open the localhost debug listener for scripts/mcp (Debug builds only)\n" +
+            "It executes arbitrary C#, never enable on a machine you share\n" +
+            "为 scripts/mcp 打开本机调试监听（仅 Debug 构建）\n" +
+            "它会执行任意 C#，不要在共用机器上开启");
+
         Reload();
+    }
+
+    internal static class Dev
+    {
+        internal static ConfigEntry<bool> Listener { get; set; } = null!;
     }
 
     internal static class Policy

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ElinTogether.Helper;
 using ElinTogether.Net;
+using ElinTogether.Patches;
 using MessagePack;
 
 namespace ElinTogether.Models;
@@ -182,6 +183,7 @@ internal sealed class FaithTransactions : EClass
             PersonalFaith.Restore(actor, state);
             using var simulate = ElinDelta.Simulate();
             using var karma = PersonalKarma.For(actor);
+            using var messages = MsgRelayContext.RedirectTo(actor);
             switch (request.Action) {
                 case FaithAction.Convert:
                     god!.JoinFaith(actor, request.Conversion);
