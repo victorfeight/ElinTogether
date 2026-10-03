@@ -7,14 +7,6 @@ namespace ElinTogether.Patches;
 [HarmonyPatch(typeof(UIInventory), nameof(UIInventory.RefreshMenu))]
 internal class InvRefreshMenuEvent
 {
-    [HarmonyPrefix]
-    internal static void LoadSaveData(UIInventory __instance)
-    {
-        if (Window.dictData.TryGetValue(__instance.window.idWindow, out var data)) {
-            __instance.window.saveData = data;
-        }
-    }
-
     [HarmonyPostfix]
     internal static void OnRefreshMenu(UIInventory __instance)
     {
@@ -29,14 +21,16 @@ internal class InvRefreshMenuEvent
 
         void PropagateSaveData()
         {
-            if (NetSession.Instance.Connection is not { } connection) {
+            if (ElinDelta.IsRemoteStateLanding ||
+                NetSession.Instance.Connection is not { } connection ||
+                __instance.owner.Container is not { isChara: false } container ||
+                !ReferenceEquals(__instance.window.saveData, container.c_windowSaveData)) {
                 return;
             }
 
             connection.Delta.AddRemote(new InvSaveDataDelta {
-                WindowId = __instance.window.idWindow,
+                Container = container,
                 Data = LZ4Bytes.Create(__instance.window.saveData),
-                IsShop = __instance.IsShop,
             });
         }
     }

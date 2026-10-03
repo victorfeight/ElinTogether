@@ -15,7 +15,7 @@ public class Flags { public int landDeedBought, garokkHammerBought; }
 public class Zone { public int uid = 7; }
 public class Map { public List<Thing> things = []; }
 public class UI { public object? currentDrag; public void EndDrag() => currentDrag = null; }
-public class DragItemCard { public bool OnDrag(bool execute, bool cancel) => true; public Info from = new(); public class Info { public Thing thing = null!; public int invX, invY; } }
+public class DragItemCard { public void OnStartDrag(){} public void OnEndDrag(){} public bool OnDrag(bool execute, bool cancel) => true; public Info from = new(); public class Info { public Thing thing = null!; public int invX, invY; } }
 public class Items : List<Thing> {
  public int GridSize = 35;
  public bool Full; public Thing? Find(string id) => this.FirstOrDefault(t => t.id == id);
@@ -28,6 +28,7 @@ public class Card {
  public Card GetRootCard() => parent?.GetRootCard() ?? this;
  public int DeliveryZone; public void SetInt(int id, int value = 0) { if (id == 102) DeliveryZone = value; }
  public Thing AddThing(Thing t, bool stack = true, int destX = -1, int destY = -1) { t.parent?.things.Remove(t); t.parent = this; things.Add(t); return t; }
+ public void RemoveCard(Card c) { things.Remove((Thing)c); c.parent = null; }
 }
 public class Chara : Card {
  public Body body = new(); public bool isDead, IsInActiveMap = true; public int Distance = 1, Money = 10000, Charges, Experience, Discount;
@@ -74,7 +75,7 @@ public static class SE { public static void Play(string id) { } }
 public static class Msg { public static void Say(string text, params object[] args) { } }
 public class Guild { public static Guild Thief = new(); public int Credit; public void AddContribution(int n) => Credit += n; }
 public static class Extensions { public static void ForeachReverse<T>(this List<T> list, Action<T> fn) { for (int i = list.Count - 1; i >= 0; i--) fn(list[i]); } }
-public static class EmpLog { public static void Information(string s, params object[] args) { } }
+public static class EmpLog { public static void Information(string s, params object[] args) { } public static void Debug(string s, params object[] args){} }
 namespace UnityEngine {
  public static class Debug { public static void Log(object? value) { } }
  public static class Mathf { public static float Sqrt(float n) => MathF.Sqrt(n); public static int Abs(int n) => Math.Abs(n); }

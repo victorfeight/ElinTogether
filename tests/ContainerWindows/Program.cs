@@ -1,0 +1,35 @@
+using ElinTogether.Models;
+using ElinTogether.Net;
+using ElinTogether.Patches;
+int checks=0;
+void Check(bool ok,string message){if(!ok)throw new Exception(message);checks++;Console.WriteLine("PASS "+message);}
+var host=new ElinNetHost();var client=new ElinNetClient();
+UIInventory Open(Card card){var ui=new UIInventory{owner=new(){Container=card},window=new(){saveData=card.c_windowSaveData!}};LayerInventory.listInv.Add(new(){invs=[ui]});return ui;}
+InvSaveDataDelta Settings(Card card,int priority)=>new(){Container=card,Data=LZ4Bytes.Create(new Window.SaveData{priority=priority,sharedType=ContainerSharedType.Shared,filter="food"})};
+var purse=new Card{uid=1,c_windowSaveData=new(){open=true}};purse.c_windowSaveData.ints[1]=12345;
+var box=new Card{uid=2,c_windowSaveData=new(){priority=88}};
+var purseUi=Open(purse);var boxUi=Open(box);var original=purse.c_windowSaveData;
+Settings(purse,7).Apply(host);
+Check(ReferenceEquals(original,purseUi.window.saveData)&&ReferenceEquals(original,purse.c_windowSaveData),"remote settings retain native item/window save object identity");
+Check(original.ints[1]==12345&&original.open&&original.priority==7,"remote settings update behavior without changing position or open state");
+Check(box.c_windowSaveData!.priority==88&&boxUi.Refreshes==0&&purseUi.Refreshes==1,"same prefab ID never updates adjacent container");
+Check(host.Delta.Items.Count==1,"host relays accepted settings for other clients");
+LayerInventory.listInv.Clear();Settings(purse,12).Apply(client);
+Check(original.priority==12&&client.Delta.Items.Count==0,"closed container receives native settings without a relay loop");
+purseUi=Open(purse);Check(ReferenceEquals(original,purseUi.window.saveData)&&original.priority==12,"reopened container uses updated item-owned record");
+var untouched=new Card{uid=3};Settings(untouched,25).Apply(host);
+Check(untouched.c_windowSaveData is {priority:25,open:false},"never-opened receiver stores initialized native settings without opening a window");
+var count=host.Delta.Items.Count;purse.isDestroyed=true;Settings(purse,99).Apply(host);purse.isDestroyed=false;
+Check(original.priority==12&&host.Delta.Items.Count==count,"destroyed item cannot receive or relay settings");
+var main=new Card{uid=4,isChara=true,c_windowSaveData=new()};Settings(main,99).Apply(host);
+var shop=new Card{uid=5,trait=new TraitChestMerchant(),c_windowSaveData=new()};Settings(shop,99).Apply(host);
+Check(main.c_windowSaveData.priority==0&&shop.c_windowSaveData.priority==0,"personal main/shop UI preferences stay out of container synchronization");
+NetSession.Instance.Connection=client;InvRefreshMenuEvent.OnRefreshMenu(purseUi);purseUi.window.buttonShared.onClick.Invoke();
+Check(client.Delta.Items.Count==1&&((InvSaveDataDelta)client.Delta.Items[0]).Container.Find()==purse,"local menu sends the actual container identity");
+ElinDelta.IsRemoteStateLanding=true;purseUi.window.buttonShared.onClick.Invoke();ElinDelta.IsRemoteStateLanding=false;
+Check(client.Delta.Items.Count==1,"remote replay cannot echo menu actions");
+purseUi.window.saveData=new();purseUi.window.buttonShared.onClick.Invoke();
+Check(client.Delta.Items.Count==1,"unowned generic window data is never published as container settings");
+NetSession.Instance.Connection=null;purseUi.window.saveData=original;purseUi.window.buttonShared.onClick.Invoke();
+Check(client.Delta.Items.Count==1,"solo menu changes generate no network traffic");
+Console.WriteLine($"{checks} container routing checks passed; Unity UI boundary simulated.");

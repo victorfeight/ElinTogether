@@ -68,4 +68,93 @@ Check(item.parent==EClass._zone&&item.pos.x==owner.pos.x&&item.pos.z==owner.pos.
 var placed=item.pos;CharaProgressCompleteEvent.Results.Clear();host.Delta.Items.Clear();CharaPickThingEvent.DeferPickup(item,new Point(8,9),CharaPickThingDelta.PickType.PickOrDrop);
 Check(item.pos==placed&&host.Delta.Items.Count==0,"deferring existing loot does not move it again");
 CharaProgressCompleteEvent.Chara=null;
+// A paid shop drag may already belong to the actor on the host.
+(client,owner,item)=Setup();host=new();host.ActiveRemoteCharas[7]=owner;NetSession.Instance.Connection=host;
+item.parent=owner;item.invX=2;item.invY=0;
+var place=new CardAddThingDelta{Thing=item,Parent=owner,TryStack=false,DestInvX=5,DestInvY=1,OriginPeer=7};
+place.Apply(host);
+Check(item.parent==owner&&item.invX==5&&item.invY==1&&owner.Removes==1,"same-container paid reservation moves into requested hotbar slot on host");
+place.Apply(host);
+Check(owner.Removes==1,"duplicate same-slot placement does not detach again");
+new CardAddThingDelta{Thing=item,Parent=owner,TryStack=false,DestInvX=-1,DestInvY=-1,OriginPeer=7}.Apply(host);
+Check(owner.Removes==1&&item.invX==5&&item.invY==1,"unspecified destination preserves existing host slot");
+
+// Exact incident: host transfer lands first, then Ally Expansion's completion
+// callback attempts to redirect that same item to the observing client's pc.
+foreach(var full in new[]{false,true}) {
+ (client,owner,item)=Setup(full);var remote=Cache(new Chara{uid=1,IsPlayer=true});item.id="gun";item.parent=remote;
+ AllyPickup.Source=remote;AllyPickup.PickForPC=true;AllyPickup.Redirects=0;
+ new CharaProgressCompleteDelta{Replay=()=>remote.Pick(item)}.Apply(client);
+ Check(item.parent==remote&&owner.Picks==0&&AllyPickup.Redirects==0&&client.Delta.Items.Count==0,
+  $"host handgun remains host-owned before ally redirection; client full={full}");
+ // Guard the alternate entry points and even a callback that directly uses pc.
+ new CharaProgressCompleteDelta{Replay=()=>{owner.Pick(item);owner.PickOrDrop(new(7,7),item);EClass._map.TrySmoothPick(new(7,7),item,owner);}}.Apply(client);
+ Check(item.parent==remote&&owner.Picks==0&&client.Delta.Items.Count==0,"all replay pickup entry points preserve authoritative ownership");
+ // A recipient's handoff runs inside the outer replay but explicitly simulates input.
+ item.parent=EClass._zone;AllyPickup.Source=null;
+ new CharaProgressCompleteDelta{Replay=()=>Handoff(owner,item).Apply(client)}.Apply(client);
+ Check(full ? item.parent==EClass._zone&&client.Delta.Items.Count==0 : item.parent==owner&&client.Delta.Items is [CardAddThingDelta],
+  $"explicit product handoff inside replay retains vanilla capacity outcome; full={full}");
+ Check(!ElinDelta.IsApplying&&!CharaProgressCompleteDelta.IsReplaying,"nested handoff restores replay and apply scopes");
+}
+(client,owner,item)=Setup();var gatheringAlly=Cache(new Chara{uid=2});AllyPickup.Source=gatheringAlly;AllyPickup.PickForPC=true;
+NetSession.Instance.Connection=null;gatheringAlly.Pick(item);
+Check(item.parent==owner,"solo ally pick-for-PC remains enabled");
+item.parent=EClass._zone;NetSession.Instance.Connection=new ElinNetHost();gatheringAlly.Pick(item);
+Check(item.parent==owner,"host ally gathering keeps configured pickup recipient");
+AllyPickup.Source=null;NetSession.Instance.Connection=client;item.parent=EClass._zone;owner.Pick(item);
+Check(item.parent==owner,"ordinary client pickup remains enabled outside replay");
+var threw=false;try{new CharaProgressCompleteDelta{Replay=()=>throw new InvalidOperationException("test")}.Apply(client);}catch(InvalidOperationException){threw=true;}
+Check(threw&&!ElinDelta.IsApplying&&!CharaProgressCompleteDelta.IsReplaying,"failed replay does not leave pickup blocked");
+foreach(var (type,method) in new[]{(typeof(CharaPickThingEvent),"OnCharaPickThingy"),(typeof(CharaPickOrDropEvent),"OnCharaPickOrDrop"),(typeof(CharaTrySmoothPickEvent),"OnTrySmoothPick")}) {
+ var attr=type.GetMethod(method,System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic)!.GetCustomAttributes(typeof(HarmonyLib.HarmonyBefore),false).Cast<HarmonyLib.HarmonyBefore>().Single();
+ Check(attr.Before.Contains("AutoActAllyExpansion"),$"{method} declares ordering before actual Ally Expansion Harmony owner");
+}
+// Exact robe race: client picks on B2F after host has moved to B1F.
+(client,owner,item)=Setup();
+var oldFloor=EClass._zone; oldFloor.uid=2043;
+oldFloor.map.Ground.Add(item);oldFloor.map.CellEntries.Add(item);
+var newFloor=new Zone{uid=8};EClass._zone=newFloor;
+EClass.game.spatials.Others[2043]=oldFloor;
+host=new();host.ActiveRemoteCharas[7]=owner;NetSession.Instance.Connection=host;
+var late=new CardAddThingDelta{Thing=item,Parent=owner,TryStack=true,DestInvX=-1,DestInvY=-1,ZoneUid=2043,OriginPeer=7};
+late.Apply(host);
+Check(item.parent==oldFloor&&oldFloor.map.Ground.Contains(item)&&oldFloor.map.CellEntries.Contains(item),"old-floor pickup cannot detach inactive map ownership or lists");
+Check(host.Delta.Items is [ZoneAddCardDelta {ZoneUid:2043}],"rejected pickup sends ground correction, never relays transfer success");
+var floorCorrection=(ZoneAddCardDelta)host.Delta.Items.Single();
+// Client predicted inventory ownership; correction arrives after activating B1F.
+item.parent=owner;owner.things.Add(item);owner.held=item;NetSession.Instance.Connection=client;
+floorCorrection.Apply(client);
+Check(item.parent==null&&!owner.things.Contains(item)&&owner.held==null&&!CardCache.Contains(item)&&!item.isDestroyed,"off-floor correction removes predicted inventory/cursor/cache without destroying host item");
+Check(newFloor.map.Ground.Count==0&&newFloor.map.CellEntries.Count==0,"correction cannot place old-floor item on the new floor");
+floorCorrection.Apply(client);
+Check(newFloor.map.Ground.Count==0,"duplicate correction cannot resurrect forgotten replica");
+// Restored host snapshot supplies the original floor item; a later pickup is legal.
+Cache(item);item.parent=oldFloor;EClass._zone=oldFloor;NetSession.Instance.Connection=host;host.Delta.Items.Clear();
+late.Apply(host);
+Check(item.parent==owner&&!oldFloor.map.Ground.Contains(item)&&!oldFloor.map.CellEntries.Contains(item),"returning to original floor allows native pickup and removes ground references");
+// Even a forged/default zone stamp cannot transfer an inactive ground object.
+item.parent=oldFloor;oldFloor.map.Ground.Add(item);oldFloor.map.CellEntries.Add(item);EClass._zone=newFloor;host.Delta.Items.Clear();
+new CardAddThingDelta{Thing=item,Parent=owner,TryStack=false,DestInvX=-1,DestInvY=-1,OriginPeer=7}.Apply(host);
+Check(item.parent==oldFloor&&host.Delta.Items is [ZoneAddCardDelta],"source root-zone validation catches unstamped inactive ground transfer");
+stack=Cache(new Thing{uid=777,parent=owner,Num=5});host.Delta.Items.Clear();
+new CardTryStackToDelta{Card=item,To=stack,Parent=owner,ZoneUid=2043,OriginPeer=7}.Apply(host);
+Check(!item.isDestroyed&&stack.Num==5&&item.parent==oldFloor,"late stack merge cannot consume old-floor source");
+// Destination container belongs to the old floor, although source is carried.
+item.parent=owner;var oldChest=Cache(new Thing{uid=778,parent=oldFloor});host.Delta.Items.Clear();
+new CardAddThingDelta{Thing=item,Parent=oldChest,TryStack=false,DestInvX=-1,DestInvY=-1,ZoneUid=8,OriginPeer=7}.Apply(host);
+Check(item.parent==owner&&host.Delta.Items is [CardAddThingDelta],"inactive destination container rejects transfer and restores actual inventory owner");
+host.Delta.Items.Clear();new ZoneAddCardDelta{Card=item,ZoneUid=2043,Pos=new(){X=3,Z=4},OriginPeer=7}.Apply(host);
+Check(item.parent==owner&&host.Delta.Items is [CardAddThingDelta],"late drop cannot install carried item on an inactive floor");
+host.Delta.Items.Clear();
+new CardPlacedDelta{Owner=item,PlaceState=PlaceState.installed,Dir=2,ByPlayer=true,ZoneUid=2043,OriginPeer=7}.Apply(host);
+Check(item.Placements==0&&host.Delta.Items is [CardAddThingDelta],"stale placement following rejected drop cannot mutate carried item");
+item.parent=oldFloor;host.Delta.Items.Clear();
+new CardTryStackToDelta{Card=stack,To=item,Parent=null,ZoneUid=8,OriginPeer=7}.Apply(host);
+Check(!stack.isDestroyed&&item.Num==1,"stack destination on inactive floor is also rejected");
+item.parent=owner;
+// Source map correction arriving before activation uses native active-map placement.
+EClass._zone=oldFloor;NetSession.Instance.Connection=client;host.Delta.Items.Clear();
+new ZoneAddCardDelta{Card=item,ZoneUid=2043,Pos=new(){X=3,Z=4}}.Apply(client);
+Check(item.parent==oldFloor&&oldFloor.map.CellEntries.Contains(item),"correction received before transition restores normal ground item");
 Console.WriteLine($"{checks} checks passed (native boundary model; production pickup hooks and outcome handlers)");

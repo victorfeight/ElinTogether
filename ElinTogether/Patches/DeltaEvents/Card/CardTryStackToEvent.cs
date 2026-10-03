@@ -54,6 +54,7 @@ internal static class CardTryStackEvent
             Card = __instance,
             To = to,
             Parent = to.parent as Card,
+            ZoneUid = EClass._zone.uid,
         });
 
         return false;

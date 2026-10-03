@@ -3,7 +3,8 @@ using MessagePack;
 
 namespace ElinTogether.Models;
 
-// The host's exact tile edit, not another loot-placement search on the client.
+// Host terrain edits from boss loot and path destruction. Keep the existing
+// packet/union identity; clients never repeat the mining or generate its drops.
 [MessagePackObject]
 public class BossLootTileDelta : ElinDelta
 {
@@ -19,8 +20,11 @@ public class BossLootTileDelta : ElinDelta
     {
         if (net.IsHost || EClass._zone?.uid != ZoneUid || !Pos.IsInActiveMapBounds) return;
         Point point = Pos;
-        if (Block) point.SetBlock(Material, Id);
+        if (Block) EClass._map.SetBlock(point.x, point.z, Material, Id, Direction);
         else point.SetObj(Id, Value, Direction);
-        EmpLog.Debug("Applied boss loot terrain in zone {ZoneUid} at {@Pos}, block {Block}, id {Id}", ZoneUid, Pos, Block, Id);
+        EClass._map.RefreshShadow(point.x, point.z);
+        EClass._map.RefreshShadow(point.x, point.z - 1);
+        EClass._map.RefreshFOV(point.x, point.z);
+        EmpLog.Debug("Applied authoritative terrain in zone {ZoneUid} at {@Pos}, block {Block}, id {Id}", ZoneUid, Pos, Block, Id);
     }
 }

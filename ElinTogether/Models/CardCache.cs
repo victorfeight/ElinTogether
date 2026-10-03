@@ -64,6 +64,13 @@ public static class CardCache
         _cards.Remove(uid);
     }
 
+    internal static void Forget(Card card)
+    {
+        if (Find(card.uid) == card) _cards.Remove(card.uid);
+        _keepalive.Remove(card);
+        _invalidCards.Remove(card);
+    }
+
     internal static void Rebind(Card card, int uid)
     {
         _cards.Remove(card.uid);

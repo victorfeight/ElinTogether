@@ -28,7 +28,7 @@ internal static class InvOwnerOnProcessEvent
 
         // Ordinary altar offerings have a validated host transaction. Do not
         // also send the old generic draglet replay for the same offering.
-        if (__instance is InvOwnerOffering) return;
+        if (__instance is InvOwnerOffering or InvOwnerBlend) return;
 
         // crafter
         if (__instance is InvOwnerCraft) {

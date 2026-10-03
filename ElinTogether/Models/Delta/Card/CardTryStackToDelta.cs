@@ -15,12 +15,15 @@ public class CardTryStackToDelta : ElinDelta
     [Key(2)]
     public required RemoteCard? Parent { get; init; }
 
+    [Key(3)] public int ZoneUid { get; init; }
+
     protected override void OnApply(ElinNetBase net)
     {
         // Clients request a merge; the host publishes the native count/removal
         // results. Receivers must never perform that merge for a second time.
         if (!net.IsHost || Card.Find() is not Thing { isDestroyed: false } card) return;
         if (CardAddThingDelta.RejectForeignOwner(net, OriginPeer, Card, card)) return;
+        if (ItemTransferContext.Reject(net, OriginPeer, ZoneUid, Card, card, To.Find())) return;
 
         if (To.Find() is not Thing { isDestroyed: false } to ||
             (Parent is not null ? Parent.Find() is not { } parent || parent != to.parent : to.parent is not Zone) ||

@@ -98,6 +98,36 @@ internal sealed class ShopTrade : EClass
     private static readonly Dictionary<Guid, Pending> Requests = [];
     internal static InvOwner.Transaction? Replaying;
     internal static bool FinishingDrag;
+    private static (DragItemCard Drag, Thing Item, Card Container)? _paidDrag;
+
+    // A paid drag is reserved in the buyer's host inventory for disconnect safety.
+    // Locally it must be cursor-only, including when the queued reservation delta
+    // arrives AFTER the direct trade reply. Never detach unrelated host transfers.
+    internal static void DetachPaidDrag(Thing item, Card container)
+    {
+        if (_paidDrag is not { } paid || !ReferenceEquals(ui.currentDrag, paid.Drag)) {
+            _paidDrag = null;
+            return;
+        }
+        if (paid.Item != item || paid.Container != container || item.parent != container) return;
+        container.RemoveCard(item);
+        LayerInventory.SetDirty(item);
+        EmpLog.Debug("Shop paid drag detached reservation: item {ItemUid}, container {ContainerUid}", item.uid, container.uid);
+    }
+
+    internal static void BeginPaidDrag(DragItemCard drag)
+    {
+        if (Replaying is not { } transaction || transaction.thing != drag.from.thing ||
+            NetSession.Instance.Connection is not ElinNetClient) return;
+        var container = transaction.destInv.Container;
+        _paidDrag = (drag, drag.from.thing, container);
+        DetachPaidDrag(drag.from.thing, container);
+    }
+
+    internal static void EndPaidDrag(DragItemCard drag)
+    {
+        if (_paidDrag is { } paid && ReferenceEquals(paid.Drag, drag)) _paidDrag = null;
+    }
 
     internal static bool Handles(ShopTransaction? shop) => shop?.trader is InvOwnerShop &&
         shop.trader.currency != CurrencyType.None && !shop.trader.UseHomeResource;
@@ -150,7 +180,7 @@ internal sealed class ShopTrade : EClass
         try {
             if (reply.Error is not null) { Msg.Say(reply.Error); return; }
             var item = reply.Item?.Find() as Thing;
-            if (pending.Drag && item is { isDestroyed: false } && !session.Closed && ShopTransaction.current == session.Native && pending.Transaction.button) {
+            if (pending.Drag && item is { isDestroyed: false } && !session.Closed && ShopTransaction.current == session.Native && pending.Transaction.button && ui.currentDrag is null) {
                 pending.Transaction.thing = item;
                 Replaying = pending.Transaction;
                 // OnApply is remote-state landing: placement here must not emit
@@ -323,7 +353,7 @@ internal sealed class ShopTrade : EClass
         });
     }
     internal static void Release(Chara actor) { if (Read(actor) is { } ledger) Settle(actor, ledger); }
-    internal static void Reset() { Completed.Clear(); Closed.Clear(); Clients.Clear(); Requests.Clear(); Replaying = null; FinishingDrag = false; }
+    internal static void Reset() { Completed.Clear(); Closed.Clear(); Clients.Clear(); Requests.Clear(); Replaying = null; FinishingDrag = false; _paidDrag = null; }
 }
 
 [MessagePackObject]

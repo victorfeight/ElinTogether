@@ -20,6 +20,7 @@ internal static class SoloPlayerProfile
         // Sticky provenance: a later checkpoint cannot reconstruct pre-upgrade history.
         public bool LegacyHistoryMissing;
         public Dictionary<string, string> Fields = [];
+        public Dictionary<int, Window.SaveData>? CarriedWindows;
     }
 
     private static readonly string[] Names = [
@@ -43,6 +44,7 @@ internal static class SoloPlayerProfile
         var state = new State { LegacyHistoryMissing = actor.GetStr(SaveKey) is { Length: > 0 } && HasMissingHistory(actor) };
         foreach (var field in Fields) state.Fields[field.Name] =
             JsonConvert.SerializeObject(field.GetValue(player), field.FieldType, GameIOContext.Settings);
+        state.CarriedWindows = PersonalContainerWindows.Capture(actor);
         var json = JsonConvert.SerializeObject(state);
         if (json.Length > MaxJsonLength) throw new InvalidOperationException("Player profile exceeds the supported size.");
         actor.SetStr(SaveKey, json);
@@ -66,6 +68,9 @@ internal static class SoloPlayerProfile
             ?? throw new InvalidOperationException("The saved player profile is empty.");
         if (state.Version != 1 || state.Fields is null)
             throw new InvalidOperationException("Unsupported saved player profile version.");
+        if (state.CarriedWindows is not null && state.CarriedWindows.Values.Any(data =>
+                data is null || data.ints is null || data.ints.Length < 20 || data.cats is null))
+            throw new InvalidOperationException("Invalid carried container layout.");
         return state;
     }
 
@@ -83,6 +88,7 @@ internal static class SoloPlayerProfile
         if (actor != player.chara) throw new InvalidOperationException("Profile owner is not the active player.");
         if (actor.GetStr(SaveKey) is not { Length: > 0 }) Initialize(actor, legacy: true);
         Restore(player, Prepare(actor));
+        PersonalContainerWindows.Restore(actor, Read(actor.GetStr(SaveKey)!).CarriedWindows);
     }
 
     internal static void Accept(Chara actor, string json)

@@ -23,6 +23,7 @@ public class CardChargeDelta : ElinDelta
             return;
         }
 
+        EmpLog.Debug("Applying card charges {Uid}: {Before} -> {After}", card.uid, card.c_charges, Charges);
         card.c_charges = Charges;
         if (card is Thing thing) {
             LayerInventory.SetDirty(thing);

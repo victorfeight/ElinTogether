@@ -1,7 +1,15 @@
 using ElinTogether.Models;
-public class EClass {public static Zone _zone=new(){uid=7};}
+public class EClass {public static Zone _zone=new(){uid=7};public static Map _map=new();}
 public class Zone {public int uid;}
-public class Chara {public void TryDropBossLoot(){}}
+public class Chara {public void TryDropBossLoot(){} public void DestroyPath(Point pos){}}
+public class Cell {public byte _blockMat,_block,obj,objVal;public int blockDir,objDir;}
+public class Map {
+ public Cell[,] cells=new Cell[10,10];public int Shadows,Fovs;
+ public Map(){for(int x=0;x<10;x++)for(int z=0;z<10;z++)cells[x,z]=new();}
+ public void SetBlock(int x,int z,int mat,int id,int dir){new Point(x,z).SetBlock(mat,id);cells[x,z]._block=(byte)id;cells[x,z]._blockMat=(byte)mat;cells[x,z].blockDir=dir;}
+ public void SetObj(int x,int z,int mat,int id,int value,int dir,bool ignoreRandomMat=false){}
+ public void RefreshShadow(int x,int z)=>Shadows++;public void RefreshFOV(int x,int z)=>Fovs++;
+}
 public class Point(int x,int z) {public int x=x,z=z;public static Dictionary<(int,int),(int block,int obj)> Tiles=new();public void SetBlock(int mat=0,int id=0){var t=Tiles[(x,z)];Tiles[(x,z)]=(id,t.obj);}public void SetObj(int id=0,int value=1,int dir=0){var t=Tiles[(x,z)];Tiles[(x,z)]=(t.block,id);}}
 public static class EmpLog{public static void Debug(string s,params object[] args){}}
 namespace ElinTogether.Models {

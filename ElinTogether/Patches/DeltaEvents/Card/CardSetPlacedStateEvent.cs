@@ -32,6 +32,7 @@ internal static class CardSetPlacedStateEvent
             PlaceState = newState,
             Dir = __instance.dir,
             ByPlayer = byPlayer,
+            ZoneUid = EClass._zone.uid,
         });
 
         return connection.IsHost;

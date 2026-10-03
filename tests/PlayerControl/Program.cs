@@ -28,6 +28,10 @@ Check(client.ControlInputBlocked&&!PlayerControl.WatchingOwnCharacter,"resume re
 client.Finish();Check(client.Host.Sent.Last() is PlayerControlReady ready&&ready.Id==request.Id,"zone completion acknowledges original handoff token");
 client.Reply(new(){Id=request.Id,Mode=PlayerControlMode.Human});Check(!client.ControlInputBlocked,"only host confirmation restores local input");
 client.Reply(new(){Id=Guid.Empty,Mode=PlayerControlMode.Companion});Check(!client.ControlInputBlocked,"empty unsolicited token cannot steal restored control");
+client.ZoneTransitionPending=true;
+Check(PlayerControl.LocalInputBlocked&&!client.ControlInputBlocked,"zone handoff blocks gameplay without discarding already-sent inventory outcomes");
+client.ZoneTransitionPending=false;
+Check(!PlayerControl.LocalInputBlocked,"completed zone handoff restores ordinary input");
 Console.WriteLine($"{checks} control-handoff checks passed; fake Unity/transport boundary.");
 
 var localGame=EClass.core.game!;

@@ -6,5 +6,6 @@
 <Reference Include="MonoMod.RuntimeDetour"><HintPath>$(ElinGamePath)/BepInEx/core/MonoMod.RuntimeDetour.dll</HintPath></Reference>
 <Reference Include="Mono.Cecil"><HintPath>$(ElinGamePath)/BepInEx/core/Mono.Cecil.dll</HintPath></Reference>
 <Compile Include="../../ElinTogether/Patches/DeltaEvents/Chara/BossLootTerrainPatch.cs" Link="BossLootTerrainPatch.cs"/>
+<Compile Include="../../ElinTogether/Patches/DeltaEvents/Chara/PathTerrainSync.cs" Link="PathTerrainSync.cs"/>
 <Compile Include="../../ElinTogether/Models/Delta/Zone/BossLootTileDelta.cs" Link="BossLootTileDelta.cs"/>
 </ItemGroup></Project>

@@ -1,0 +1,21 @@
+using ElinTogether.Models;
+using Newtonsoft.Json;
+int checks=0;
+void Check(bool ok,string why){if(!ok)throw new Exception(why);checks++;Console.WriteLine("PASS "+why);}
+var local=new Window.SaveData {open=true,fixedPos=true,useBG=true,filter="old"};
+for(int i=1;i<local.ints.Length;i++)local.ints[i]=i*100+1;
+var before=(int[])local.ints.Clone();
+var remote=new Window.SaveData {open=false,excludeDump=true,excludeCraft=true,onlyRottable=true,filter="+food",cats=[4,5],priority=7};
+ContainerWindowSettings.CopyShared(local,remote);
+Check(new[]{1,2,3,4,5,7,8,12,13}.All(i=>local.ints[i]==before[i]),"native layout integers preserved by shared settings");
+Check(local.open&&local.fixedPos&&local.useBG,"native local window flags remain local");
+Check(local.excludeDump&&local.excludeCraft&&local.onlyRottable&&local.priority==7,"native gameplay settings apply");
+Check(local.filter=="+food"&&local.cats.SetEquals(remote.cats),"filters synchronized");
+remote.cats.Clear();Check(local.cats.Count==2,"filter categories are not aliased");
+var json=JsonConvert.SerializeObject(local);var restored=JsonConvert.DeserializeObject<Window.SaveData>(json)!;
+Check(restored.ints[1]==before[1]&&restored.onlyRottable&&restored.fixedPos,"real native JSON callbacks retain layout and flags");
+var authoritative=new Window.SaveData{priority=99,excludeDump=false};
+ContainerWindowSettings.CopyLayout(authoritative,restored);
+Check(authoritative.priority==99&&!authoritative.excludeDump,"restoring personal layout preserves authoritative behavior");
+Check(authoritative.ints[1]==before[1]&&authoritative.fixedPos,"restoring layout copies exact coordinates and presentation flags");
+Console.WriteLine($"{checks} native Window.SaveData checks passed.");

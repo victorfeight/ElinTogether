@@ -61,9 +61,16 @@ public class BuildVersionIntegrity : EClass
         V27 = 27,
         // Host-authored live land expansion bounds.
         V28 = 28,
+        // Authoritative equipment enhancement changes and transfer reconciliation.
+        V29 = 29,
+        // Zone-bound item outcomes and inactive-map prediction correction.
+        V30 = 30,
+        V31 = 31,
+        // Container settings identify their owning item, never a shared UI prefab.
+        V32 = 32,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V28;
+    public const APIVersion APIVersionLatest = APIVersion.V32;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

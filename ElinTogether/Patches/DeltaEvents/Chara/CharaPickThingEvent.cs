@@ -12,13 +12,14 @@ namespace ElinTogether.Patches;
 internal static class CharaPickThingEvent
 {
     [HarmonyPrefix]
+    [HarmonyBefore("AutoActAllyExpansion")]
     internal static bool OnCharaPickThingy(Chara __instance, Thing t, ref Thing __result)
     {
         if (NetSession.Instance.Connection is not { } connection) {
             return true;
         }
 
-        if (connection.IsClient && !CardCache.Contains(t)) {
+        if (SkipClientReplayPickup(__instance, t) || (connection.IsClient && !CardCache.Contains(t))) {
             // pick self without returning null
             __result = t;
             return false;
@@ -33,6 +34,18 @@ internal static class CharaPickThingEvent
 
         // Ordinary pickup is already synchronized by AddThing, TryStackTo and
         // Zone.AddCard. Publishing an attempt here also published rejected pickups.
+        return true;
+    }
+
+    internal static bool SkipClientReplayPickup(Chara? actor, Thing item)
+    {
+        // Completion replay is presentation of a host decision, not a new pickup.
+        // Run before Ally Expansion can redirect the remote actor to EClass.pc.
+        // Explicit product handoffs use Simulate(), so remain ordinary local input.
+        if (NetSession.Instance.Connection is not ElinNetClient ||
+            !ElinDelta.IsRemoteStateLanding || !CharaProgressCompleteDelta.IsReplaying) return false;
+        EmpLog.Debug("PickupTrace suppressed completion replay pickup: actor {ActorUid}, item {ItemUid}, parent {ParentUid}",
+            actor?.uid, item.uid, (item.parent as Card)?.uid);
         return true;
     }
 
@@ -71,13 +84,14 @@ internal static class CharaTryPickGroundItemEvent
 internal static class CharaPickOrDropEvent
 {
     [HarmonyPrefix]
+    [HarmonyBefore("AutoActAllyExpansion")]
     internal static bool OnCharaPickOrDrop(Chara __instance, Point p, Thing t)
     {
         if (NetSession.Instance.Connection is not { } connection) {
             return true;
         }
 
-        if (connection.IsClient && !CardCache.Contains(t)) {
+        if (CharaPickThingEvent.SkipClientReplayPickup(__instance, t) || (connection.IsClient && !CardCache.Contains(t))) {
             return false;
         }
 
@@ -95,13 +109,14 @@ internal static class CharaPickOrDropEvent
 internal static class CharaTrySmoothPickEvent
 {
     [HarmonyPrefix]
+    [HarmonyBefore("AutoActAllyExpansion")]
     internal static bool OnTrySmoothPick(Point p, Thing t, Chara c)
     {
         if (NetSession.Instance.Connection is not { } connection) {
             return true;
         }
 
-        if (connection.IsClient && !CardCache.Contains(t)) {
+        if (CharaPickThingEvent.SkipClientReplayPickup(c, t) || (connection.IsClient && !CardCache.Contains(t))) {
             return false;
         }
 

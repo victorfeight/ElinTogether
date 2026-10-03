@@ -14,6 +14,7 @@ internal partial class ElinNetClient
     private const int MaxZoneSyncRetries = 3;
 
     private int _zoneSyncFailures;
+    internal bool ZoneTransitionPending { get; private set; }
 
     /// <summary>
     ///     Request a map snapshot manually, mostly just used when joining a session
@@ -47,6 +48,7 @@ internal partial class ElinNetClient
     /// </summary>
     private void OnZoneDataResponse(ZoneDataResponse response)
     {
+        ZoneTransitionPending = true;
         using var _ = LogContext.PushProperty("Zone", new { response.ZoneFullName, response.ZoneUid }, true);
 
         EmpLog.Information("Received zone state");
@@ -175,7 +177,10 @@ internal partial class ElinNetClient
 
             if (pc.isDead) {
                 PutHimRightEr(fresh ? response.Pos : null);
-                if (fresh) FinishControlResume();
+                if (fresh) {
+                    ZoneTransitionPending = false;
+                    FinishControlResume();
+                }
                 return;
             }
 
@@ -187,6 +192,7 @@ internal partial class ElinNetClient
 
             pc.Stub_Move(response.Pos, Card.MoveType.Force);
             pc.SetDir(pc.dir);
+            ZoneTransitionPending = false;
             FinishControlResume();
         });
     }

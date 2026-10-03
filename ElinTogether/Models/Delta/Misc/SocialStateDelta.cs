@@ -46,7 +46,7 @@ public sealed class SocialStateDelta : ElinDelta
     protected override void OnApply(ElinNetBase net)
     {
         if (net.IsHost || Id == Guid.Empty || Target.Find() is not Chara target || !Received.Add(Id)) return;
-        target._affinity = AffinityValue;
+        SocialNotifications.ApplyAffinity(target, AffinityValue);
         target.interest = Interest;
         target.SetStr(72, FavouriteFood);
         target.SetStr(73, FavouriteCategory);

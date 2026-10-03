@@ -1,0 +1,40 @@
+Cross-floor item outcome regression (2026-10-03)
+
+Evidence: paired host Player (19), host session archive, local Player/session.
+Robe UID 69798 was picked by client 719 on Nymelle B2F (2043) at
+12:07:15 UTC after the host activated B1F (8). Host CardAddThingDelta
+accepted the request. Host returned to B2F, then picked the same UID
+from client inventory at 12:07:24 UTC; subsequent ground picks still
+referenced the inventory item.
+
+Native boundary: Card.AddThing -> old parent.RemoveCard. Zone.RemoveCard
+only calls Map.OnCardRemovedFromZone for the active zone. Inactive-zone
+transfer changes ownership while leaving map.things and tile entries intact.
+The test boundary reproduces that conditional cleanup.
+
+Fix: ItemTransferContext validates client outcome source/destination roots
+and the action's zone before mutation or success relay. Add, stack, drop,
+and placement use the same guard. Existing item-location packets correct
+prediction. An inactive-floor correction detaches the client replica and
+releases cache references without Destroy or off-map placement; the next
+host map snapshot provides ground state. Client action input/ticks pause
+between map response and completed activation. Pending outcomes still
+reach the host for validation rather than being silently discarded.
+
+59 pickup checks and 35 control/identity checks passed. These are linked
+production-handler tests with native/Unity boundary models, not a live
+Steam multiplayer test. Protocol V30 requires both peers to update.
+
+In-game acceptance:
+- Pick a ground item while host changes floors, then return.
+- Repeat with compatible stacks, a ground container, and a held-item drop.
+- Item must remain at authoritative ground/container location or belong
+  to exactly one character; host cannot pick it out of client inventory.
+- Normal same-floor pickups, overflow drops, AutoAct product handoffs,
+  shop cursor placement and Take a Break must continue working.
+- Rejected races log PickupTrace stale-zone rejected with source, target,
+  request and active zone IDs; correction logs off-map replica released.
+
+This prevents the traced race. It does not reconstruct items already sold,
+spent or corrupted by earlier gameplay, and does not claim all ghosting
+causes are eliminated.

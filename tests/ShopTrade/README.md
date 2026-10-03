@@ -32,6 +32,19 @@ native UI.EndDrag with its action callback suppressed, avoiding a second sale.
 Closing the UI while a request is pending waits for its reply before settlement.
 One request per client shop session is in flight at a time.
 
+Paid cursor presentation detaches from the actual buyer container before vanilla
+OnStartDrag, rather than trying to remove the purchase from the old shop button's
+container. A matching late host reservation is also detached while that exact
+cursor remains active. Ending the drag/reset clears this transient presentation
+state; other items and other destinations are untouched. The host keeps its paid
+reservation for disconnect safety. Explicit same-container placement relocates
+the reserved host item, clearing its old slot first. A reply cannot replace an
+unrelated cursor that was started while waiting.
+
+Regression checks cover both reservation/reply arrival orders, unrelated updates,
+drag end/reset, and ordinary drag isolation. UI methods are boundary stubs; actual
+Unity cursor callbacks and transport ordering still require the acceptance run.
+
 Each player's native net-purchase/net-sale ledger is persisted on their host
 character. Only ledger data and archived items are stored, not UI objects or the
 host's global ShopTransaction.current. Native GetPrice/Process handle price and
@@ -65,6 +78,10 @@ transactions for arbitrary exceptions thrown by other mods. Both peers need V16.
   alternate currency, vending machine, empty/full inventory, and cursed equipment.
 - Close during a pending purchase and disconnect while holding a paid item. Check
   host ownership and saved ledger; rejoin without another payment or reward.
+- Buy a rod by ordinary click with one free backpack slot. While it is on the
+  cursor it must not also occupy a client backpack slot. Wait several seconds,
+  then place it in a chosen backpack/hotbar slot, sell it back, or drop it. Compare
+  identity/count/charges and money on both peers, then reopen/rejoin.
 - Two clients plus host trade with one merchant. Check independent refund ledgers,
   no forced UI reopening and no premature chest lock.
 - Save/reload with an open ledger; inspect world purchase counters, stolen flags

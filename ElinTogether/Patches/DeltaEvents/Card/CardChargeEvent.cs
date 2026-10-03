@@ -25,10 +25,14 @@ internal static class CardChargeEvent
             return;
         }
 
-        // client will accept later
-        connection.Delta.AddRemote(new CardChargeDelta {
+        // Completion is replayed on clients before its captured results land.
+        // Sending charges ahead of that replay lets OnRead decrement them again.
+        // Keep charges with the other absolute results (including final ModNum).
+        var delta = new CardChargeDelta {
             Card = __instance,
             Charges = __instance.c_charges,
-        });
+        };
+        if (CharaProgressCompleteEvent.ShouldPack(false)) CharaProgressCompleteEvent.Pack(delta);
+        else connection.Delta.AddRemote(delta);
     }
 }

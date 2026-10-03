@@ -24,6 +24,8 @@ public class CardAddThingDelta : ElinDelta
     [Key(4)]
     public required int DestInvY { get; init; }
 
+    [Key(5)] public int ZoneUid { get; init; }
+
     protected override void OnApply(ElinNetBase net)
     {
         if (Thing.Find() is not Thing { isDestroyed: false } thing) {
@@ -39,12 +41,20 @@ public class CardAddThingDelta : ElinDelta
         }
 
         if (RejectForeignOwner(net, OriginPeer, Thing, thing)) return;
+        if (ItemTransferContext.Reject(net, OriginPeer, ZoneUid, Thing, thing, parent)) return;
 
         if (net.IsHost) {
             net.Delta.AddRemote(this);
         }
 
         var before = QuickTransferTrace.Item(thing);
+        // A paid cursor item is still reserved in this container on the host.
+        // Moving it into an explicit slot must relocate it, not hit AddThing's
+        // same-parent early return. Remove first so the old grid slot is cleared.
+        if (net.IsHost && OriginPeer != 0 && thing.parent == parent &&
+            ((DestInvX >= 0 && DestInvX != thing.invX) || (DestInvY >= 0 && DestInvY != thing.invY))) {
+            parent.RemoveCard(thing);
+        }
         if (thing.parent != parent) {
             var added = parent.AddThing(thing, TryStack, DestInvX, DestInvY);
             if (added == thing) {
@@ -66,6 +76,7 @@ public class CardAddThingDelta : ElinDelta
         EmpLog.Debug("PickupTrace transfer-result: origin {OriginPeer}, item {ItemUid}, requestedParent {ParentUid}, before {Before}, after {After}, matchesParent {MatchesParent}, consumed {Consumed}",
             OriginPeer, Thing.Uid, Parent.Uid, before, QuickTransferTrace.Item(thing),
             thing.parent == parent, thing.isDestroyed);
+        if (net.IsClient) ShopTrade.DetachPaidDrag(thing, parent);
     }
 
     // All pickup outcomes must honor a host-side ownership change, including

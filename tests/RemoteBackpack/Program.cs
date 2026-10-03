@@ -16,6 +16,19 @@ Check(!RemoteBackpackCapacityPatch.IsFull(bag, 0, ref full) && !full, "temporary
 EClass.pc = originalPC;
 var slots = bag.Select(t => { bool visible = true; RemoteBackpackCapacityPatch.ShouldShowOnGrid(bag, t, ref visible); return visible; }).Count(v => v);
 Check(slots == 23, "host inspection uses same equipment and hotbar exclusions as client");
+// Production IsRemotePlayer becomes false while the host runs companion AI.
+remote.IsPlayer = false; remote.SavedPlayer = true;
+Check(!RemoteBackpackCapacityPatch.IsFull(bag, 0, ref full) && !full, "Take a Break retains free slots despite NPC-sized total item count");
+Check(!RemoteBackpackCapacityPatch.IsAlmostFull(bag, 2, ref full) && !full, "gift follow-up cannot prematurely sell inventory by counting equipment and hotbar");
+slots = bag.Count(t => { bool visible = true; RemoteBackpackCapacityPatch.ShouldShowOnGrid(bag, t, ref visible); return visible; });
+Check(slots == 23, "Take a Break inspection still excludes equipped and hotbar items");
+NetSession.Instance.Connection = null;
+Check(!RemoteBackpackCapacityPatch.IsFull(bag, 0, ref full) && !full, "offline saved-character ally retains player backpack capacity");
+EClass.pc = remote;
+Check(RemoteBackpackCapacityPatch.IsFull(bag, 0, ref full), "switching to saved character restores vanilla local-player grid handling");
+EClass.pc = originalPC; NetSession.Instance.Connection = host;
+remote.IsPlayer = true;
+Check(!RemoteBackpackCapacityPatch.IsFull(bag, 0, ref full) && !full, "regaining human control preserves capacity");
 for (int i = 0; i < 12; i++) bag.Add(new Thing());
 RemoteBackpackCapacityPatch.IsFull(bag, 0, ref full);
 Check(full, "exactly full backpack is still full");
@@ -30,7 +43,8 @@ Check(RemoteBackpackCapacityPatch.IsFull(bag, 0, ref full), "ordinary NPC capaci
 bag.owner = new Card();
 Check(RemoteBackpackCapacityPatch.IsFull(bag, 0, ref full), "bags and special containers retain native rules");
 bag.owner = remote; NetSession.Instance.Connection = null;
-Check(RemoteBackpackCapacityPatch.IsFull(bag, 0, ref full), "solo inventories remain native");
+remote.IsPlayer = false; remote.SavedPlayer = false;
+Check(RemoteBackpackCapacityPatch.IsFull(bag, 0, ref full), "ordinary solo NPC inventories remain native");
 NetSession.Instance.Connection = host;
 var map = EClass.game.activeZone.map;
 map.bounds.SetBounds(4, 5, 12, 13);
@@ -61,9 +75,9 @@ Check(host.Delta.Sent.Count == 1, "unrelated bounds emit nothing");
 Console.WriteLine($"{checks} remote backpack and map bounds checks passed");
 
 public class Card { }
-public class Chara : Card { public bool IsPlayer; }
+public class Chara : Card { public bool IsPlayer, SavedPlayer; public bool GetBool(string key) => key == "remote_chara" && SavedPlayer; }
 public class Thing { public bool isEquipped; public int invY; }
-public class ThingContainer : List<Thing> { public Card owner = new(); public int GridSize; public bool IsFull(int y = 0) => throw new NotImplementedException(); public bool ShouldShowOnGrid(Thing t) => throw new NotImplementedException(); }
+public class ThingContainer : List<Thing> { public Card owner = new(); public int GridSize; public bool IsFull(int y = 0) => throw new NotImplementedException(); public bool IsAlmostFull(int threshold = 2) => throw new NotImplementedException(); public bool ShouldShowOnGrid(Thing t) => throw new NotImplementedException(); }
 public class EClass { public static Chara pc = new() { IsPlayer = true }; public static Game game = new(); }
 public class Game { public bool isLoading; public Zone activeZone = new(); }
 public class Zone { public int uid = 7; public Map map = new(); }

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup><ItemGroup>
+<Compile Include="../../ElinTogether/Models/ContainerWindowSettings.cs" Link="ContainerWindowSettings.cs"/>
+<Reference Include="Elin"><HintPath>$(ElinGamePath)/Elin_Data/Managed/Elin.dll</HintPath></Reference>
+<Reference Include="$(ElinGamePath)/Elin_Data/Managed/Plugins*.dll" />
+<Reference Include="UnityEngine.CoreModule"><HintPath>$(ElinGamePath)/Elin_Data/Managed/UnityEngine.CoreModule.dll</HintPath></Reference>
+<Reference Include="Newtonsoft.Json"><HintPath>$(MSBuildToolsPath)/Newtonsoft.Json.dll</HintPath></Reference>
+</ItemGroup></Project>

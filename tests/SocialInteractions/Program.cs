@@ -101,4 +101,28 @@ EClass.player.chara=frey;
 
 NetSession.Instance.Connection=null;local=new Thing{uid=15};frey.AddThing(local);frey.GiveGift(npc,local);
 Check(local.parent==npc&&!SocialInteractions.Active,"single-player gift remains vanilla");
+// Presentation observes accepted absolute changes; never recalculates affinity.
+NetSession.Instance.Connection=client;
+var notices=new List<(int Before,int After)>();
+Action<Chara,int,int> observer=(c,b,a)=>notices.Add((b,a));
+SocialNotifications.AffinityChanged+=observer;
+npc._affinity=10;
+var noticePacket=SocialStateDelta.Capture(npc);
+npc._affinity=5;
+noticePacket.Apply(client); noticePacket.Apply(client);
+Check(notices.SequenceEqual(new[]{(5,10)}),"accepted social result emits one confirmed affinity notification; duplicate packet emits none");
+SocialNotifications.ApplyAffinity(npc,10);
+Check(notices.Count==1,"second delivery path of same affinity value does not duplicate popup");
+SocialNotifications.ApplyAffinity(npc,7);
+Check(notices.Last()==(10,7),"negative affinity reports actual confirmed difference");
+SocialNotifications.AffinityChanged-=observer;
+Action<Chara,int,int> broken=(c,b,a)=>throw new Exception("optional widget failed");
+SocialNotifications.AffinityChanged+=broken;
+SocialNotifications.AffinityChanged+=observer;
+SocialNotifications.ApplyAffinity(npc,12);
+Check(npc._affinity==12&&notices.Last()==(7,12),"broken UI subscriber cannot block affinity state or another subscriber");
+SocialNotifications.AffinityChanged-=broken;
+SocialNotifications.AffinityChanged-=observer;
+SocialNotifications.ApplyAffinity(npc,15);
+Check(npc._affinity==15,"affinity replication works without notification mod");
 Console.WriteLine($"{checks} social checks passed");

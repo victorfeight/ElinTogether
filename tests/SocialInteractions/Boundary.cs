@@ -70,7 +70,7 @@ namespace HarmonyLib {
 namespace ElinTogether.Helper { public class Marker {} }
 namespace ElinTogether {
  public sealed class ScopeExit:IDisposable {public Action? OnExit;public void Dispose()=>OnExit?.Invoke();}
- public static class EmpLog{public static void Information(string s,params object[] a){} }
+ public static class EmpLog{public static void Warning(string s,params object[] a){} public static void Information(string s,params object[] a){} }
 }
 namespace ElinTogether.Patches {
  internal static class MsgRelayContext {internal static ElinTogether.ScopeExit RedirectTo(Chara c)=>new();}

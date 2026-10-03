@@ -19,11 +19,15 @@ public class CardPlacedDelta : ElinDelta
     [Key(3)]
     public required bool ByPlayer { get; init; }
 
+    [Key(4)] public int ZoneUid { get; init; }
+
     protected override void OnApply(ElinNetBase net)
     {
         if (Owner.Find() is not { } card) {
             return;
         }
+
+        if (card is Thing item && ItemTransferContext.Reject(net, OriginPeer, ZoneUid, Owner, item)) return;
 
         if (net.IsHost) {
             net.Delta.AddRemote(this);

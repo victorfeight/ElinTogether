@@ -40,6 +40,12 @@ public class ZoneAddCardDelta : ElinDelta
         }
 
         if (CardAddThingDelta.RejectForeignOwner(net, OriginPeer, Card, card)) return;
+        if (card is Thing item && ItemTransferContext.Reject(net, OriginPeer, ZoneUid, Card, item, ground: zone)) return;
+
+        if (net.IsClient && zone != _zone && card is Thing) {
+            ItemTransferContext.ForgetInactiveReplica(card);
+            return;
+        }
 
         // relay to other clients
         if (net.IsHost) {

@@ -129,4 +129,30 @@ var empty = new ShopTransaction { trader = nativeShop.trader }; ShopTransaction.
 var count = client.Delta.Sent.Count;
 ShopTrade.CloseClient(empty);
 Check(client.Delta.Sent.Count == count + 1 && ((ShopTradeDelta)client.Delta.Sent[^1]).Close, "empty shop close still requests chest cleanup");
+
+// Host reservation and cursor presentation must remain distinct in both orders.
+var paid = Item("paidrod", 1); actor.AddThing(paid);
+var paidTransaction = new InvOwner.Transaction { thing = paid, destInv = new InvOwnerShop(actor, actor, CurrencyType.None, PriceType.Default) };
+ShopTrade.Replaying = paidTransaction;
+var cursor = new DragItemCard(); cursor.from.thing = paid; EClass.ui.currentDrag = cursor;
+ElinTogether.Patches.ShopTradePatch.StartPaidDrag(cursor);
+Check(paid.parent is null && !actor.things.Contains(paid), "paid cursor detaches from actual buyer inventory rather than original merchant button");
+ShopTrade.Replaying = null;
+actor.AddThing(paid); ShopTrade.DetachPaidDrag(paid, actor);
+Check(paid.parent is null && !actor.things.Contains(paid), "late host reservation cannot recreate a second visible inventory entry");
+var unrelated = Item("other", 1); actor.AddThing(unrelated); ShopTrade.DetachPaidDrag(unrelated, actor);
+Check(unrelated.parent == actor, "unrelated inventory update is preserved during paid drag");
+chest.AddThing(paid); ShopTrade.DetachPaidDrag(paid, chest);
+Check(paid.parent == chest, "authoritative transfer to a different container is not detached");
+ElinTogether.Patches.ShopTradePatch.EndPaidDrag(cursor); EClass.ui.currentDrag = null;
+actor.AddThing(paid); ShopTrade.DetachPaidDrag(paid, actor);
+Check(paid.parent == actor, "ending the cursor restores normal authoritative inventory landing");
+actor.RemoveCard(paid); EClass.ui.currentDrag = cursor; ShopTrade.Replaying = paidTransaction;
+ElinTogether.Patches.ShopTradePatch.StartPaidDrag(cursor); ShopTrade.Replaying = null;
+actor.AddThing(paid); ShopTrade.DetachPaidDrag(paid, actor);
+Check(paid.parent is null, "reply before reservation still registers the paid cursor");
+ShopTrade.Reset(); actor.AddThing(paid); ShopTrade.DetachPaidDrag(paid, actor);
+Check(paid.parent == actor, "disconnect/reset discards transient cursor reservation view");
+ShopTrade.Replaying = null; ElinTogether.Patches.ShopTradePatch.StartPaidDrag(cursor);
+Check(paid.parent == actor, "ordinary native drag is not intercepted");
 Console.WriteLine($"{checks} checks passed using vanilla ShopTransaction");

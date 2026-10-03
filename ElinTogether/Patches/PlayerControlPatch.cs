@@ -15,7 +15,7 @@ internal static class PlayerControlPatch
     {
         if (__instance != EClass.pc) return true;
         if (NetSession.Instance.Connection is ElinNetClient client)
-            return !client.ControlInputBlocked || ElinDelta.IsApplying;
+            return !(client.ControlInputBlocked || client.ZoneTransitionPending) || ElinDelta.IsApplying;
         if (NetSession.Instance.Connection is ElinNetHost host && host.IsCompanionControlled(__instance) &&
             !__instance.isDead) {
             __instance.FindNewEnemy();

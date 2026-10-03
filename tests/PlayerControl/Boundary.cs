@@ -35,6 +35,7 @@ namespace ElinTogether.Net {
   public void Ready(PlayerControlReady r,ISteamNetPeer p)=>OnPlayerControlReady(r,p);
  }
  internal partial class ElinNetClient:EClass {
+ public bool ZoneTransitionPending;
   public Peer Host=new();public Buffer Delta=new();public bool CanCheckpoint=true;
   public bool CheckpointPersonalProfile()=>CanCheckpoint; public void WorldStateDeltaUpdate(){}
   public void Reply(PlayerControlReply r)=>OnPlayerControlReply(r);public void Finish()=>FinishControlResume();

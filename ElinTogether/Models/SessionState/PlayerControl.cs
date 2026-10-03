@@ -30,7 +30,7 @@ public sealed class PlayerControlReady
 internal static class PlayerControl
 {
     internal static bool LocalInputBlocked => NetSession.Instance.Connection switch {
-        ElinNetClient client => client.ControlInputBlocked,
+        ElinNetClient client => client.ControlInputBlocked || client.ZoneTransitionPending,
         ElinNetHost host => host.States.TryGetValue(0, out var state) && state.Control != PlayerControlMode.Human,
         _ => false,
     };

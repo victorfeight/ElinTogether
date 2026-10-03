@@ -114,6 +114,7 @@ internal static class CardAddThingEvent
             TryStack = tryStack,
             DestInvX = destInvX,
             DestInvY = destInvY,
+            ZoneUid = EClass._zone.uid,
         });
 
         return true;

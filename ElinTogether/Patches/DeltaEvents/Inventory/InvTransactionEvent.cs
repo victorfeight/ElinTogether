@@ -21,8 +21,9 @@ internal static class InvTransactionEvent
             return true;
         }
 
-        // effect windows is fake inv just like Windows 8
-        if (__instance.destInv is InvOwnerEffect) {
+        // These slots select an existing item. Do not detach equipped gear on
+        // the host merely to select it; their handlers submit validated actions.
+        if (__instance.destInv is InvOwnerEffect or InvOwnerBlend) {
             return true;
         }
 

@@ -40,3 +40,30 @@ Check(CharaProgressCompleteEvent.Packed.Count==2&&host.Delta.Items.Count==before
 NetSession.Instance.Connection=null;Point.Tiles[(3,2)]=(6,8);
 BossLootTerrainPatch.SetBlock(alternate,0,0);BossLootTerrainPatch.SetObj(alternate,0,1,0);
 Check(Point.Tiles[(3,2)]==(0,0)&&host.Delta.Items.Count==before,"single-player retains vanilla edits without networking");
+
+// The movement path uses GoalRemote on clients; capture host edits rather than
+// relying on the client's CanDestroyPath/GoalCombat predicate.
+var charaType=module.Types.Single(t=>t.Name=="Chara");
+var path=charaType.Methods.Single(m=>m.Name=="DestroyPath");
+Check(path.HasBody && charaType.Methods.Single(m=>m.Name=="CanDestroyPath").Body.Instructions.Any(i=>i.Operand is TypeReference t && t.Name=="GoalCombat"),"installed native wall-breaking eligibility depends on GoalCombat");
+var mapType=module.Types.Single(t=>t.Name=="Map");
+Check(mapType.Methods.Any(m=>m.Name=="SetBlock"&&m.Parameters.Count==5) && mapType.Methods.Any(m=>m.Name=="SetObj"&&m.Parameters.Count==7),"installed terrain setters match capture hooks");
+Check(mapType.Methods.Single(m=>m.Name=="RemoveLonelyRamps").Body.Instructions.Any(i=>i.Operand is MethodReference m && m.Name=="MineBlock"),"native dependent ramp cleanup re-enters captured mining path");
+CharaProgressCompleteEvent.Packing=false;NetSession.Instance.Connection=host;
+before=host.Delta.Items.Count;
+PathTerrainSync.Block(EClass._map,2,2);
+Check(host.Delta.Items.Count==before,"ordinary mining and building are not captured again");
+Check(PathTerrainSync.Begin(out var outer),"host runs native path destruction");
+EClass._map.cells[2,2]._block=0;PathTerrainSync.Block(EClass._map,2,2);
+PathTerrainSync.Begin(out var inner);PathTerrainSync.Object(EClass._map,2,2);PathTerrainSync.End(inner);
+PathTerrainSync.Block(EClass._map,3,2);PathTerrainSync.End(outer);
+Check(host.Delta.Items.Count==before+3,"nested path and dependent tile changes publish exact edits");
+PathTerrainSync.Block(EClass._map,2,2);
+Check(host.Delta.Items.Count==before+3,"finalizer restores capture scope, including exceptional exits");
+NetSession.Instance.Connection=client;
+Check(!PathTerrainSync.Begin(out outer),"client movement never independently mines walls or creates drops");PathTerrainSync.End(outer);
+NetSession.Instance.Connection=null;
+Check(PathTerrainSync.Begin(out outer),"solo destruction remains native");PathTerrainSync.End(outer);
+var shadows=EClass._map.Shadows;var fovs=EClass._map.Fovs;
+new BossLootTileDelta{ZoneUid=7,Pos=new(){X=2,Z=2},Block=true,Material=4,Id=0,Direction=2}.Apply(client);
+Check(EClass._map.Shadows==shadows+2&&EClass._map.Fovs==fovs+1&&EClass._map.cells[2,2].blockDir==2,"authoritative terrain refreshes shadows/FOV and preserves block direction");

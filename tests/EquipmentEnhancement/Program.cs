@@ -1,0 +1,64 @@
+using ElinTogether.Models;
+using ElinTogether.Net;
+using ElinTogether.Patches;
+using Mono.Cecil;
+
+int checks = 0;
+void Check(bool condition, string label) { if (!condition) throw new Exception(label); checks++; Console.WriteLine("PASS " + label); }
+using var module = ModuleDefinition.ReadModule(args[0]);
+MethodDefinition Method(string type, string name) => module.Types.Single(t => t.Name == type).Methods.Single(m => m.Name == name);
+bool Calls(MethodDefinition method, string name) => method.Body.Instructions.Any(i => i.Operand is MethodReference m && m.Name == name);
+var modify = Method("Card", "ModEncLv");
+Check(modify.Parameters.Count == 1 && modify.Parameters[0].ParameterType.FullName == "System.Int32", "installed native enhancement mutation has supported signature");
+Check(Calls(Method("TraitCrafter", "Craft"), "ModEncLv"), "installed crafter repairs call shared enhancement method");
+Check(Calls(Method("Card", "SetEncLv"), "ModEncLv"), "installed absolute setter delegates to native enhancement mutation");
+Check(Calls(modify, "ApplyMaterialElements") && Calls(modify, "ModBase"), "native mutation refreshes material bonuses and equipment elements");
+Check(Calls(Method("Thing", "ApplyMaterialElements"), "SetParent"), "native material refresh updates equipped character links");
+
+var host = new ElinNetHost(); var client = new ElinNetClient();
+var hostGear = new Thing { uid = 29300, encLV = -2, Armor = -3 };
+CardCache.Items[hostGear.uid] = hostGear; NetSession.Instance.Connection = host;
+CharaProgressCompleteEvent.Active = true;
+hostGear.ModEncLv(1); hostGear.ModEncLv(1);
+Check(hostGear.encLV == 0 && CharaProgressCompleteEvent.Packed.Count == 2 && host.Delta.Items.Count == 0, "two repairs publish host levels inside existing completion bundle");
+Check(CharaProgressCompleteEvent.Packed.Cast<CardEnhancementDelta>().Select(d => d.Level).SequenceEqual(new[] { -1, 0 }), "packets contain absolute levels, not another repair command");
+var cached = new Thing { uid = 29300, encLV = -2, Armor = -3, Equipped = true, LinkedArmor = -3 };
+var owner = new Card { uid = 719 }; cached.parent = owner;
+CardCache.Items[cached.uid] = cached; NetSession.Instance.Connection = client;
+foreach (var result in CharaProgressCompleteEvent.Packed) result.Apply(client);
+Check(cached.encLV == 0 && cached.Armor == 1 && cached.LinkedArmor == 1, "cached equipped girdle receives repaired level and native linked armor changes");
+Check(cached.MaterialRefreshes == 4 && cached.NativeCalls == 2, "both repair steps invoke native material recalculation");
+Check(ReferenceEquals(CardCache.Items[29300], cached) && cached.parent == owner, "repair preserves cached identity, ownership and equipment references");
+var final = CharaProgressCompleteEvent.Packed.Last(); final.Apply(client); final.Apply(client);
+Check(cached.NativeCalls == 2 && cached.Armor == 1, "repeated final state cannot double-enchant item");
+Check(client.Delta.Items.Count == 0 && LayerInventory.Dirty.Contains(29300), "client refreshes inventory without echoing gameplay");
+cached.ModEncLv(-1); var prior = cached.encLV; final.Apply(host);
+Check(cached.encLV == prior, "host ignores incoming enhancement result");
+cached.isDestroyed = true; final.Apply(client); Check(cached.encLV == prior, "destroyed item stays untouched"); cached.isDestroyed = false;
+CardCache.Items.Remove(cached.uid); final.Apply(client); Check(CardCache.Items.Count == 0, "missing item is not recreated from an enhancement packet");
+
+NetSession.Instance.Connection = host; CardCache.Items[hostGear.uid] = hostGear;
+CharaProgressCompleteEvent.Active = false; host.Delta.Items.Clear();
+owner.AddThing(hostGear, false, -1, -1);
+Check(host.Delta.Items.Count == 1 && ((CardEnhancementDelta)host.Delta.Items[0]).Level == 0, "transfer republishes current enhancement for previously repaired gear");
+var shoes = new Thing { uid = 40047, encLV = -1, Armor = -2 };
+CardCache.Items[shoes.uid] = shoes; shoes.ModEncLv(1);
+Check(((CardEnhancementDelta)host.Delta.Items.Last()).Card.Uid == 40047, "non-bundled enhancement uses normal host result queue");
+NetSession.Instance.Connection = client; CardCache.Items[hostGear.uid] = cached;
+host.Delta.Items[0].Apply(client);
+Check(cached.encLV == 0, "retransfer repairs stale pre-fix cached enhancement without reconnect");
+var weapon = new Thing { uid = 99, encLV = 2, Damage = 4, IsWeapon = true };
+CardCache.Items[99] = weapon;
+new CardEnhancementDelta { Card = weapon, Level = 1 }.Apply(client);
+Check(weapon.encLV == 1 && weapon.Damage == 3, "authoritative downgrade repairs client weapon prediction using native damage adjustment");
+
+NetSession.Instance.Connection = host; var count = host.Delta.Items.Count;
+shoes.ModEncLv(0); Check(host.Delta.Items.Count == count, "no-change mutation sends nothing");
+EClass.game.isLoading = true; shoes.ModEncLv(1); EClass.game.isLoading = false;
+Check(host.Delta.Items.Count == count, "save loading does not generate enhancement traffic");
+var uncached = new Thing { uid = 7 }; uncached.ModEncLv(1);
+var food = new Thing { uid = 8, IsEquipmentOrRangedOrAmmo = false }; CardCache.Items[8] = food; food.ModEncLv(1);
+Check(host.Delta.Items.Count == count, "generation and unrelated food enhancement remain outside equipment synchronization");
+NetSession.Instance.Connection = null; shoes.ModEncLv(1);
+Check(host.Delta.Items.Count == count, "solo play stays native");
+Console.WriteLine($"{checks} equipment checks passed; installed native IL inspected, Unity rendering simulated.");

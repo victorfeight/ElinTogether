@@ -12,6 +12,12 @@ internal static class ShopTradePatch
     [HarmonyPostfix, HarmonyPatch(typeof(ShopTransaction), nameof(ShopTransaction.OnEndTransaction))]
     internal static void HostClose(ShopTransaction __instance) => ShopTrade.PublishHostClose(__instance);
 
+    [HarmonyPrefix, HarmonyPatch(typeof(DragItemCard), nameof(DragItemCard.OnStartDrag))]
+    internal static void StartPaidDrag(DragItemCard __instance) => ShopTrade.BeginPaidDrag(__instance);
+
+    [HarmonyPostfix, HarmonyPatch(typeof(DragItemCard), nameof(DragItemCard.OnEndDrag))]
+    internal static void EndPaidDrag(DragItemCard __instance) => ShopTrade.EndPaidDrag(__instance);
+
     [HarmonyPrefix, HarmonyPatch(typeof(DragItemCard), nameof(DragItemCard.OnDrag))]
     internal static bool FinishPaidDrag(ref bool __result)
     {

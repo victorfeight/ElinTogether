@@ -36,7 +36,7 @@ public class Stats{public int kills;}public class Pref{public int sort;}
 public class HotbarManager{public int Slot;public bool Initialized;public List<HotItem> Items=[];public void OnCreateGame()=>Initialized=true;}
 public class HotItem{}public class HotItemAbility:HotItem{public string Alias="";}public class NumLog{}public class HotItemNoItem:HotItem{}public class ReturnInfo{public int turns;}
 public class RecipeManager{public HashSet<string> knownRecipes=["axe"];public HashSet<string> craftedRecipes=["axe"];}
-public class Thing{public int uid,Num,invX,invY;public string id="",c_idAbility="";public bool isDestroyed;public Trait trait=new();public void Destroy()=>isDestroyed=true;}
+public class Thing{public Window.SaveData? c_windowSaveData; [JsonIgnore] public Chara? Root; public Chara? GetRootCard()=>Root; public List<Thing> things=[]; public int uid,Num,invX,invY;public string id="",c_idAbility="";public bool isDestroyed;public Trait trait=new();public void Destroy()=>isDestroyed=true;}
 public class Trait{}public class TraitAbility:Trait{}
 public static class CardBlueprint{public static void SetNormalRarity(){}}
 public static class WidgetCurrentTool{public static bool dirty;}
@@ -103,7 +103,7 @@ public static class EmpPop{public static void Information(string s){}}
 public static class EmpLog{public static void Warning(Exception e,string m,params object[] a){}public static void Information(string message,params object[] args){}public static void Warning(string m,params object[] a){}public static void Debug(string m,params object[] a){}}
 namespace ElinTogether.Helper{public class Placeholder{}}
 namespace ElinTogether.Net.Steam{public interface ISteamNetPeer{bool IsConnected{get;}}public class FakeProfilePeer:ISteamNetPeer{public bool Connected=true;public bool IsConnected=>Connected;}}
-namespace ElinTogether.Helper.Extensions{public static class Ext{public static IEnumerable<Thing> Flatten(this List<Thing> things)=>things;}}
+namespace ElinTogether.Helper.Extensions{public static class Ext{public static IEnumerable<Thing> Flatten(this List<Thing> things)=>things.SelectMany(t=>new[]{t}.Concat(t.things.Flatten()));}}
 namespace MessagePack{public class MessagePackObjectAttribute:Attribute{}public class KeyAttribute(int n):Attribute{public int N=n;}}
 namespace ElinTogether.Net{
  public class ElinNetBase:EClass{}public class ElinNetHost:ElinNetBase{public Queue Delta=new();public Dictionary<int,Chara> ActiveRemoteCharas=[];}internal partial class ElinNetClient:ElinNetBase {
@@ -132,3 +132,16 @@ namespace ElinTogether.Models{
 }
 
 namespace ElinTogether.Models { public enum PlayerControlMode { Human, Companion, Resuming } }
+
+public class Window {
+ public SaveData? saveData; public int SavedX; public void UpdateSaveData(){if(saveData!=null)saveData.ints[1]=SavedX;}
+ public class SaveData {
+  public int[] ints=new int[20]; public HashSet<int> cats=[]; public string filter=""; public string[]? _filterStrs;
+  public int autodump,sharedType,priority,flag,category,sortMode;
+  public bool excludeDump,excludeCraft,compress,advDistribution,noRotten,onlyRottable,alwaysSort,sort_ascending,open,useBG,noRightClickClose,fixedPos,shiftToShowMenu;
+ }
+}
+public class InvOwner {public Thing Container=new();}
+public class UIInventory {public InvOwner owner=new(); public Window window=new();}
+public class LayerInventory {public static List<LayerInventory> listInv=[]; public List<UIInventory> invs=[];}
+public static class IO {public static T DeepCopy<T>(T value)=>JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(value))!;}

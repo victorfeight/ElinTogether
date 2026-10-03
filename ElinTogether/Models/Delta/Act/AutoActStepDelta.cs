@@ -62,7 +62,7 @@ public class AutoActStepDelta : ElinDelta
                 foreach (var tile in Tiles) tile.Apply();
                 if (HasTargetState && Target?.Find() is Chara npc) {
                     npc.interest = TargetInterest;
-                    npc._affinity = TargetAffinity;
+                    SocialNotifications.ApplyAffinity(npc, TargetAffinity);
                 }
                 if (Success && Kind == Step.Disarm && Target?.Find() is { } trapCard) trapCard.SetInt(60, TrapFailures);
                 if (Success && Tool?.Find() is { } tool) tool.c_charges = Charges;

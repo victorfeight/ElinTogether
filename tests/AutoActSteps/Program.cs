@@ -40,6 +40,13 @@ Check(disarm.Success&&TraitTrap.Attempts==1&&EClass.game.player.chara==pc,"disar
 var npc=new Chara{uid=600,pos=new(2,1)};var chat=Request(AutoActStepDelta.Step.Chat,target:npc);var affinity=Affinity.CC;chat.Apply(host);
 Check(chat.Success&&npc.interest==40&&npc._affinity==1&&EClass.game.player.chara==pc&&Affinity.CC==affinity,"chat resolves host affinity and restores global context");
 Check(SocialInteractions.Calls==1,"AutoAct conversation delegates to shared social resolver");
+var affinityNotices=0;
+Action<Chara,int,int> notify=(c,b,a)=>affinityNotices++;
+SocialNotifications.AffinityChanged+=notify;
+npc._affinity=0;chat.Apply(client);chat.Apply(client);
+Check(npc._affinity==1&&affinityNotices==1,"AutoAct reply emits one notification for confirmed change, none for repeated value");
+SocialNotifications.AffinityChanged-=notify;
+
 var potCard=Tool(new TraitToolWaterPot());var pour=new AutoActPourWater.SubActPourWater{pos=new(2,3),pot=(TraitToolWaterPot)potCard.trait!,targetCount=4};
 var rebuilt=TaskPourWaterArgs.Create(pour).CreateSubAct();
 Check(rebuilt is AutoActPourWater.SubActPourWater{targetCount:4},"pouring serializer preserves custom type and depth");

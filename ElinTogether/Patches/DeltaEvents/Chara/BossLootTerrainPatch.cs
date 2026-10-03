@@ -49,7 +49,7 @@ internal static class BossLootTerrainPatch
         Send(new BossLootTileDelta { ZoneUid = EClass._zone.uid, Pos = point, Block = false, Id = id, Value = value, Direction = dir });
     }
 
-    private static void Send(BossLootTileDelta delta)
+    internal static void Send(BossLootTileDelta delta)
     {
         if (NetSession.Instance.Connection is not ElinNetHost host) return;
         // Preserve ordering before chest placement, including a kill during progress.
