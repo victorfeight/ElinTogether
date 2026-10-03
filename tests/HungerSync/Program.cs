@@ -1,0 +1,47 @@
+using ElinTogether.Models;
+using ElinTogether.Net;
+int checks=0;
+void Check(bool ok,string name){if(!ok)throw new Exception(name);checks++;Console.WriteLine("PASS "+name);}
+var actor=EClass.pc;actor.uid=719;actor.hunger.value=75;
+var report=CharaStateSnapshot.CreateSelf();
+Check(report.Hunger==75&&report.CompanionVitals is null,"human report captures exact hunger without claiming host authority");
+var mirror=new Chara{uid=719};report.ApplyReconciliation(mirror);
+Check(mirror.hunger.value==75,"validated owner report updates host mirror");
+var host=new ElinNetHost();NetSession.Instance.Connection=host;
+CharaStateSnapshot Snapshot(bool companion,int hunger){
+ host.Companions.Clear();if(companion)host.Companions.Add(actor);
+ var before=actor.hunger.value;actor.hunger.value=hunger;
+ var snapshot=CharaStateSnapshot.Create(actor);actor.hunger.value=before;return snapshot;
+}
+var companionSnapshot=Snapshot(true,20);
+Check(companionSnapshot.CompanionVitals is not null,"host marks companion hunger authority");
+PlayerControl.WatchingOwnCharacter=false;companionSnapshot.ApplyReconciliation();
+Check(actor.hunger.value==75,"human ignores delayed host companion snapshot");
+PlayerControl.WatchingOwnCharacter=true;
+actor.IsPC=false; // PlayerIdentityPatch hides IsPC during spectator delta replay.
+Snapshot(false,10).ApplyReconciliation();
+Check(actor.hunger.value==75,"entering break ignores pre-handoff human snapshot");
+companionSnapshot.ApplyReconciliation();
+Check(actor.hunger.value==20,"spectator receives host filled state while still on break");
+Snapshot(true,80).ApplyReconciliation();
+Check(actor.hunger.value==80,"spectator also receives host hunger increase");
+PlayerControl.WatchingOwnCharacter=false;actor.hunger.value=45;companionSnapshot.ApplyReconciliation();
+Check(actor.hunger.value==45,"resume protects freshly reloaded local state");
+var observer=new Chara{uid=1};observer.hunger.value=15;
+var other=CharaStateSnapshot.Create(observer);observer.hunger.value=90;other.ApplyReconciliation();
+Check(observer.hunger.value==15,"other players see host-reported hunger regardless of control mode");
+var absent=new CharaStateSnapshot{Owner=actor,Pos=actor.pos,CurrentZoneUid=1,Hp=0,IsDead=false,Hostility=default,OriginalHostility=default,UidMaster=0,MinionType=default,CompanionVitals=new()};
+PlayerControl.WatchingOwnCharacter=true;absent.ApplyReconciliation();
+Check(actor.hunger.value==45,"missing hunger never resets character to zero");
+actor.stamina.value=31;actor.mana.value=-12;actor.sleepiness.value=63;actor.SAN.value=42;
+actor.depression.value=17;actor.bladder.value=28;actor.hygiene.value=39;
+var vitals=Snapshot(true,20);
+actor.stamina.value=0;actor.mana.value=0;actor.sleepiness.value=0;actor.SAN.value=0;
+actor.depression.value=0;actor.bladder.value=0;actor.hygiene.value=0;
+vitals.ApplyReconciliation();
+Check(actor.stamina.value==31&&actor.mana.value==-12&&actor.sleepiness.value==63&&actor.SAN.value==42&&actor.depression.value==17&&actor.bladder.value==28&&actor.hygiene.value==39,"all companion needs restored including negative mana");
+PlayerControl.WatchingOwnCharacter=false;actor.mana.value=5;vitals.ApplyReconciliation();
+Check(actor.mana.value==5,"late companion vitals cannot overwrite resumed player mana");
+mirror.mana.value=7;vitals.ApplyReconciliation(mirror);
+Check(mirror.mana.value==7,"client report cannot inject companion vitals into host");
+Console.WriteLine($"{checks} hunger synchronization checks passed (game/transport boundary stubbed).");

@@ -23,6 +23,14 @@ public partial class SteamNetManager(ISteamNetSerializer? serializer = null) : I
     private ISteamNetListener? _listener;
     private HSteamNetPollGroup _pollGroup;
 
+    internal NetworkFlightRecorder? Trace { get; set; }
+    internal void RefreshTraceStats()
+    {
+        foreach (var peer in _peers) peer.UpdateRealtime();
+    }
+    internal string TraceState => $"pollGroup={_pollGroup} disposed={_disposed} waiting={_waitingForPackets} inbox={_receivedPackets.Count} " +
+        string.Join(";", _peers.Select(p => p.TraceState));
+
     public bool IsHost { get; private set; }
     public bool IsListening { get; private set; }
 
@@ -61,7 +69,9 @@ public partial class SteamNetManager(ISteamNetSerializer? serializer = null) : I
             return;
         }
 
+        _broadcast.Trace = Trace;
         _pollGroup = SteamNetworkingSockets.CreatePollGroup();
+        Trace?.Mark("connection", $"create poll group={_pollGroup}");
         _listener = listener;
 
         SteamCallback<SteamNetConnectionStatusChangedCallback_t>.Add(HandleStatusChange);
@@ -76,15 +86,20 @@ public partial class SteamNetManager(ISteamNetSerializer? serializer = null) : I
             return;
         }
 
+        using var poll = Trace?.Enter("poll", $"ReceiveMessages group={_pollGroup} profileOnly={accept is not null}");
         var received = SteamNetworkingSockets.ReceiveMessagesOnPollGroup(_pollGroup, _batchedMessages, _batchedMessages.Length);
+        if (received < 0) Trace?.Fault($"ReceiveMessages returned {received} group={_pollGroup}");
 
         for (var i = 0; i < received; ++i) {
             var msg = SteamNetworkingMessage_t.FromIntPtr(_batchedMessages[i]);
             try {
                 var peer = _peers.Find(p => p.Connection == msg.m_conn);
                 if (peer is null) {
+                    Trace?.Fault($"received unknown connection={msg.m_conn} message={msg.m_nMessageNumber} bytes={msg.m_cbSize}");
                     continue;
                 }
+                Trace?.Mark($"rx/{peer.Id}", $"message={msg.m_nMessageNumber} bytes={msg.m_cbSize}");
+                using var decode = Trace?.Enter("decode", $"peer={peer.Id} message={msg.m_nMessageNumber} bytes={msg.m_cbSize}");
 
                 var bytes = new byte[msg.m_cbSize];
                 Marshal.Copy(msg.m_pData, bytes, 0, msg.m_cbSize);
@@ -98,9 +113,13 @@ public partial class SteamNetManager(ISteamNetSerializer? serializer = null) : I
                 }
 
                 var packet = _serializer.Deserialize(payload, type);
-                _receivedPackets.Add(packet, peer);
+                _receivedPackets.Add(packet, peer, msg.m_nMessageNumber);
+                Trace?.Mark($"decoded/{peer.Id}", $"message={msg.m_nMessageNumber} {NetworkPacketTrace.Describe(packet)}");
 
                 peer.Stat.Received(msg.m_cbSize);
+            } catch (Exception ex) {
+                Trace?.Fault($"decode failed connection={msg.m_conn} message={msg.m_nMessageNumber}: {ex}");
+                throw;
             } finally {
                 SteamNetworkingMessage_t.Release(_batchedMessages[i]);
             }
@@ -114,10 +133,19 @@ public partial class SteamNetManager(ISteamNetSerializer? serializer = null) : I
     // Only invoked by a synchronous save/disconnect exchange, never a scheduler.
     internal bool WaitForPackets(Func<object, bool> accept, Func<bool> complete, Func<bool> valid)
     {
-        if (_waitingForPackets) return false;
+        if (_waitingForPackets) { Trace?.Fault("profile wait rejected: nested wait"); return false; }
         _waitingForPackets = true;
+        using var wait = Trace?.Enter("profile-wait", "bounded receive wait");
         try {
-            return PlayerProfileReplyWait.Run(() => Poll(accept), complete, () => valid() && !NetShutdown.IsQuitting);
+            var invalidated = false;
+            var result = PlayerProfileReplyWait.Run(() => Poll(accept), complete, () => {
+                var current = valid() && !NetShutdown.IsQuitting;
+                invalidated |= !current;
+                return current;
+            });
+            Trace?.Mark("profile-wait", $"result={result} invalidated={invalidated} quitting={NetShutdown.IsQuitting}");
+            if (!result) Trace?.Fault("profile wait failed");
+            return result;
         } finally { _waitingForPackets = false; }
     }
 
@@ -193,6 +221,8 @@ public partial class SteamNetManager(ISteamNetSerializer? serializer = null) : I
             SteamNetworkingSockets.CloseConnection(peer.Connection, 0, reason, true);
         }
 
+        Trace?.Expect($"rx/{peer.Id}", false);
+        Trace?.Mark("connection", $"remove peer={peer.Id} reason={reason}");
         _peers.Remove(peer);
         _broadcast.RemoveTarget(peer);
 
@@ -208,7 +238,10 @@ public partial class SteamNetManager(ISteamNetSerializer? serializer = null) : I
             return duplicate;
         }
 
-        var peer = new SteamNetPeer(connection, _serializer);
+        var peer = new SteamNetPeer(connection, _serializer) { Trace = Trace };
+        _receivedPackets.Trace = Trace;
+        Trace?.Expect($"rx/{peer.Id}", true);
+        Trace?.Mark("connection", $"add peer={peer.Id} steam={peer.User} handle={connection} state={peer.ConnectionState}");
         if (!peer.IsConnected) {
             SteamNetworkingSockets.CloseConnection(peer.Connection, 0, EmpDisconnectInfo.RemoteClosed, true);
             return FakePeer;
@@ -216,7 +249,9 @@ public partial class SteamNetManager(ISteamNetSerializer? serializer = null) : I
 
         peer.User.SetPlayedWith();
 
-        SteamNetworkingSockets.SetConnectionPollGroup(connection, _pollGroup);
+        var grouped = SteamNetworkingSockets.SetConnectionPollGroup(connection, _pollGroup);
+        Trace?.Mark("connection", $"assign peer={peer.Id} handle={connection} group={_pollGroup} success={grouped}");
+        if (!grouped) Trace?.Fault($"poll group assignment failed peer={peer.Id}");
 
         _peers.Add(peer);
         _broadcast.AddTarget(peer);
@@ -232,6 +267,7 @@ public partial class SteamNetManager(ISteamNetSerializer? serializer = null) : I
     private void HandleStatusChange(SteamNetConnectionStatusChangedCallback_t status)
     {
         var connection = status.m_hConn;
+        Trace?.Mark("connection", $"callback handle={connection} old={status.m_eOldState} new={status.m_info.m_eState} end={status.m_info.m_eEndReason} detail={status.m_info.m_szEndDebug}");
 
         switch (status.m_info.m_eState) {
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connecting:

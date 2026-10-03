@@ -37,7 +37,10 @@ public abstract partial class ElinNetBase : EMono
             return;
         }
 
-        Scheduler.Tick();
+        Trace.Expect("net", true);
+        using var update = Trace.Enter("net", "ElinNetBase.Update");
+        CaptureTraceContext();
+        using (Trace.Enter("scheduler", "Tick")) Scheduler.Tick();
         Socket.Poll();
 
         if (Input.GetKeyDown(EmpConfig.Client.PingKeybind.Value) && !ui.BlockActions) {
@@ -50,6 +53,8 @@ public abstract partial class ElinNetBase : EMono
 
     private void OnDestroy()
     {
+        Trace.Report("component-destroy", true);
+        Trace.Dispose();
         if (NetShutdown.IsQuitting) {
             return;
         }
@@ -77,6 +82,8 @@ public abstract partial class ElinNetBase : EMono
         Router.OnPeerConnectedEvent += OnPeerConnected;
         Router.OnPeerDisconnectedEvent += OnPeerDisconnected;
 
+        Socket.Trace = Trace;
+        Router.Trace = Trace;
         Socket.Initialize(Router);
 
         RegisterPackets();
@@ -88,6 +95,8 @@ public abstract partial class ElinNetBase : EMono
 
     internal void Shutdown()
     {
+        Trace.Report("shutdown", true);
+        Trace.Dispose();
         Socket.Shutdown();
     }
 

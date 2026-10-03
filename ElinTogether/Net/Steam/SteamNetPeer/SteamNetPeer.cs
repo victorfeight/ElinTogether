@@ -24,6 +24,13 @@ internal class SteamNetPeer : ISteamNetPeer, IDisposable
     // ReSharper disable once ChangeFieldTypeToSystemThreadingLock
     protected readonly object ArenaLock = new();
 
+    internal NetworkFlightRecorder? Trace { get; set; }
+    private int _pendingReliable, _pendingUnreliable, _unackedReliable;
+    private long _queueTime;
+    internal string TraceState => $"peer={Id} steam={User} handle={Connection} state={ConnectionState} " +
+        $"rx={Stat.PacketsReceived}/{Stat.BytesReceived} tx={Stat.PacketsSent}/{Stat.BytesSent} rxAge={Stat.SecondsSinceLastReceive:F1} " +
+        $"pendingReliable={_pendingReliable} pendingUnreliable={_pendingUnreliable} unacked={_unackedReliable} queueUs={_queueTime} ping={Stat.LastPingMs} qos={Stat.ConnectionQualityLocal}/{Stat.ConnectionQualityRemote}";
+
     public readonly HSteamNetConnection Connection;
     public readonly SteamNetworkingIdentity RemoteIdentity;
     protected readonly ISteamNetSerializer Serializer;
@@ -31,6 +38,7 @@ internal class SteamNetPeer : ISteamNetPeer, IDisposable
     protected IntPtr Arena;
     protected int ArenaSize;
     private bool _disposed;
+    private EResult? _lastSendFailure;
 
     public SteamNetPeer(HSteamNetConnection connection, ISteamNetSerializer serializer)
     {
@@ -75,8 +83,15 @@ internal class SteamNetPeer : ISteamNetPeer, IDisposable
 
     public virtual bool Send<T>(T message, SteamNetSendFlag sendFlags = SteamNetSendFlag.Reliable)
     {
-        var bytes = Serializer.Serialize(message);
-        return Send(bytes, sendFlags);
+        using var serialize = Trace?.Enter("serialize", typeof(T).Name);
+        try {
+            var bytes = Serializer.Serialize(message);
+            Trace?.Mark("outgoing", NetworkPacketTrace.Describe(message!));
+            return Send(bytes, sendFlags);
+        } catch (Exception ex) {
+            Trace?.Fault($"serialize/send type={typeof(T).Name}: {ex}");
+            throw;
+        }
     }
 
     public virtual bool Send(byte[] bytes, SteamNetSendFlag sendFlags = SteamNetSendFlag.Reliable)
@@ -97,9 +112,20 @@ internal class SteamNetPeer : ISteamNetPeer, IDisposable
             Marshal.Copy(bytes, 0, Arena, size);
 
             // crash on native side cannot be handled
-            var result = SteamNetworkingSockets.SendMessageToConnection(Connection, Arena, (uint)size, (int)sendFlags, out _);
+            using var send = Trace?.Enter("send", $"peer={Id} bytes={size}");
+            var result = SteamNetworkingSockets.SendMessageToConnection(Connection, Arena, (uint)size, (int)sendFlags, out var messageNumber);
+            RecordSend(bytes, result, messageNumber);
             if (result != EResult.k_EResultOK) {
+                if (_lastSendFailure != result) {
+                    EmpLog.Warning("Steam send failed: peer {Peer}, result {Result}, state {State}, bytes {Bytes}, receiveAge {ReceiveAge:F1}s",
+                        Id, result, ConnectionState, size, Stat.SecondsSinceLastReceive);
+                }
+                _lastSendFailure = result;
                 return false;
+            }
+            if (_lastSendFailure is not null) {
+                EmpLog.Information("Steam sending recovered for peer {Peer} after {Result}", Id, _lastSendFailure);
+                _lastSendFailure = null;
             }
         }
 
@@ -107,6 +133,13 @@ internal class SteamNetPeer : ISteamNetPeer, IDisposable
         UpdateRealtime();
 
         return true;
+    }
+
+    internal void RecordSend(byte[] bytes, EResult result, long messageNumber)
+    {
+        var type = bytes.Length >= 4 ? BitConverter.ToUInt32(bytes, 0).ToString("X8") : "short";
+        Trace?.Mark($"tx/{Id}", $"message={messageNumber} hash={type} bytes={bytes.Length} result={result}");
+        if (result != EResult.k_EResultOK) Trace?.Fault($"Steam send peer={Id} message={messageNumber} result={result} state={ConnectionState}");
     }
 
     protected void PinArena(int size)
@@ -137,6 +170,10 @@ internal class SteamNetPeer : ISteamNetPeer, IDisposable
             return;
         }
 
+        _pendingReliable = status.m_cbPendingReliable;
+        _pendingUnreliable = status.m_cbPendingUnreliable;
+        _unackedReliable = status.m_cbSentUnackedReliable;
+        _queueTime = (long)status.m_usecQueueTime;
         Stat.LastPingMs = status.m_nPing;
         Stat.ConnectionQualityLocal = status.m_flConnectionQualityLocal;
         Stat.ConnectionQualityRemote = status.m_flConnectionQualityRemote;

@@ -228,4 +228,31 @@ Check(!fallback.Contains(original)&&!original.CompanionAI&&!original.GetBool(Sol
 original.host=EClass.pc;Check(!fallback.TryBegin(original),"attached character cannot autonomously take over");original.host=null;
 original.isDead=true;Check(!fallback.TryBegin(original),"AI takeover does not revive dead characters");original.isDead=false;
 original.party=null;Check(!fallback.TryBegin(original),"character outside host party is not retained as companion");
+// Production reconnect checkpoint boundary: a broken old transport cannot veto recovery.
+NetSession.Instance.Connection=null;
+var recoveryClient=new ElinNetClient();recoveryClient.InitializeProfile();
+Check(!recoveryClient.CheckpointPersonalProfile(),"ordinary save still requires actual host acknowledgement");
+var backupRoot=CorePath.PathBackup;
+Check(recoveryClient.TryRecover(),"unacknowledged profile is archived and permits reconnect");
+var recoveryFiles=Directory.GetFiles(Path.Combine(backupRoot,"ElinTogether-profiles"),"*.json");
+Check(recoveryFiles.Length==1,"one finalized recovery archive is written");
+var recoveryDoc=JObject.Parse(File.ReadAllText(recoveryFiles[0]));
+Check((int)recoveryDoc["uid"]! == EClass.pc.uid && recoveryDoc["personalProfile"]!.ToString(Newtonsoft.Json.Formatting.None)==EClass.pc.GetStr(SoloPlayerProfile.SaveKey),"recovery archive preserves exact owner profile");
+var sentBefore=recoveryClient.Host.Sends;
+Check(recoveryClient.CheckpointPersonalProfile()&&recoveryClient.Host.Sends==sentBefore,"teardown after prepared recovery does not wait on the failed connection again");
+var healthyClient=new ElinNetClient();healthyClient.InitializeProfile();healthyClient.Host.OnSend=healthyClient.Ack;
+Check(healthyClient.TryRecover()&&Directory.GetFiles(Path.Combine(backupRoot,"ElinTogether-profiles"),"*.json").Length==1,"healthy reconnect acknowledges normally without creating a recovery archive");
+var disconnectedClient=new ElinNetClient();disconnectedClient.InitializeProfile();disconnectedClient.IsConnected=false;
+Check(disconnectedClient.TryRecover()&&Directory.GetFiles(Path.Combine(backupRoot,"ElinTogether-profiles"),"*.json").Length==2,"already disconnected transport still archives current profile before recovery");
+var failedBackup=new ElinNetClient();failedBackup.InitializeProfile();
+CorePath.PathBackup=recoveryFiles[0];
+Check(!failedBackup.TryRecover(),"failed disk backup cannot silently discard unacknowledged profile");
+CorePath.PathBackup=backupRoot;
+Check(!failedBackup.CheckpointPersonalProfile(),"failed recovery leaves normal acknowledgement requirement active");
+// EMono.pc dereferences game.player: it is not a null-safe title-screen getter.
+var gameBeforeTitle=EClass.game;
+EClass.game=null!;EClass.core.IsGameStarted=false;
+var titleClient=new ElinNetClient();
+Check(titleClient.CheckpointPersonalProfile(),"title-screen Stop/checkpoint with no game or profile does not evaluate pc");
+EClass.game=gameBeforeTitle;EClass.core.IsGameStarted=true;
 Console.WriteLine($"{checks} checks passed; fixture exports: {CorePath.PathBackup}");

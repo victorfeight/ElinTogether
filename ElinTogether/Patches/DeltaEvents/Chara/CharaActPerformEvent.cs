@@ -40,7 +40,11 @@ internal static class CharaActPerformEvent
 
         // Item-bound zaps capture their context before vanilla mutates Act.TC/TP.
         // Throws have their own existing event as well.
-        if (__instance is ActPray || __instance is ActZap || __instance is ActThrow and not ActRanged) {
+        // Native melee creates these nested retaliation actions without source IDs.
+        // Their authoritative damage/conditions already use the result deltas;
+        // replaying them as standalone ability 0 cannot reconstruct the action.
+        if (__instance is ActMeleeCounter or ActMeleeParry ||
+            __instance is ActPray || __instance is ActZap || __instance is ActThrow and not ActRanged) {
             return;
         }
 

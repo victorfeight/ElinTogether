@@ -1,0 +1,71 @@
+using ElinTogether.Models;
+using ElinTogether.Net;
+using ElinTogether.Patches;
+var checks=0;
+void Check(bool ok,string name){if(!ok)throw new Exception(name);Console.WriteLine("PASS "+name);checks++;}
+T Cache<T>(T c) where T:Card {CardCache.Items[c.uid]=c;return c;}
+(ElinNetClient,Chara,Thing) Setup(bool full=false){CardCache.Items.Clear();CharaProgressCompleteEvent.Chara=null;CharaProgressCompleteEvent.Results.Clear();EClass._zone=new();EClass._map=new();var net=new ElinNetClient();NetSession.Instance.Connection=net;var c=Cache(new Chara{uid=10,IsPC=true,IsPlayer=true,Full=full});EClass.pc=c;var t=Cache(new Thing{uid=20,parent=EClass._zone});return(net,c,t);}
+CharaPickThingDelta Handoff(Chara c,Thing t,CharaPickThingDelta.PickType type=CharaPickThingDelta.PickType.Pick)=>new(){Owner=c,Thing=t,Type=type,Pos=new(){X=3,Z=4}};
+var (client,owner,item)=Setup(true);
+owner.Pick(item);
+Check(item.parent==EClass._zone&&client.Delta.Items.Count==0,"full manual/AutoAct direct pickup stays ground and publishes no attempt");
+owner.Full=false;var bag=Cache(new Thing{uid=30,parent=owner});owner.Destination=bag;owner.Pick(item);
+Check(client.Delta.Items is [CardAddThingDelta d]&&d.Parent.Uid==bag.uid,"successful pickup publishes only chosen bag transfer");
+var transfer=(CardAddThingDelta)client.Delta.Items.Single();item.parent=EClass._zone;var host=new ElinNetHost();host.ActiveRemoteCharas[7]=owner;NetSession.Instance.Connection=host;transfer.OriginPeer=7;transfer.Apply(host);
+Check(item.parent==bag&&owner.Picks==2,"host reproduces destination without rerunning pickup");
+transfer.Apply(host);Check(item.parent==bag,"repeated transfer is idempotent");
+(client,owner,item)=Setup(true);var stack=Cache(new Thing{uid=40,parent=owner,Num=5});owner.Stack=stack;item.Num=2;owner.Pick(item);
+Check(client.Delta.Items is [CardTryStackToDelta]&&!item.isDestroyed&&stack.Num==5,"full inventory with compatible stack submits one host merge");
+var merge=(CardTryStackToDelta)client.Delta.Items.Single();host=new();host.ActiveRemoteCharas[7]=owner;NetSession.Instance.Connection=host;merge.OriginPeer=7;merge.Apply(host);merge.Apply(host);
+Check(item.isDestroyed&&stack.Num==7,"host merges source once even if request repeats");
+(client,owner,item)=Setup(true);owner.Pick(item);owner.Pick(item);owner.Pick(item);
+Check(client.Delta.Items.Count==0&&item.parent==EClass._zone,"repeated AutoAct-style failed calls cannot manufacture inventory additions");
+(client,owner,item)=Setup();item.parent=null;Handoff(owner,item,CharaPickThingDelta.PickType.TrySmoothPick).Apply(client);
+Check(item.parent==owner&&client.Delta.Items is [CardAddThingDelta],"harvest handoff emits ordinary transfer despite outer replay context");
+Check(!ElinDelta.IsApplying,"handoff restores outer apply depth");
+(client,owner,item)=Setup(true);item.parent=null;Handoff(owner,item,CharaPickThingDelta.PickType.TrySmoothPick).Apply(client);
+Check(item.parent==EClass._zone&&item.pos.x==3&&client.Delta.Items is [ZoneAddCardDelta],"full harvest leaves product at native drop position with one ground outcome");
+(client,owner,item)=Setup();item.parent=null;EClass._map.Smooth=false;Handoff(owner,item,CharaPickThingDelta.PickType.TrySmoothPick).Apply(client);
+Check(item.parent==EClass._zone&&client.Delta.Items is [ZoneAddCardDelta],"smooth pickup disabled retains vanilla ground placement");
+(client,owner,item)=Setup(true);Handoff(owner,item).Apply(client);
+Check(client.Delta.Items.Count==0&&item.parent==EClass._zone,"rejected existing-ground pickup emits no guessed outcome");
+(client,owner,item)=Setup(true);item.parent=null;Handoff(owner,item).Apply(client);
+Check(client.Delta.Items is [ZoneAddCardDelta],"parentless full product drops once without duplicate ground message");
+(client,owner,item)=Setup(true);stack=Cache(new Thing{uid=40,parent=owner});owner.Stack=stack;Handoff(owner,item).Apply(client);
+Check(client.Delta.Items is [CardTryStackToDelta]&&!item.isDestroyed,"harvest stack uses existing host merge rather than local destructive replay");
+(client,owner,item)=Setup();owner.IsPC=false;item.parent=null;Handoff(owner,item).Apply(client);
+Check(item.parent==EClass._zone&&owner.Picks==0&&client.Delta.Items.Count==0,"observer only stages new product and emits no pickup");
+item.pos=new(8,9);Handoff(owner,item).Apply(client);
+Check(item.pos.x==8,"observer does not relocate already grounded product");
+item.parent=owner;Handoff(owner,item).Apply(client);
+Check(item.parent==owner,"late handoff never removes a collected product");
+(client,owner,item)=Setup();owner.ThrowPick=true;try{Handoff(owner,item).Apply(client);}catch(InvalidOperationException){}
+Check(!ElinDelta.IsApplying,"native pickup exception restores simulation scope");
+(client,owner,item)=Setup();host=new();NetSession.Instance.Connection=host;Handoff(owner,item).Apply(host);
+Check(owner.Picks==0&&host.Delta.Items.Count==0,"host refuses product handoff as client pickup request");
+CharaProgressCompleteEvent.Chara=owner;Thing result=null!;
+var run=CharaPickThingEvent.OnCharaPickThingy(owner,item,ref result);
+Check(!run&&result==item&&CharaProgressCompleteEvent.Results is [CharaPickThingDelta],"remote crafting still defers product instead of picking on host");
+CharaProgressCompleteEvent.Chara=null;
+(client,owner,item)=Setup();host=new();host.ActiveRemoteCharas[7]=owner;NetSession.Instance.Connection=host;var other=Cache(new Chara{uid=50,IsPlayer=true});item.parent=other;
+new CardAddThingDelta{Thing=item,Parent=owner,TryStack=false,DestInvX=-1,DestInvY=-1,OriginPeer=7}.Apply(host);
+Check(item.parent==other&&host.Delta.Items is [CardAddThingDelta correction]&&correction.Parent.Uid==other.uid,"competing pickup corrects client to actual host owner");
+host.Delta.Items.Clear();stack=Cache(new Thing{uid=40,parent=owner});new CardTryStackToDelta{Card=item,To=stack,Parent=owner,OriginPeer=7}.Apply(host);
+Check(!item.isDestroyed&&stack.Num==1&&host.Delta.Items is [CardAddThingDelta],"stack cannot consume another player's item");
+host.Delta.Items.Clear();new ZoneAddCardDelta{Card=item,ZoneUid=1,Pos=new(),OriginPeer=7}.Apply(host);
+Check(item.parent==other&&host.Delta.Items is [CardAddThingDelta],"late overflow ground outcome cannot drop another player's item");
+item.parent=EClass._zone;stack.isDestroyed=true;host.Delta.Items.Clear();new CardTryStackToDelta{Card=item,To=stack,Parent=owner,OriginPeer=7}.Apply(host);
+Check(item.parent==EClass._zone&&host.Delta.Items is [ZoneAddCardDelta],"missing stack target returns actual ground location without forced add");
+stack.isDestroyed=false;stack.parent=other;host.Delta.Items.Clear();new CardTryStackToDelta{Card=item,To=stack,Parent=owner,OriginPeer=7}.Apply(host);
+Check(item.parent==EClass._zone&&!item.isDestroyed,"moved stack target cannot trigger unchecked insertion");
+item.parent=null;stack.isDestroyed=true;host.Delta.Items.Clear();new CardTryStackToDelta{Card=item,To=stack,Parent=owner,OriginPeer=7}.Apply(host);
+Check(item.parent==EClass._zone&&host.Delta.Items is [ZoneAddCardDelta],"failed deferred-product stack preserves parentless loot on requesting player's tile");
+// Host-staged products survive failure/disconnect and are eligible for normal
+// ground-card collection validation before the collecting client responds.
+(client,owner,item)=Setup();host=new();NetSession.Instance.Connection=host;CharaProgressCompleteEvent.Chara=owner;item.parent=null;
+CharaPickThingEvent.DeferPickup(item,null,CharaPickThingDelta.PickType.Pick);
+Check(item.parent==EClass._zone&&item.pos.x==owner.pos.x&&item.pos.z==owner.pos.z&&host.Delta.Items is [ZoneAddCardDelta]&&CharaProgressCompleteEvent.Results is [CharaPickThingDelta],"generated pickup is grounded on host before product handoff");
+var placed=item.pos;CharaProgressCompleteEvent.Results.Clear();host.Delta.Items.Clear();CharaPickThingEvent.DeferPickup(item,new Point(8,9),CharaPickThingDelta.PickType.PickOrDrop);
+Check(item.pos==placed&&host.Delta.Items.Count==0,"deferring existing loot does not move it again");
+CharaProgressCompleteEvent.Chara=null;
+Console.WriteLine($"{checks} checks passed (native boundary model; production pickup hooks and outcome handlers)");

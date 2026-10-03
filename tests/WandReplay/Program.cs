@@ -53,3 +53,39 @@ NetSession.Instance.Connection=null;
 Check(ClientWandSummonEvent.Before(EffectId.Summon,caster,summonRef),"single player summon unchanged");
 NetSession.Instance.Connection=client;caster.IsPC=false;
 Check(ClientWandSummonEvent.Before(EffectId.Summon,caster,summonRef),"other caster excluded from local wand suppression");
+
+NetSession.Instance.Connection=host;Act.CC=caster;Act.TC=caster;
+var countBefore=host.Delta.Items.Count;
+CharaActPerformEvent.OnCharaActPerform(new ActMeleeCounter(),true);
+CharaActPerformEvent.OnCharaActPerform(new ActMeleeParry(),true);
+Check(host.Delta.Items.Count==countBefore,"native nested retaliations never become invalid standalone action packets");
+var invalid=CharaActPerformDelta.Create(new Act());
+invalid.Apply(client);
+Check(true,"zero-ID legacy/unknown action never reaches ACT.Create fallback");
+
+foreach(var kind in new[]{"knowledge","item","strife"}) {
+ host.Delta.Items.Clear();NetSession.Instance.Connection=host;
+ var statue=new Thing{uid=8000};var shrine=new TraitShrine{owner=statue,Shrine=new(){id=kind}};statue.trait=shrine;
+ var use=new CardOnUseDelta{Card=statue,RootCard=statue,User=caster};
+ use.Apply(host);
+ Check(shrine.Uses==1&&!shrine.SawReplay&&!statue.isOn,kind+": host executes fresh shrine simulation once");
+ Check(host.Delta.Items.Count==3&&ReferenceEquals(host.Delta.Items[0],use)&&host.Delta.Items[1] is CardGenDelta&&host.Delta.Items[2] is ZoneAddCardDelta,
+  kind+": activation then creation then ground placement use existing hooks");
+ var generated=(CardGenDelta)host.Delta.Items[1];var placed=(ZoneAddCardDelta)host.Delta.Items[2];
+ Check(generated.Card.uid==placed.Card.Uid&&placed.Pos.X==13&&placed.Pos.Z==14,kind+": same reward UID lands on shrine tile");
+ use.Apply(host);
+ Check(shrine.Uses==1&&host.Delta.Items.Count==3,kind+": exhausted shrine rejects repeated request before relay");
+ NetSession.Instance.Connection=client;client.Delta.Items.Clear();var cleanupBefore=CardCache.DestroyQueued;
+ use.Apply(client);
+ Check(shrine.SawReplay&&client.Delta.Items.Count==0&&CardCache.DestroyQueued==cleanupBefore+1,
+  kind+": client presentation retains replay guards and discards temporary reward");
+ Check(!ElinDelta.IsApplying,kind+": replay depth restored");
+}
+NetSession.Instance.Connection=host;host.Delta.Items.Clear();
+var brokenCard=new Thing{uid=9000};var brokenShrine=new TraitShrine{owner=brokenCard,Fail=true};brokenCard.trait=brokenShrine;
+try {new CardOnUseDelta{Card=brokenCard,RootCard=brokenCard,User=caster}.Apply(host);throw new Exception("expected failure");}
+catch(InvalidOperationException){}
+Check(!ElinDelta.IsApplying,"shrine exception cannot leak simulation scope");
+var otherCard=new Thing{uid=9001};var otherShrine=new TraitShrine{owner=otherCard,Shrine=new(){id="armor"}};otherCard.trait=otherShrine;
+new CardOnUseDelta{Card=otherCard,RootCard=otherCard,User=caster}.Apply(host);
+Check(otherShrine.SawReplay,"owner-local shrine retains existing replay context");

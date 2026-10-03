@@ -25,35 +25,28 @@ internal static class CharaPickThingEvent
         }
 
         if (CharaProgressCompleteEvent.ShouldPack(true)) {
-            CharaProgressCompleteEvent.Pack(new CharaPickThingDelta {
-                Owner = CharaProgressCompleteEvent.Chara!,
-                Thing = t,
-                Pos = null,
-                Type = CharaPickThingDelta.PickType.Pick,
-            });
-
-            CardCache.KeepAlive(t);
+            DeferPickup(t, null, CharaPickThingDelta.PickType.Pick);
 
             __result = t;
             return false;
         }
 
-        if (connection.IsClient && PendingUid.IsPending(t.uid)) {
-            return true;
-        }
-
-        // we are host, propagate to everyone
-        // we are client, only propagate ourselves
-        if (connection.IsHost || __instance.IsPC) {
-            connection.Delta.AddRemote(new CharaPickThingDelta {
-                Owner = __instance,
-                Thing = t,
-                Pos = null,
-                Type = CharaPickThingDelta.PickType.Pick,
-            });
-        }
-
+        // Ordinary pickup is already synchronized by AddThing, TryStackTo and
+        // Zone.AddCard. Publishing an attempt here also published rejected pickups.
         return true;
+    }
+
+    internal static void DeferPickup(Thing thing, Point? pos, CharaPickThingDelta.PickType type)
+    {
+        var owner = CharaProgressCompleteEvent.Chara!;
+        // A deferred product must already exist on the host. This preserves loot
+        // on rejection/disconnect and lets shared-card collection validate it.
+        // Existing zone hooks publish this placement before the pickup handoff.
+        if (thing.parent is null) EClass._zone.AddCard(thing, pos ?? owner.pos);
+        CharaProgressCompleteEvent.Pack(new CharaPickThingDelta {
+            Owner = owner, Thing = thing, Pos = pos, Type = type,
+        });
+        CardCache.KeepAlive(thing);
     }
 }
 
@@ -92,14 +85,7 @@ internal static class CharaPickOrDropEvent
             return true;
         }
 
-        CharaProgressCompleteEvent.Pack(new CharaPickThingDelta {
-            Owner = CharaProgressCompleteEvent.Chara!,
-            Thing = t,
-            Pos = p,
-            Type = CharaPickThingDelta.PickType.PickOrDrop,
-        });
-
-        CardCache.KeepAlive(t);
+        CharaPickThingEvent.DeferPickup(t, p, CharaPickThingDelta.PickType.PickOrDrop);
 
         return false;
     }
@@ -123,14 +109,7 @@ internal static class CharaTrySmoothPickEvent
             return true;
         }
 
-        CharaProgressCompleteEvent.Pack(new CharaPickThingDelta {
-            Owner = CharaProgressCompleteEvent.Chara!,
-            Thing = t,
-            Pos = p,
-            Type = CharaPickThingDelta.PickType.TrySmoothPick,
-        });
-
-        CardCache.KeepAlive(t);
+        CharaPickThingEvent.DeferPickup(t, p, CharaPickThingDelta.PickType.TrySmoothPick);
 
         return false;
     }

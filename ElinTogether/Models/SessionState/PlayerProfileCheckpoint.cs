@@ -57,19 +57,26 @@ internal sealed class PlayerProfileChannel(int ownerUid, Guid session)
         };
     }
 
-    internal void Acknowledge(PlayerProfileReceipt receipt)
+    internal bool Acknowledge(PlayerProfileReceipt receipt)
     {
-        if (receipt.OwnerUid == OwnerUid && receipt.Session == Session && receipt.Revision == _revision)
-            _acknowledged = receipt.Revision;
+        if (receipt.OwnerUid != OwnerUid || receipt.Session != Session || receipt.Revision != _revision) return false;
+        _acknowledged = receipt.Revision;
+        return true;
+    }
+
+    internal string? RejectionReason(Chara actor, PlayerProfileCheckpoint checkpoint)
+    {
+        if (actor.uid != OwnerUid || checkpoint.OwnerUid != OwnerUid) return "owner-mismatch";
+        if (Session == Guid.Empty || checkpoint.Session != Session) return "session-mismatch";
+        if (checkpoint.Revision <= 0 || checkpoint.Revision < _revision) return "invalid-or-old-revision";
+        if (checkpoint.Revision == _revision && checkpoint.Json != _lastJson) return "same-revision-different-content";
+        return null;
     }
 
     internal PlayerProfileReceipt? Accept(Chara actor, PlayerProfileCheckpoint checkpoint)
     {
-        if (actor.uid != OwnerUid || checkpoint.OwnerUid != OwnerUid || checkpoint.Session != Session ||
-            Session == Guid.Empty || checkpoint.Revision <= 0 || checkpoint.Revision < _revision) return null;
-        if (checkpoint.Revision == _revision) {
-            if (checkpoint.Json != _lastJson) return null;
-        } else {
+        if (RejectionReason(actor, checkpoint) is not null) return null;
+        if (checkpoint.Revision != _revision) {
             SoloPlayerProfile.Accept(actor, checkpoint.Json);
             _lastJson = checkpoint.Json;
             _revision = checkpoint.Revision;

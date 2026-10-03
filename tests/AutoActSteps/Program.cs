@@ -39,6 +39,7 @@ Check(Msg.Local.Contains("trap")&&!host.Messages.Any(m=>m.Message.Text=="trap"),
 Check(disarm.Success&&TraitTrap.Attempts==1&&EClass.game.player.chara==pc,"disarm runs once with requester context and restores host PC");
 var npc=new Chara{uid=600,pos=new(2,1)};var chat=Request(AutoActStepDelta.Step.Chat,target:npc);var affinity=Affinity.CC;chat.Apply(host);
 Check(chat.Success&&npc.interest==40&&npc._affinity==1&&EClass.game.player.chara==pc&&Affinity.CC==affinity,"chat resolves host affinity and restores global context");
+Check(SocialInteractions.Calls==1,"AutoAct conversation delegates to shared social resolver");
 var potCard=Tool(new TraitToolWaterPot());var pour=new AutoActPourWater.SubActPourWater{pos=new(2,3),pot=(TraitToolWaterPot)potCard.trait!,targetCount=4};
 var rebuilt=TaskPourWaterArgs.Create(pour).CreateSubAct();
 Check(rebuilt is AutoActPourWater.SubActPourWater{targetCount:4},"pouring serializer preserves custom type and depth");

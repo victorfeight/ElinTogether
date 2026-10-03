@@ -117,6 +117,7 @@ internal static partial class EmpLogger
 #else
                     buffered: true,
 #endif
+                    flushToDiskInterval: TimeSpan.FromSeconds(2),
                     rollingInterval: RollingInterval.Day,
                     retainedFileCountLimit: 3);
         }

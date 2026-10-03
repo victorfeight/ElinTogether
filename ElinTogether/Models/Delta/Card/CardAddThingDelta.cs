@@ -38,14 +38,7 @@ public class CardAddThingDelta : ElinDelta
             return;
         }
 
-        if (net is ElinNetHost host && OriginPeer != 0 &&
-            thing.GetRootCard() is Chara { IsPlayer: true } holder &&
-            holder != host.ActiveRemoteCharas.GetValueOrDefault(OriginPeer)) {
-            EmpLog.Warning("Refusing {DeltaType} from peer {PeerIndex}, uid {Uid} is held by player {HolderUid}",
-                nameof(CardAddThingDelta), OriginPeer, Thing.Uid, holder.uid);
-            Rebind(net, Thing, thing);
-            return;
-        }
+        if (RejectForeignOwner(net, OriginPeer, Thing, thing)) return;
 
         if (net.IsHost) {
             net.Delta.AddRemote(this);
@@ -75,19 +68,32 @@ public class CardAddThingDelta : ElinDelta
             thing.parent == parent, thing.isDestroyed);
     }
 
+    // All pickup outcomes must honor a host-side ownership change, including
+    // stacking and a late ground result from an overflowing client.
+    internal static bool RejectForeignOwner(ElinNetBase net, int originPeer, RemoteCard remote, Card card)
+    {
+        if (net is not ElinNetHost host || originPeer == 0 || card is not Thing thing ||
+            thing.GetRootCard() is not Chara { IsPlayer: true } holder ||
+            holder == host.ActiveRemoteCharas.GetValueOrDefault(originPeer)) return false;
+
+        EmpLog.Warning("Refusing inventory outcome from peer {PeerIndex}, uid {Uid} is held by player {HolderUid}",
+            originPeer, thing.uid, holder.uid);
+        Rebind(net, remote, thing);
+        return true;
+    }
+
     internal static void Rebind(ElinNetBase net, RemoteCard remote, Thing thing)
     {
-        if (thing.parent is not Card parent) {
-            return;
+        if (thing.parent is Card parent) {
+            net.Delta.AddRemote(new CardAddThingDelta {
+                Thing = remote, Parent = parent, TryStack = false,
+                DestInvX = thing.invX, DestInvY = thing.invY,
+            });
+        } else if (thing.parent is Zone zone) {
+            net.Delta.AddRemote(new ZoneAddCardDelta {
+                Card = remote, ZoneUid = zone.uid, Pos = thing.pos,
+            });
         }
-
-        net.Delta.AddRemote(new CardAddThingDelta {
-            Thing = remote,
-            Parent = parent,
-            TryStack = false,
-            DestInvX = thing.invX,
-            DestInvY = thing.invY,
-        });
     }
 
     protected override bool OnRefresh()

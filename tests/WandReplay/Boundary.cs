@@ -6,13 +6,21 @@ public class EClass { public static Zone _zone = new(){uid=7}; public static Map
 public class Map { public List<Chara> charas = new(); }
 public class Zone { public int uid; public bool IsActiveZone=true; public void AddCard(Card c,int x,int z) { ZoneAddCardEvent.OnAddCardToZone(this,c,x,z); c.pos=new(x,z); if(c is Chara a) EClass._map.charas.Add(a); } }
 public class Point(int x=0,int z=0) { public int x=x,z=z; public int Distance(Point p)=>Math.Max(Math.Abs(x-p.x),Math.Abs(z-p.z)); }
-public class Card { public int uid; public bool isDestroyed; public bool IsPC; public Point pos=new(); public Card? parent; public Card GetRootCard()=>parent?.GetRootCard()??this; }
-public class Thing:Card { public int c_charges; public object? trait; }
+public class Card { public int uid; public bool isDestroyed; public bool IsPC; public bool isOn=true;public Trait trait=null!;public Point pos=new(); public Card? parent; public Card GetRootCard()=>parent?.GetRootCard()??this; }
+public class Thing:Card { public int c_charges; }
 public class Chara:Card { public bool isDead; public bool IsInActiveMap=true; public Elements elements=new(); }
 public class Elements { public Element? GetElement(int id)=>null; }
 public class Element { public Act? act; }
-public class TraitRod { public Thing owner=null!; public string IdEffect="Summon",N1="shadow"; }
-public class TraitAbility {}
+public class TraitRod:Trait { public Thing owner=null!; public string IdEffect="Summon",N1="shadow"; }
+public class TraitAbility:Trait {}
+public class Trait { public virtual bool OnUse(Chara c)=>true; }
+public class ShrineData {public string id="knowledge";}
+public class TraitShrine:Trait {
+ public Card owner=null!;public ShrineData Shrine=new();public int Uses;public bool SawReplay,Fail;
+ public bool CanUse(Chara c)=>owner.isOn;
+ public override bool OnUse(Chara c){Uses++;SawReplay=ElinDelta.IsApplying;if(Fail)throw new InvalidOperationException("reward failed");
+  var reward=new Thing{uid=7000+Uses};CardGenEvent.OnCardGenCreate(reward);EClass._zone.AddCard(reward,13,14);owner.isOn=false;return true;}
+}
 public class Act {
  public int id; public static Chara CC=null!; public static Card? TC; public static Point TP=new();
  public virtual bool Perform(Chara c,Card? t,Point? p) { CC=c;TC=t;TP=p??c.pos; return true; }
@@ -63,7 +71,7 @@ namespace ElinTogether.Models {
 }
 namespace ElinTogether.Patches {
  public static class ZoneActivateEvent {public static bool IsHappening;}
- public static class CharaProgressCompleteEvent {public static bool ShouldPack(bool b)=>false;public static void Pack(ElinDelta d){}}
+ public static class CharaProgressCompleteEvent {public static object? Action;public static bool ShouldPack(bool b)=>false;public static void Pack(ElinDelta d){}}
 }
 namespace MessagePack {public class MessagePackObjectAttribute:Attribute{} public class KeyAttribute(int n):Attribute { public int Value=>n; }}
 namespace HarmonyLib {
@@ -75,3 +83,5 @@ namespace HarmonyLib {
 public enum EffectId { Summon, Silence }
 public struct ActRef { public Thing? refThing; }
 public static class ActEffect { public static void ProcAt(){} }
+
+public class ActMeleeCounter:Act {} public class ActMeleeParry:Act {} public class ActPray:Act {} public class TaskBuild {}

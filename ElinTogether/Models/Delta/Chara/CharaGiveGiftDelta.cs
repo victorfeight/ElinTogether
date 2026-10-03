@@ -1,5 +1,5 @@
+using System;
 using ElinTogether.Net;
-using ElinTogether.Patches;
 using MessagePack;
 
 namespace ElinTogether.Models;
@@ -16,20 +16,11 @@ public class CharaGiveGiftDelta : ElinDelta
     [Key(2)]
     public required RemoteCard Thing { get; init; }
 
+    [Key(3)] public Guid Id { get; init; }
+    [Key(4)] public int ZoneUid { get; init; }
+
     protected override void OnApply(ElinNetBase net)
     {
-        if (From.Find() is not Chara from || To.Find() is not Chara to || Thing.Find() is not Thing thing) {
-            return;
-        }
-
-        if (net.IsClient && from.IsPC) {
-            return;
-        }
-
-        if (net.IsHost) {
-            net.Delta.AddRemote(this);
-        }
-
-        from.Stub_GiveGift(to, thing);
+        if (net is ElinNetHost host) SocialInteractions.Give(host, OriginPeer, this);
     }
 }

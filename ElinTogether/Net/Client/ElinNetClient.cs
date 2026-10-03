@@ -11,6 +11,7 @@ namespace ElinTogether.Net;
 internal partial class ElinNetClient : ElinNetBase
 {
     private DateTime _lastTimeout = DateTime.Now;
+    private bool _reportedReceiveStall;
 
     public override bool IsHost => false;
     public ISteamNetPeer Host => Socket.FirstPeer;
@@ -21,6 +22,19 @@ internal partial class ElinNetClient : ElinNetBase
         base.Update();
 
         if (IsConnected) {
+            // A connected Steam handle is not proof that game packets are arriving.
+            // Do not discard the player's live profile automatically on a stall.
+            var stalled = _handshakePhase == NetHandshakePhase.Joined &&
+                Host.Stat.SecondsSinceLastReceive > Math.Max(15, EmpConfig.Policy.Timeout.Value);
+            if (stalled && !_reportedReceiveStall) {
+                EmpLog.Warning("Host packet stream stalled: no packets for {Seconds:F1}s, tick {Tick}, received {Received}, sent {Sent}, buffered {Buffers}",
+                    Host.Stat.SecondsSinceLastReceive, Session.Tick, Host.Stat.PacketsReceived,
+                    Host.Stat.PacketsSent, Delta.GetCounts());
+                EmpPop.Information("The host connection has stopped delivering game updates. You can use Reconnect in the multiplayer menu; unsaved personal profile data will be backed up first.");
+            } else if (!stalled && _reportedReceiveStall) {
+                EmpLog.Information("Host packet stream resumed at tick {Tick}", Session.Tick);
+            }
+            _reportedReceiveStall = stalled;
             _lastTimeout = DateTime.Now;
             return;
         }

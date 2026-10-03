@@ -96,3 +96,13 @@ public struct Color {public float r,g,b,a;}
 public static class Msg {public static List<string> Local=[];public static Color currentColor;public static bool ignoreAll,alwaysVisible;public static void SetColor()=>currentColor=default;public static void SayRaw(){}}
 namespace ElinTogether {public class ScopeExit:IDisposable {public Action? OnExit;public void Dispose()=>OnExit?.Invoke();}}
 namespace ElinTogether.Models {public class MsgSayDelta {public string Text="";public float R,G,B,A;}}
+// Social transaction internals are covered by tests/SocialInteractions; this
+// suite verifies the AutoAct adapter calls that shared boundary.
+namespace ElinTogether.Models {internal static class SocialInteractions {
+ internal static int Calls;
+ internal static void Talk(Chara actor,Chara target){
+  Calls++;var pc=EClass.pc;var affinity=Affinity.CC;
+  try{EClass.game.player.chara=actor;if(target.interest>0)target.affinity.OnTalkRumor();}
+  finally{EClass.game.player.chara=pc;Affinity.CC=affinity;}
+ }
+}}

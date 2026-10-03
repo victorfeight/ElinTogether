@@ -25,7 +25,10 @@ internal partial class ElinNetHost
             foreach (var peer in peers) {
                 if (!peer.IsConnected || !_profileChannels.TryGetValue(peer.Id, out var channel)) return SaveFailed();
                 var request = barrier.Add(peer.Id, channel.OwnerUid, channel.Session);
-                if (!peer.Send(request)) return SaveFailed();
+                var sent = peer.Send(request);
+                EmpLog.Information("ProfileTrace host-request peer={Peer} uid={Uid} session={Session} request={Request} sent={Sent}",
+                    peer.Id, request.OwnerUid, request.Session, request.RequestId, sent);
+                if (!sent) return SaveFailed();
             }
             if (!Socket.WaitForPackets(p => p is PlayerProfileCheckpoint,
                 () => barrier.Complete,
@@ -48,13 +51,22 @@ internal partial class ElinNetHost
 
     private void OnPlayerProfileCheckpoint(PlayerProfileCheckpoint checkpoint, ISteamNetPeer peer)
     {
-        if (!AcceptsPlayerInput(peer.Id)) return;
-        if (!ActiveRemoteCharas.TryGetValue(peer.Id, out var actor) || actor.IsPC ||
-            !_profileChannels.TryGetValue(peer.Id, out var channel)) return;
+        EmpLog.Information("ProfileTrace host-receive peer={Peer} uid={Uid} session={Session} revision={Revision} request={Request}",
+            peer.Id, checkpoint.OwnerUid, checkpoint.Session, checkpoint.Revision, checkpoint.RequestId);
+        if (!AcceptsPlayerInput(peer.Id)) { Reject("input-not-owned"); return; }
+        if (!ActiveRemoteCharas.TryGetValue(peer.Id, out var actor)) { Reject("actor-missing"); return; }
+        if (actor.IsPC) { Reject("actor-is-host-pc"); return; }
+        if (!_profileChannels.TryGetValue(peer.Id, out var channel)) { Reject("channel-missing"); return; }
+        if (channel.RejectionReason(actor, checkpoint) is { } reason) { Reject(reason); return; }
+
+        void Reject(string reason) => EmpLog.Warning("ProfileTrace host-reject peer={Peer} uid={Uid} session={Session} revision={Revision} reason={Reason}",
+            peer.Id, checkpoint.OwnerUid, checkpoint.Session, checkpoint.Revision, reason);
         try {
             if (channel.Accept(actor, checkpoint) is { } receipt) {
                 _profileSave?.Receive(peer.Id, receipt);
-                peer.Send(receipt);
+                var sent = peer.Send(receipt);
+                EmpLog.Information("ProfileTrace host-receipt peer={Peer} uid={Uid} session={Session} revision={Revision} request={Request} sent={Sent}",
+                    peer.Id, receipt.OwnerUid, receipt.Session, receipt.Revision, receipt.RequestId, sent);
                 EmpLog.Debug("Personal profile checkpoint accepted: actor {Uid}, revision {Revision}", actor.uid, receipt.Revision);
             }
         } catch (Exception ex) {

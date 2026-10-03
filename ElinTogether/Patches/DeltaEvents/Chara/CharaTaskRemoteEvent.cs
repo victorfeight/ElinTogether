@@ -85,6 +85,7 @@ internal static class CharaTaskRemoteEvent
             // BaseTaskHarvest task => BaseTaskHarvestArgs.Create(task),
             // ai
             AI_ArmPillow ai => AIArmPillowArgs.Create(ai),
+            AI_Massage ai => AIMassageArgs.Create(ai),
             AI_AttackHome ai => AIAttackHomeArgs.Create(ai),
             AI_Bladder ai => AIBladderArgs.Create(ai),
             AI_Churyu ai => AIChuryuArgs.Create(ai),
@@ -113,7 +114,6 @@ internal static class CharaTaskRemoteEvent
             // AI_HaulResource ai => AIHaulResourceArgs.Create(ai),
             // AI_Idle ai => AIIdleArgs.Create(ai),
             // AI_LeaveMap ai => AILeaveMapArgs.Create(ai),
-            // AI_Massage ai => AIMassageArgs.Create(ai),
             // AI_Meditate ai => AIMeditateArgs.Create(ai),
             // AI_Mofu ai => AIMofuArgs.Create(ai),
             // AI_Offer ai => AIOfferArgs.Create(ai),

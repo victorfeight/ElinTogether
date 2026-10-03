@@ -1,5 +1,5 @@
 using ElinTogether.Models;
-public class EClass {public static Chara pc=new();public static Player player=new();public static Core core=new();}
+public class EClass {public static object _zone=new();public static Chara pc=new();public static Player player=new();public static Core core=new();}
 public class Player {public HotItem currentHotItem=new();} public class HotItem {public Thing? RenderThing;}
 public class Core {public Config config=new();} public class Config {public GameConfig game=new();} public class GameConfig {public bool hideWeapons,showOffhand;}
 public class Card {public bool isDestroyed;public int uid;public int Num=1;public int LightRadius;public int GetLightRadius()=>LightRadius;public Card? parent;public Card GetRootCard()=>parent?.GetRootCard()??this;}
@@ -9,6 +9,7 @@ public class Body {public Slot? slotMainHand,slotOffHand;}public class Slot {pub
 public class Profile {public Hand? RemoteMainHand,RemoteOffHand;} public record Hand(RemoteCard? Card,bool Flag);
 public class AIAct {public enum Status {Running,Success}public Status status;public AIAct? child;public Chara owner=null!;public bool IsChildRunning=>child?.status==Status.Running;public virtual bool IsIdle=>false;public virtual bool IsNoGoal=>false;public virtual int MaxRestart=>0;public virtual bool CancelWhenDamaged=>true;public virtual bool PushChara=>true;public virtual IEnumerable<Status> Run(){yield break;}public void SetOwner(Chara c)=>owner=c;public void Reset()=>status=Status.Success;public void Tick(){} }
 public class NoGoal:AIAct {}
+public class AI_Steal:AIAct {}
 public class BaseTaskHarvest:AIAct {public Card? Captured;public void SetTarget(Chara c)=>Captured=c.held;}
 public static class EmpLog {public static void Warning(string s,params object?[] args){}public static void Debug(string s,params object?[] args){}}
 namespace MessagePack {public class MessagePackObjectAttribute:Attribute {} public class KeyAttribute(int key):Attribute {}}
@@ -20,7 +21,7 @@ public abstract class ElinDelta:EClass {protected static IDisposable Simulate(bo
 public static class PendingUid {public static bool IsPending(int uid)=>false;}
 }
 
-namespace ElinTogether.Patches {public static class RemoteCraft{public static bool IsHostRun(AIAct? a)=>false;}}
+namespace ElinTogether.Patches {public static class MoongateTheftPatch {public static bool IsTheftBlocked(object zone)=>false;} public static class RemoteCraft{public static bool IsHostRun(AIAct? a)=>false;}}
 namespace ElinTogether.Models {
 public abstract class TaskArgsBase{public abstract AIAct CreateSubAct();}
 public class HarvestArgs:TaskArgsBase{public override AIAct CreateSubAct()=>new BaseTaskHarvest();}

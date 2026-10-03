@@ -9,29 +9,34 @@ namespace ElinTogether.Patches;
 internal static class CharaGiveGiftEvent
 {
     [HarmonyPrefix]
-    internal static void OnGiveGift(Chara __instance, Chara c, Thing t)
+    internal static bool OnGiveGift(Chara __instance, Chara c, Thing t, out SocialInteractions.Context? __state)
     {
+        __state = null;
         if (NetSession.Instance.Connection is not { } connection) {
-            return;
+            return true;
         }
-
-        if (connection.IsClient && (!__instance.IsPC || !CardCache.Contains(t))) {
-            return;
+        if (connection.IsClient && ElinDelta.IsApplying) return false;
+        if (SocialInteractions.Active || ElinDelta.IsApplying) return true;
+        if (connection.IsHost) {
+            if (__instance.IsPC) __state = SocialInteractions.Begin(__instance, c, gift: true);
+            return true;
         }
-
-        connection.Delta.AddRemote(new CharaGiveGiftDelta {
-            From = __instance,
-            To = c,
-            Thing = t,
-        });
+        if (__instance.IsPC && !PlayerControl.LocalInputBlocked) {
+            var source = PendingSplit.Split(t);
+            if (source is not null && !PendingUid.IsPending(source.Uid)) {
+                connection.Delta.AddRemote(new CharaGiveGiftDelta {
+                    Id = Guid.NewGuid(), ZoneUid = EClass._zone.uid,
+                    From = __instance, To = c, Thing = source,
+                });
+                // The host splits the real stack. This UI-only copy must not
+                // enter the recipient's inventory or run gift effects locally.
+                if (PendingUid.IsPending(t.uid)) CardCache.DelayDestroy(t);
+            }
+        }
+        return false;
     }
 
-    extension(Chara chara)
-    {
-        [HarmonyReversePatch(HarmonyReversePatchType.Snapshot)]
-        internal void Stub_GiveGift(Chara c, Thing t)
-        {
-            throw new NotImplementedException("Chara.GiveGift");
-        }
-    }
+    [HarmonyFinalizer]
+    internal static void End(SocialInteractions.Context? __state) => __state?.Dispose();
+
 }

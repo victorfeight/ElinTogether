@@ -42,6 +42,9 @@ public class CharaStateSnapshot : EClass
 
     [Key(10)] public int Investment { get; init; }
 
+    [Key(11)] public int? Hunger { get; init; }
+    [Key(12)] public CompanionVitalsSnapshot? CompanionVitals { get; init; }
+
     public static CharaStateSnapshot Create(Chara chara)
     {
         return new() {
@@ -55,6 +58,9 @@ public class CharaStateSnapshot : EClass
             UidMaster = chara.c_uidMaster,
             MinionType = chara.c_minionType,
             Investment = chara.c_invest,
+            Hunger = chara.hunger.value,
+            CompanionVitals = NetSession.Instance.Connection is ElinNetHost host &&
+                host.IsCompanionControlled(chara) ? CompanionVitalsSnapshot.Capture(chara) : null,
         };
     }
 
@@ -70,6 +76,7 @@ public class CharaStateSnapshot : EClass
             OriginalHostility = pc.c_originalHostility,
             UidMaster = pc.c_uidMaster,
             MinionType = pc.c_minionType,
+            Hunger = pc.hunger.value,
             State = new() {
                 LastAct = PlayerActivity.ReportAct(pc),
                 LastReceivedTick = NetSession.Instance.Tick,
@@ -87,6 +94,22 @@ public class CharaStateSnapshot : EClass
         var chara = remoteChara ?? Owner.Find() as Chara;
         if (chara is null) {
             return;
+        }
+
+        // Client reports have already passed the host's peer/control checks.
+        // A local human keeps authority; a spectator follows the host only while
+        // both ends agree it is companion-controlled. Never replay eating here.
+        // IsPC is deliberately false during spectator replay; UI ownership is
+        // still the actual local character reference.
+        var isLocalCharacter = ReferenceEquals(chara, pc);
+        if (Hunger is { } hunger && (remoteChara is not null || !isLocalCharacter ||
+            (CompanionVitals is not null && PlayerControl.WatchingOwnCharacter))) {
+            chara.hunger.value = hunger;
+        }
+        // Only host snapshots can carry companion vitals. Client reports never
+        // override them; late break snapshots cannot overwrite a resumed PC.
+        if (remoteChara is null && (!isLocalCharacter || PlayerControl.WatchingOwnCharacter)) {
+            CompanionVitals?.Apply(chara);
         }
 
         // this is received from host side

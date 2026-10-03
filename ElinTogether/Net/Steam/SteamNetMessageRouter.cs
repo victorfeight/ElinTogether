@@ -9,6 +9,7 @@ public sealed class SteamNetMessageRouter : ISteamNetListener
 {
     private readonly ConcurrentDictionary<uint, Action<object, ISteamNetPeer>> _handlers = [];
 
+    internal NetworkFlightRecorder? Trace { get; set; }
     public Func<object, ISteamNetPeer, bool>? ShouldReceivePacket { get; set; }
 
     public void OnPeerConnected(ISteamNetPeer peer)
@@ -28,11 +29,14 @@ public sealed class SteamNetMessageRouter : ISteamNetListener
         }
 
         if (ShouldReceivePacket?.Invoke(msg, peer) is false) {
+            Trace?.Fault($"router rejected peer={peer.Id} type={msg.GetType().Name}");
             return;
         }
 
         if (_handlers.TryGetValue(SteamNetTypeRegistry.GetHash(msg.GetType()), out var handler)) {
             handler(msg, peer);
+        } else {
+            Trace?.Fault($"no handler peer={peer.Id} type={msg.GetType().Name}");
         }
     }
 
@@ -53,6 +57,7 @@ public sealed class SteamNetMessageRouter : ISteamNetListener
             try {
                 handler((T)packet);
             } catch (Exception ex) {
+                Trace?.Fault($"handler={handler.Method.Name} peer={peer.Id}: {ex}");
                 EmpLog.Verbose(ex, "Exception at handling T1 message {CallbackName}, T1 = {MessageType}",
                     handler.Method.Name, typeof(T).Name);
                 DebugThrow.Void(ex);
@@ -75,6 +80,7 @@ public sealed class SteamNetMessageRouter : ISteamNetListener
             try {
                 handler((T)packet, peer);
             } catch (Exception ex) {
+                Trace?.Fault($"handler={handler.Method.Name} peer={peer.Id}: {ex}");
                 EmpLog.Verbose(ex, "Exception at handling T2 message {CallbackName}, T2 = {MessageType}, from {@Peer}",
                     handler.Method.Name, typeof(T).Name, peer);
                 DebugThrow.Void(ex);

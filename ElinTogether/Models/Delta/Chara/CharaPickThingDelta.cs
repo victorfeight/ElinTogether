@@ -29,84 +29,46 @@ public class CharaPickThingDelta : ElinDelta
 
     protected override void OnApply(ElinNetBase net)
     {
-        // we do not apply to ourselves
-        if (Owner.Find() is not Chara chara) {
-            return;
-        }
+        // This is a host-created product handoff, not a report of attempted pickup.
+        // Only the collecting client decides the destination using its vanilla
+        // inventory settings. Everyone else receives ordinary inventory outcomes.
+        if (net.IsHost || Owner.Find() is not Chara chara) return;
 
         if (Thing.Find() is not Thing { isDestroyed: false } thing) {
             TaskCache.CancelClientAct(net, this, Thing);
             return;
         }
 
-        EmpLog.Debug("PickupTrace packet: origin {OriginPeer}, type {PickType}, actor {ActorUid}, item {ItemUid}, state {State}, progressReplay {ProgressReplay}",
-            OriginPeer, Type, chara.uid, thing.uid, QuickTransferTrace.Item(thing),
-            CharaProgressCompleteDelta.IsReplaying);
+        EmpLog.Debug("PickupTrace product handoff: type {PickType}, actor {ActorUid}, item {ItemUid}, state {State}",
+            Type, chara.uid, thing.uid, QuickTransferTrace.Item(thing));
 
-        // realign
-        if (net.IsHost && thing.GetRootCard() is Chara holder && holder != chara && holder.IsPlayer) {
-            EmpLog.Warning("Refusing {DeltaType} from peer {PeerIndex}, uid {Uid} is held by player {HolderUid}",
-                nameof(CharaPickThingDelta), OriginPeer, Thing.Uid, holder.uid);
-            CardAddThingDelta.Rebind(net, Thing, thing);
+        // A late handoff must not move an item that has already been collected.
+        if (thing.GetRootCard() is Chara { IsPlayer: true }) return;
+        if (!chara.IsPC) {
+            // Keep a newly generated product visible until its owner's outcome
+            // arrives. Do not relocate an existing item on an observer.
+            if (thing.parent is null) _zone.AddCard(thing, Pos ?? chara.pos);
             return;
         }
 
-        if (CharaProgressCompleteDelta.IsReplaying) {
-            if (net.IsClient && chara.IsRemotePlayer) {
-                _zone.AddCard(thing);
-                return;
+        // This delegated local decision must emit the same transfer/stack/drop
+        // messages as ordinary pickup, rather than silently mutating during replay.
+        using (Simulate()) {
+            switch (Type) {
+                case PickType.Pick:
+                    chara.Pick(thing);
+                    break;
+                case PickType.PickOrDrop:
+                    chara.PickOrDrop(Pos, thing);
+                    break;
+                case PickType.TrySmoothPick:
+                    _map.TrySmoothPick(Pos, thing, chara);
+                    break;
             }
-        } else if (chara.IsPC) {
-            return;
         }
 
-        // relay to clients
-        if (net.IsHost && Type != PickType.Pick) {
-            net.Delta.AddRemote(this);
-        }
-
-        switch (Type) {
-            case PickType.Pick:
-                chara.Pick(thing);
-                // force add
-                if (net.IsHost && !thing.isDestroyed && thing.parent == _zone) {
-                    EmpLog.Warning("Mirror pick of {Uid} failed to store, forcing into chara {OwnerUid}",
-                        thing.uid, chara.uid);
-                    // clients must add thingy
-                    using (Simulate()) {
-                        chara.AddThing(thing);
-                    }
-                }
-
-                if (!thing.isDestroyed) {
-                    EmpLog.Debug("Chara {OwnerUid} picked {Uid}, now in parent {ParentUid}",
-                        chara.uid, thing.uid, (thing.parent as Card)?.uid ?? -1);
-                }
-
-                break;
-            case PickType.PickOrDrop:
-                chara.PickOrDrop(Pos, thing);
-                break;
-            case PickType.TrySmoothPick:
-                _map.TrySmoothPick(Pos, thing, chara);
-                break;
-        }
-
-        if (thing.isDestroyed || thing.parent != _zone) {
-            return;
-        }
-
-        if (net.IsClient && !CharaProgressCompleteDelta.IsReplaying) {
-            EmpLog.Warning("Relay {PickType} of {Uid} failed to store in {OwnerUid}, forcing local",
-                Type, thing.uid, chara.uid);
-            chara.AddThing(thing);
-            return;
-        }
-
-        net.Delta.AddRemote(new ZoneAddCardDelta {
-            Card = Thing,
-            Pos = thing.pos,
-            ZoneUid = _zone.uid,
-        });
+        // A rejected pickup of an already-grounded item has no mutation to send.
+        // In particular, a queued stack/codex request can leave it grounded until
+        // the host responds; never follow that request with a guessed ground result.
     }
 }

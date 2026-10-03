@@ -15,6 +15,15 @@ internal class EmpConsole
         server.StartServer();
     }
 
+    [ConsoleCommand("net_trace")]
+    internal static string DumpNetworkTrace()
+    {
+        if (NetSession.Instance.Connection is not { } connection) return "No multiplayer connection.";
+        connection.CaptureTraceContext();
+        connection.Trace.Report("manual", true);
+        return "Network diagnostic snapshot written to Player.log and the session log.";
+    }
+
     [ConsoleCommand("disconnect")]
     internal static void Disconnect()
     {

@@ -9,7 +9,7 @@ namespace ElinTogether {
  }
 }
 namespace ElinTogether.Net {
- public class ElinNetBase { public void ReportDesync(string text) {} }
+ public class ElinNetBase { internal readonly NetworkFlightRecorder Trace = new(_ => {}, watchdog: false); public void ReportDesync(string text) {} }
  public class ElinNetHost:ElinNetBase { public Dictionary<int,object> ActiveRemoteCharas=[]; public HashSet<int> Watching=[]; public bool AcceptsPlayerInput(int peer) => ActiveRemoteCharas.ContainsKey(peer) && !Watching.Contains(peer); }
 }
 namespace ElinTogether.Models {
@@ -35,3 +35,5 @@ namespace ElinTogether.Models {
   internal static void PrepareOutgoing(List<ElinDelta> batch, params List<ElinDelta>[] queued) { }
  }
 }
+
+namespace ElinTogether.Models { public class GameDelta:ElinDelta {} }

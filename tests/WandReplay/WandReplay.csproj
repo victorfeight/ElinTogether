@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
 <ItemGroup>
+<Compile Include="../../ElinTogether/Models/Delta/Card/CardOnUseDelta.cs" Link="CardOnUseDelta.cs" />
 <Compile Include="../../ElinTogether/Models/Delta/Chara/CharaActPerformDelta.cs" Link="CharaActPerformDelta.cs" />
 <Compile Include="../../ElinTogether/Patches/DeltaEvents/Act/ActZapEvent.cs" Link="ActZapEvent.cs" />
 <Compile Include="../../ElinTogether/Patches/DeltaEvents/Chara/CharaActPerformEvent.cs" Link="CharaActPerformEvent.cs" />

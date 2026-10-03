@@ -6,8 +6,8 @@ public class EClass {
  public static Core core=new();public static World world=>game.world;
  public static Sources sources=new();
 }
-public class Core{public bool IsGameStarted=true;}
-public class World{public Date date=new();}public class Date{public int Day=20;public int GetRawDay()=>Day;}
+public class Core{public bool IsGameStarted=true;public Game game=>EClass.game;}
+public class World{public Date date=new();}public class Date{public const int DayToken=1440;public int Day=20;public int GetRawDay()=>Day*DayToken;}
 public class Game {
  public static string id="fixture";public static string Saved="";public static int SaveCalls,LoadCalls;public static bool FailSave,FailNextLoad,SkipSelectionHook;
  public Player player=new();public Cards cards=new();public World world=new();public Religions religions=new();public bool isCloud,isLoading;
@@ -99,15 +99,24 @@ public static class CorePath{public static string PathBackup=Path.Combine(Path.G
 public class GameIndex{public string id="";public bool cloud;public GameIndex Create(Game g)=>this;}
 public static class GameIO{public static int Backups;public static bool FailBackup;public static void MakeBackup(GameIndex i){if(FailBackup)throw new IOException("fixture backup failed");Backups++;}}
 public static class GameIOContext{public static JsonSerializerSettings Settings=new(){PreserveReferencesHandling=PreserveReferencesHandling.Objects,TypeNameHandling=TypeNameHandling.Auto,ObjectCreationHandling=ObjectCreationHandling.Replace};}
-public static class EmpLog{public static void Information(string message,params object[] args){}public static void Warning(string m,params object[] a){}public static void Debug(string m,params object[] a){}}
+public static class EmpPop{public static void Information(string s){}}
+public static class EmpLog{public static void Warning(Exception e,string m,params object[] a){}public static void Information(string message,params object[] args){}public static void Warning(string m,params object[] a){}public static void Debug(string m,params object[] a){}}
 namespace ElinTogether.Helper{public class Placeholder{}}
 namespace ElinTogether.Net.Steam{public interface ISteamNetPeer{bool IsConnected{get;}}public class FakeProfilePeer:ISteamNetPeer{public bool Connected=true;public bool IsConnected=>Connected;}}
 namespace ElinTogether.Helper.Extensions{public static class Ext{public static IEnumerable<Thing> Flatten(this List<Thing> things)=>things;}}
 namespace MessagePack{public class MessagePackObjectAttribute:Attribute{}public class KeyAttribute(int n):Attribute{public int N=n;}}
 namespace ElinTogether.Net{
- public class ElinNetBase{}public class ElinNetHost:ElinNetBase{public Queue Delta=new();public Dictionary<int,Chara> ActiveRemoteCharas=[];}public class ElinNetClient:ElinNetBase{}
+ public class ElinNetBase:EClass{}public class ElinNetHost:ElinNetBase{public Queue Delta=new();public Dictionary<int,Chara> ActiveRemoteCharas=[];}internal partial class ElinNetClient:ElinNetBase {
+ public PlayerControlMode ControlMode=PlayerControlMode.Human;public bool IsConnected=true;
+ public static NetSession Session=>NetSession.Instance;public ProfilePeer Host=new();public ProfileSocket Socket=new();
+ public void InitializeProfile(){Session.Player=pc;_profileChannel=new(pc.uid,Guid.NewGuid());}
+ public bool TryRecover()=>PrepareProfileForReconnect();
+ public void Ack(PlayerProfileCheckpoint c)=>OnPlayerProfileReceipt(new(){OwnerUid=c.OwnerUid,Session=c.Session,Revision=c.Revision});
+ }
+ public class ProfilePeer{public int Sends;public bool SendResult=true;public Action<PlayerProfileCheckpoint>? OnSend;public bool Send(PlayerProfileCheckpoint p){Sends++;OnSend?.Invoke(p);return SendResult;}}
+ public class ProfileSocket{public bool WaitForPackets(Func<object,bool> accept,Func<bool> complete,Func<bool> valid)=>valid()&&complete();}
  public class Queue{public void AddRemote(object d){}}
- public class NetSession{public static NetSession Instance=new();public ElinNetBase? Connection;public bool IsClient=>Connection is ElinNetClient;}
+ public class NetSession{public static NetSession Instance=new();public ElinNetBase? Connection;public bool IsClient=>Connection is ElinNetClient;public Chara? Player;public ulong SessionId=123;}
 }
 namespace ElinTogether.Models{
  public class ElinDelta:EClass{public int OriginPeer;protected virtual void OnApply(ElinNetBase net){}}
@@ -121,3 +130,5 @@ namespace ElinTogether.Models{
  }
  public class LZ4Bytes{public string Text="";public static LZ4Bytes Create<T>(T value)=>new(){Text=JsonConvert.SerializeObject(value,GameIOContext.Settings)};public string DecompressToString()=>Text;}
 }
+
+namespace ElinTogether.Models { public enum PlayerControlMode { Human, Companion, Resuming } }

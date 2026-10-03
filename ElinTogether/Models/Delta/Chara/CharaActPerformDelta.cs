@@ -69,6 +69,9 @@ public class CharaActPerformDelta : ElinDelta
         if (ActId == 0) {
             EmpLog.Warning("ActionTrace receiving zero-ID action: origin {OriginPeer}, actor {ActorUid}, target {TargetUid}, senderType {SenderType}, zone {ZoneUid}",
                 OriginPeer, Owner.Uid, TargetCard?.Uid, DiagnosticActType ?? "unreported", ZoneUid);
+            // Zero is not an ability identity. Native nested reactions arrive via
+            // authoritative outcome deltas; never feed an invalid ID to ACT.Create.
+            return;
         }
 
         if (ActId == ABILITY.ActZap) {

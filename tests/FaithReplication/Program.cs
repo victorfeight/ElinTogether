@@ -62,7 +62,7 @@ Check(a.Evalue(85)==3&&!a.elements.ExpCalls.Any(c=>c.Id==306)&&EClass.player.Kar
 // Transport ordering: the host can queue its daily state, then send a newer
 // transaction result immediately before that older queued packet is flushed.
 var oldState=a.GetStr(PersonalFaith.SaveKey)!;
-var newer=PersonalFaith.Read(a);newer.PrayerDay=EClass.world.date.Day;newer.Days=20;PersonalFaith.Save(a,newer);
+var newer=PersonalFaith.Read(a);newer.PrayerDay=EClass.world.date.GetRawDay();newer.Days=20;PersonalFaith.Save(a,newer);
 var newest=a.GetStr(PersonalFaith.SaveKey)!;
 new FaithResultDelta{Owner=a,PersonalState=oldState,FaithId="earth"}.Apply(client);
 Check(a.GetStr(PersonalFaith.SaveKey)==newest&&a.faith==second,"older daily state cannot undo a newer conversion or prayer result");
@@ -96,4 +96,23 @@ Check(host.Replies.Count==retries+1&&Last().Id==wrongZone.Id,"duplicate request 
 var campaign=Request(FaithAction.Convert);campaign.God=god.id;campaign.Conversion=Religion.ConvertType.Campaign;
 a.Distance=99;PersonalFaith.AdvanceActive(a);days=PersonalFaith.Read(a).Days;FaithTransactions.Resolve(host,1,campaign);
 Check(a.faith==god&&a.c_daysWithGod==days,"vanilla healing campaign conversion preserves conversion type and requires no altar");
+// Real vanilla time units, including an existing nonzero solo-play baseline.
+var baselineDay=EClass.world.date.Day;
+var timed=new Chara{uid=800,c_daysWithGod=129};PersonalFaith.BeginSession(timed);
+EClass.world.date.Day+=2;PersonalFaith.AdvanceActive(timed);
+Check(timed.c_daysWithGod==131,"2880 minute timestamp delta adds two worship days to an existing baseline");
+var timestamp=PersonalFaith.Read(timed).AccountedDay;
+Check(timestamp==EClass.world.date.GetRawDay(),"saved accounted/prayer fields remain minute timestamps");
+PersonalFaith.AdvanceActive(timed);Check(timed.c_daysWithGod==131,"repeated same-day snapshots do not add worship duration");
+EClass.world.date.Day--;PersonalFaith.AdvanceActive(timed);Check(timed.c_daysWithGod==131,"older world clock cannot subtract worship duration");
+EClass.world.date.Day+=10;PersonalFaith.BeginSession(timed);PersonalFaith.AdvanceActive(timed);
+Check(timed.c_daysWithGod==131,"dormant gap is rebased rather than credited on join");
+var oldPc=EClass.pc;EClass.player.chara=timed;var timedState=PersonalFaith.Read(timed);
+timedState.PrayerDay=EClass.world.date.GetRawDay();PersonalFaith.Save(timed,timedState);
+PersonalFaith.RestoreDay();Check(timed.c_daysWithGod==131&&EClass.player.prayed,"same-day restore preserves prayer cooldown and day count");
+EClass.world.date.Day+=3;PersonalFaith.RestoreDay();
+Check(timed.c_daysWithGod==134&&!EClass.player.prayed,"client reconciliation converts three elapsed days from minute timestamps");
+PersonalFaith.RestoreDay();Check(timed.c_daysWithGod==134,"repeated client reconciliation does not compound the delta");
+EClass.world.date.Day-=4;PersonalFaith.RestoreDay();Check(timed.c_daysWithGod==131,"client receiving a future accounted timestamp adds zero days");
+EClass.player.chara=oldPc;EClass.world.date.Day=baselineDay;
 Console.WriteLine($"{checks} checks passed");

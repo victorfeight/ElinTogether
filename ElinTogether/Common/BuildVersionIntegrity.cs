@@ -53,9 +53,15 @@ public class BuildVersionIntegrity : EClass
         V23 = 23,
         // Failed progress results must never replay native completion.
         V24 = 24,
+        // Pickup attempts are replaced by inventory outcomes and product handoffs.
+        V25 = 25,
+        // Hunger and host-controlled companion vitals in character snapshots.
+        V26 = 26,
+        // Host-resolved gifts/conversations and synchronized important-item flags.
+        V27 = 27,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V24;
+    public const APIVersion APIVersionLatest = APIVersion.V27;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

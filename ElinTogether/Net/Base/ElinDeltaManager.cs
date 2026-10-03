@@ -118,13 +118,20 @@ public class ElinDeltaManager
                 // A save/disconnect callback can revoke ownership while this
                 // batch is already being applied. Buffered input is not authority.
                 if (net is ElinNetHost host && delta.OriginPeer != 0 &&
-                    !host.AcceptsPlayerInput(delta.OriginPeer)) continue;
+                    !host.AcceptsPlayerInput(delta.OriginPeer)) {
+                    net.Trace.Mark("delta-rejected", $"peer={delta.OriginPeer} type={delta.GetType().Name} input-not-owned");
+                    continue;
+                }
 
                 if (gameStarted || !delta.RequiresGameStarted) {
+                    using var applying = net.Trace.Enter("apply", $"batch={BatchCount} peer={delta.OriginPeer} type={delta.GetType().Name}");
                     delta.Apply(net);
+                    net.Trace.Mark("applied", $"batch={BatchCount} type={delta.GetType().Name}");
+                    if (delta is GameDelta) net.Trace.Mark("game-time", "applied");
                 }
             } catch (Exception ex) {
-                var deltaType = delta.GetType().Name;
+                net.Trace.Fault($"delta batch={BatchCount} type={delta?.GetType().Name}: {ex}");
+                var deltaType = delta?.GetType().Name ?? "null";
                 var desyncInfo = ex.ToString();
                 if (IsCapturing) {
                     GetLatestSnapshot()?.Desyncs.Add(new(BatchCount, desyncInfo, deltaType));

@@ -39,6 +39,8 @@ public class ZoneAddCardDelta : ElinDelta
             return;
         }
 
+        if (CardAddThingDelta.RejectForeignOwner(net, OriginPeer, Card, card)) return;
+
         // relay to other clients
         if (net.IsHost) {
             net.Delta.AddRemote(this);

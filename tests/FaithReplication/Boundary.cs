@@ -7,7 +7,7 @@ public class EClass {
 }
 public class Game{public Player player=new();public Religions religions=new();}
 public class Player{public Chara chara=new();public bool prayed;public int totalFeat,Karma;public void ModKarma(int n)=>Karma+=n;}
-public class World{public Date date=new();}public class Date{public int Day=10;public int GetRawDay()=>Day;}
+public class World{public Date date=new();}public class Date{public const int DayToken=1440;public int Day=10;public int GetRawDay()=>Day*DayToken;}
 public class Zone{public int uid=1;}public class Map{public List<Thing> things=[];public List<Chara> charas=[];}
 public class Point{}
 public class Card{

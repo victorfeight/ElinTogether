@@ -170,7 +170,7 @@ internal partial class ElinNetClient
             request.LobbyId);
 
         // Disconnect triggers OnPeerDisconnected → RemoveComponent → LeaveLobby
-        if (!CheckpointPersonalProfile()) return;
+        if (!PrepareProfileForReconnect()) return;
         Socket.Disconnect(Host, EmpDisconnectInfo.JoinWhileConnected);
         CoroutineHelper.Deferred(() => Session.Lobby.ConnectLobby(request.LobbyId));
     }
@@ -187,7 +187,7 @@ internal partial class ElinNetClient
             lobby);
 
         // Disconnect triggers OnPeerDisconnected → RemoveComponent → LeaveLobby
-        if (!CheckpointPersonalProfile()) return;
+        if (!PrepareProfileForReconnect()) return;
         Socket.Disconnect(Host, EmpDisconnectInfo.HostReconnectRequest);
         CoroutineHelper.Deferred(() => Session.Lobby.ConnectLobby(lobby));
     }

@@ -59,12 +59,13 @@ internal sealed class SteamNetPeerBroadcast(ISteamNetSerializer serializer)
                 }
 
                 var result = SteamNetworkingSockets.SendMessageToConnection(peer.Connection, Arena, (uint)bytes.Length,
-                    (int)sendFlags, out _);
+                    (int)sendFlags, out var messageNumber);
+                peer.RecordSend(bytes, result, messageNumber);
                 if (result != EResult.k_EResultOK) {
                     success = false;
                 }
 
-                peer.Stat.Sent(bytes.Length);
+                if (result == EResult.k_EResultOK) peer.Stat.Sent(bytes.Length);
                 peer.UpdateRealtime();
             }
 

@@ -1,9 +1,12 @@
 using System;
+using System.Diagnostics;
 
 namespace ElinTogether.Net.Steam;
 
 public sealed class SteamNetPeerStat
 {
+    private long _lastReceive = Stopwatch.GetTimestamp();
+    public double SecondsSinceLastReceive => (Stopwatch.GetTimestamp() - _lastReceive) / (double)Stopwatch.Frequency;
     public float AvgBpsIn;
     public float AvgBpsOut;
     public float AvgPingMs;
@@ -38,6 +41,7 @@ public sealed class SteamNetPeerStat
 
     public void Received(int bytes)
     {
+        _lastReceive = Stopwatch.GetTimestamp();
         BytesReceived += bytes;
         PacketsReceived++;
     }

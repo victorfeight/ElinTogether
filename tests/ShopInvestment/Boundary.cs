@@ -88,7 +88,7 @@ public class DramaCustomSequence {
     public void _TempTalk(string who, string s, string jump) => manager.lastTalk = new();
 }
 namespace ElinTogether.Net {
-    public class ElinNetBase { public ElinDeltaManager Delta = new(); public bool IsHost => this is ElinNetHost; public void ReportDesync(string s) => throw new Exception(s); }
+    public class ElinNetBase { internal readonly NetworkFlightRecorder Trace = new(_ => {}, watchdog: false); public ElinDeltaManager Delta = new(); public bool IsHost => this is ElinNetHost; public void ReportDesync(string s) => throw new Exception(s); }
     public class ElinNetHost : ElinNetBase {
         public Dictionary<int, Chara> ActiveRemoteCharas = [];
         public bool AcceptsPlayerInput(int peer) => ActiveRemoteCharas.ContainsKey(peer);

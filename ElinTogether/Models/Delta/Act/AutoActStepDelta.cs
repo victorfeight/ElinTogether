@@ -128,12 +128,7 @@ public class AutoActStepDelta : ElinDelta
             case Step.Chat:
                 if (Target?.Find() is not Chara npc || npc.isDead || npc.IsHostile(owner) ||
                     npc.pos.Distance(pos) > 0 || !(npc.IsHumanSpeak || owner.HasElement(1640))) return false;
-                var previous = game.player.chara;
-                var previousAffinity = Affinity.CC;
-                try {
-                    game.player.chara = owner;
-                    if (npc.interest > 0) npc.affinity.OnTalkRumor();
-                } finally { game.player.chara = previous; Affinity.CC = previousAffinity; }
+                SocialInteractions.Talk(owner, npc);
                 HasTargetState = true;
                 TargetInterest = npc.interest;
                 TargetAffinity = npc._affinity;

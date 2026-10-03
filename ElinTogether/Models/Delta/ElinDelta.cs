@@ -19,6 +19,7 @@ namespace ElinTogether.Models;
 [Union(113, typeof(CardIdentifyDelta))]
 [Union(114, typeof(CardShrineUsedDelta))]
 [Union(115, typeof(CardAmmoDelta))]
+[Union(116, typeof(CardImportantDelta))]
 // Chara
 [Union(200, typeof(CharaMoveDelta))]
 [Union(201, typeof(CharaTickDelta))]
@@ -81,6 +82,8 @@ namespace ElinTogether.Models;
 [Union(618, typeof(MapRevealDelta))]
 [Union(619, typeof(FaithRequestDelta))]
 [Union(620, typeof(FaithResultDelta))]
+[Union(621, typeof(SocialTalkDelta))]
+[Union(622, typeof(SocialStateDelta))]
 // Inv
 [Union(700, typeof(InvOwnerOnProcessDelta))]
 [Union(701, typeof(InvRerollDelta))]

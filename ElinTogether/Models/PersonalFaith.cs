@@ -21,6 +21,8 @@ internal static class PersonalFaith
         public int Version = 1;
         public long Revision;
         public int Days;
+        // Vanilla GetRawDay is midnight expressed in minutes, not a day index.
+        // Keep these timestamps unchanged for existing saves/prayer equality.
         public int PrayerDay = -1;
         public int AccountedDay;
         public Dictionary<string, God> Gods = [];
@@ -87,7 +89,7 @@ internal static class PersonalFaith
         var state = Read(actor);
         var today = EClass.world.date.GetRawDay();
         if (today <= state.AccountedDay) return;
-        state.Days += today - state.AccountedDay;
+        state.Days += ElapsedDays(today, state.AccountedDay);
         state.AccountedDay = today;
         actor.c_daysWithGod = state.Days;
         Save(actor, state);
@@ -124,7 +126,7 @@ internal static class PersonalFaith
         var today = EClass.world.date.GetRawDay();
         // A result can precede the client's time-advance packet. Reconcile after
         // vanilla's daily callback instead of incrementing the received day twice.
-        EClass.pc.c_daysWithGod = state.Days + Math.Max(0, today - state.AccountedDay);
+        EClass.pc.c_daysWithGod = state.Days + ElapsedDays(today, state.AccountedDay);
         EClass.player.prayed = state.PrayerDay == today;
         EClass.pc.RefreshFaithElement();
     }
@@ -135,4 +137,7 @@ internal static class PersonalFaith
         Restore(EClass.pc, Read(EClass.pc));
         EClass.pc.RefreshFaithElement();
     }
+
+    private static int ElapsedDays(int today, int accountedDay) =>
+        Math.Max(0, (today - accountedDay) / Date.DayToken);
 }
