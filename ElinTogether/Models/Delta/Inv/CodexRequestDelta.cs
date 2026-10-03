@@ -77,17 +77,9 @@ public class CodexRequestDelta : ElinDelta
         var delivered = false;
         try {
             var dest = receiver.things.GetDest(card);
-            // Remote inventories can have no grid (IsFull counts ALL entries), or an
-            // NPC grid containing hotbar/equipment. Neither measures PC backpack space.
-            // Keep vanilla bag/stack routing first; only fall back to an actually free
-            // main-backpack slot. This does not change general pickup/overflow behavior.
-            var used = receiver.things.Count(t => t.invY != 1 && !t.isEquipped);
+            // GetDest now uses the shared remote-player capacity correction.
+            var used = PlayerBackpackCapacity.Used(receiver.things);
             var capacity = receiver.things.GridSize;
-            if (!dest.IsValid && receiver != pc && used < capacity) {
-                dest.container = receiver;
-                EmpLog.Information("Codex capacity fallback for {Uid}: backpack {Used}/{Capacity}, total {Total}",
-                    receiver.uid, used, capacity, receiver.things.Count);
-            }
             if (!dest.IsValid) {
                 EmpLog.Information("Codex withdrawal rejected for {Uid}: backpack {Used}/{Capacity}, total {Total}",
                     receiver.uid, used, capacity, receiver.things.Count);

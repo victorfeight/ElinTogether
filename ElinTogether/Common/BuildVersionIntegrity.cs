@@ -59,9 +59,11 @@ public class BuildVersionIntegrity : EClass
         V26 = 26,
         // Host-resolved gifts/conversations and synchronized important-item flags.
         V27 = 27,
+        // Host-authored live land expansion bounds.
+        V28 = 28,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V27;
+    public const APIVersion APIVersionLatest = APIVersion.V28;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

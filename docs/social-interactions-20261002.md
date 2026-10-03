@@ -84,5 +84,7 @@ Keep host and client Player.log and Session logs for these checks. The host
 item IDs, remaining count and destruction state. Pair this with existing
 inventory transfer logs when examining an outcome.
 
-Deployment is separate: staging build only while the current god test is
-running. Protocol is V27; both peers need the new build before social testing.
+Deployed with the subsequent V28 inventory-capacity, live land-expansion and
+local-widget fixes. Both peers need V28. User confirmed gift giving works in
+live multiplayer; the remaining acceptance cases above are not implied by
+that confirmation.

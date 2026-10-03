@@ -106,6 +106,7 @@ internal partial class ElinNetClient
 
         probeGame.isCloud = false;
         probeGame.isLoading = true;
+        LocalWidgetLayout.Restore(player);
         probeGame.OnGameInstantiated();
         probeGame.OnLoad();
         PersonalFaith.RestoreJoinedPlayer();

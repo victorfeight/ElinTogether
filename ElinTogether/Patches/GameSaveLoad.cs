@@ -1,4 +1,5 @@
 using ElinTogether.Net;
+using ElinTogether.Models;
 using HarmonyLib;
 
 namespace ElinTogether.Patches;
@@ -11,6 +12,7 @@ internal class GameSaveLoad
     internal static bool OnSaveRemoteGame(bool isAutoSave, ref bool __result)
     {
         if (isAutoSave && EClass.debug.ignoreAutoSave) return true;
+        LocalWidgetLayout.CaptureLive();
         if (NetSession.Instance.Connection is ElinNetHost host && !host.PreparePersonalProfilesForSave()) {
             __result = false;
             return false;

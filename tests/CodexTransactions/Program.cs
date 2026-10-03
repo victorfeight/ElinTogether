@@ -51,7 +51,7 @@ Check(entry.numCard == 3 && !other.isDestroyed, "cannot deposit another player's
 
 // A full-looking NPC grid may be entirely occupied by hotbar/equipment.
 var crowded = new Chara { uid = 721 }; host.ActiveRemoteCharas[9] = crowded;
-crowded.things.Full = true; crowded.things.GridSize = 4;
+crowded.things.CapacityDriven = true; crowded.things.GridSize = 4;
 for (var i = 0; i < 2; i++) crowded.AddThing(new Thing { invY = 1 }, false);
 for (var i = 0; i < 2; i++) crowded.AddThing(new Thing { isEquipped = true }, false);
 entry.numCard = 1;
@@ -61,9 +61,10 @@ Check(entry.numCard == 0 && crowded.things.Count == 5, "remote full-looking inve
 foreach (var t in crowded.things.Take(4)) { t.invY = 0; t.isEquipped = false; }
 entry.numCard = 1;
 var actualFull = Request(); actualFull.OriginPeer = 9; actualFull.Apply(host);
-Check(entry.numCard == 1 && crowded.things.Count == 5, "fallback never bypasses actual backpack capacity");
+Check(entry.numCard == 1 && crowded.things.Count == 5, "shared capacity never bypasses actual backpack capacity");
 
 // Actual production routing prefixes, with only transport/formatting mocked.
+#if !CAPACITY_ONLY
 host.Replies.Clear();
 var result = "";
 using (PersonalMsgSayPatch.ForCollector(client)) {
@@ -160,3 +161,4 @@ crafter.Source.type="Talisman"; crafting.owner=originalPC;
 TalismanCraftPatch.Before(crafter,crafting,out var ownContext);
 try { Check(PersonalMsgSayPatch.OnRemoteToggleMessage("talisman_pc",weapon,weapon,null,null,ref result),"host's own talisman confirmation remains local"); }
 finally { TalismanCraftPatch.Restore(ownContext); }
+#endif

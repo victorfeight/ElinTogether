@@ -17,6 +17,7 @@ public class Map { public List<Thing> things = []; }
 public class UI { public object? currentDrag; public void EndDrag() => currentDrag = null; }
 public class DragItemCard { public bool OnDrag(bool execute, bool cancel) => true; public Info from = new(); public class Info { public Thing thing = null!; public int invX, invY; } }
 public class Items : List<Thing> {
+ public int GridSize = 35;
  public bool Full; public Thing? Find(string id) => this.FirstOrDefault(t => t.id == id);
  public bool IsFull(Thing t) => Full;
 }
@@ -40,6 +41,7 @@ public class Chara : Card {
  public void SetStr(string key, string? value) => saved[key] = value;
 }
 public class Thing : Card {
+ public int invY;
  public int Num = 1, BuyPrice = 100, SellPrice = 40;
  public BlessedState blessedState = BlessedState.Normal; public bool IsIdentified = true, c_isImportant, isEquipped;
  public string Name => id;

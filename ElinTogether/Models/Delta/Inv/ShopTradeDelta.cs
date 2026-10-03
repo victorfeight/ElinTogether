@@ -197,7 +197,13 @@ internal sealed class ShopTrade : EClass
         }
         if (request.RequestId == Guid.Empty || !Completed.Add((peer, request.RequestId))) return;
         var reply = new ShopTradeReplyDelta { RequestId = request.RequestId, Error = "The trade could not be completed. Reopen the shop and try again." };
-        void Reject() => host.SendDeltaTo(peer, reply);
+        void Reject(string reason = "invalid-session-merchant-item-or-destination")
+        {
+            EmpLog.Information("Shop trade rejected {RequestId}: reason {Reason}, actor {Actor}, merchant {Merchant}, item {Item}, quantity {Quantity}, quoted price {Price}, sell {Sell}, backpack {Used}/{Capacity}, total entries {Total}",
+                request.RequestId, reason, actor.uid, request.Merchant?.Uid, request.Item?.Uid, request.Quantity,
+                request.Price, request.Sell, PlayerBackpackCapacity.Used(actor.things), actor.things.GridSize, actor.things.Count);
+            host.SendDeltaTo(peer, reply);
+        }
         if (Closed.Contains((peer, request.SessionId)) || actor.isDead || !actor.IsInActiveMap || _zone.uid != request.ZoneUid ||
             request.Merchant?.Find() is not { isDestroyed: false } merchant ||
             (merchant is Chara npc ? npc.isDead || !npc.IsInActiveMap : merchant is not Thing machine || !_map.things.Contains(machine)) || actor.Dist(merchant) > 3 ||
@@ -222,7 +228,12 @@ internal sealed class ShopTrade : EClass
         var destination = request.Sell ? chest : request.Destination?.Find();
         if (destination is null || (!request.Sell && destination.GetRootCard() != actor)) { Reject(); return; }
         var currency = request.Currency.ToString().ToLowerInvariant();
-        if (price < 0 || price != request.Price || destination.things.IsFull(thing) ||
+        if (price < 0 || price != request.Price) { Reject($"price-mismatch: host={price}"); return; }
+        if (destination.things.IsFull(thing)) {
+            reply.Error = "Inventory full. The trade was not charged.";
+            Reject("destination-full"); return;
+        }
+        if (
             (request.Sell && (thing.c_isImportant || (!ledger.CanSellBack(thing, request.Quantity) && (!trader.AllowSell || price == 0)))) ||
             (!request.Sell && actor.GetCurrency(currency) < price) ||
             (request.Sell && thing.things.Count > 0 && !ledger.HasBought(thing)) || (thing.isEquipped && thing.blessedState <= BlessedState.Cursed)) { Reject(); return; }

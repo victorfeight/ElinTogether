@@ -13,7 +13,7 @@ public class CodexManager { public void AddCard(string id, int num = 1) {
  } readonly Dictionary<string,CodexCreature> entries = new(); public CodexCreature GetOrCreate(string id) { if (!entries.ContainsKey(id)) entries[id] = new(); return entries[id]; } }
 public class Card { public int uid; public object? parent; public bool isDestroyed; public object GetRootCard() => parent is Card c ? c.GetRootCard() : this; public virtual Thing AddThing(Thing t, bool stack) => throw new NotImplementedException(); }
 public class Chara : Card { public string? c_altName; public string NameSimple => "Player"; public void Pick(Thing t) {} public bool IsInActiveMap = true; public Bag things; public Chara() { things = new(this); } public int Dist(object p) => 1; public override Thing AddThing(Thing t, bool stack) { t.parent = this; things.Items.Add(t); return t; } }
-public class Bag(Chara owner) : List<Thing> { public int GridSize = 40; public bool Full; public Thing? Stack; public List<Thing> Items => this; public Dest GetDest(Thing t) => new() { stack = Stack, container = Full ? null : owner }; public List<Thing> List(Func<Thing,bool> f, bool onlyAccessible) => Items.Where(f).ToList(); }
+public class Bag(Chara owner) : List<Thing> { public int GridSize = 40; public bool Full, CapacityDriven; public Thing? Stack; public List<Thing> Items => this; public Dest GetDest(Thing t) => new() { stack = Stack, container = (CapacityDriven ? PlayerBackpackCapacity.Used(this) >= GridSize : Full) ? null : owner }; public List<Thing> List(Func<Thing,bool> f, bool onlyAccessible) => Items.Where(f).ToList(); }
 public class Dest { public Card? container; public Thing? stack; public bool IsValid => stack != null || container != null; }
 public class Thing : Card { public Thing? ammoData; public int c_ammo, refVal, encLV; public string id = "figure3", c_idRefCard = ""; public object trait = new TraitCard(); public object pos = new(); public int invY; public bool isEquipped; public int Num = 1; public void MakeFigureFrom(string s) { c_idRefCard = s; } public void Destroy() { isDestroyed = true; } public bool TryStackTo(Thing t) { t.Num += Num; Destroy(); return true; } }
 public class TraitCard {}
@@ -42,6 +42,8 @@ namespace HarmonyLib {
  public class HarmonyFinalizer : Attribute {}
 }
 namespace ElinTogether.Models {
+ public static class WishInteraction { public static Chara? Receiver; }
+ public static class MsgRelayContext { public static bool TrySend(ElinTogether.Net.ElinNetHost host,int peer,string text,ref string result) => host.SendDeltaTo(peer,new MsgSayDelta { Text=text }); }
  public static class RemoteCraft { public static Chara? ProductReceiver; }
  public class MsgSayDelta : ElinDelta { public string Text = ""; public float R,G,B,A; }
 }

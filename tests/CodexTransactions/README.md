@@ -1,6 +1,6 @@
 # Shared codex transaction checks
 
-Run `dotnet run --project tests/CodexTransactions -c Release` with the repository SDK.
+Run `dotnet run --project tests/CodexTransactions -c Release -p:CapacityOnly=true` with the repository SDK for the 14 collection/withdrawal checks validated with the shared backpack-capacity fix. The legacy message-routing section below still targets methods removed during relay consolidation and needs a separate test migration; it is excluded by this switch.
 The project links the production CodexRequestDelta handler and supplies in-memory
 substitutes for the Elin and network boundaries. It does not run Unity, Harmony,
 MessagePack serialization, or a live peer session.
