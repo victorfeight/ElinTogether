@@ -85,3 +85,5 @@ public struct ActRef { public Thing? refThing; }
 public static class ActEffect { public static void ProcAt(){} }
 
 public class ActMeleeCounter:Act {} public class ActMeleeParry:Act {} public class ActPray:Act {} public class TaskBuild {}
+
+namespace ElinTogether.Models { internal static class TpSpellBridge { internal static bool IsManagedId(int id)=>false; internal static bool IsManaged(Act act)=>false; internal static Capture? Current; internal sealed class Capture{internal void ObserveGeneration(Card card){}} } }

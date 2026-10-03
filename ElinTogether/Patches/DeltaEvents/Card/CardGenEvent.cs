@@ -53,6 +53,7 @@ internal static class CardGenEvent
             return;
         }
 
+        TpSpellBridge.Current?.ObserveGeneration(__result);
         connection.Delta.AddRemote(CardGenDelta.Create(__result));
     }
 }

@@ -113,6 +113,8 @@ namespace ElinTogether.Models;
 // Act
 [Union(900, typeof(ActThrowDelta))]
 [Union(901, typeof(AutoActStepDelta))]
+[Union(902, typeof(TpSpellRequestDelta))]
+[Union(903, typeof(TpSpellResultDelta))]
 // Element
 [Union(1000, typeof(ElementChangeDelta))]
 public abstract class ElinDelta : EClass

@@ -33,6 +33,8 @@ internal static class CharaActPerformEvent
             return;
         }
 
+        if (TpSpellBridge.IsManaged(__instance)) return; // Dedicated host request/outcome route.
+
         // to save bandwidth, only propagate successful act perform events
         if (!__result && !_alwaysSuccessfulActs.Contains(__instance.id)) {
             return;

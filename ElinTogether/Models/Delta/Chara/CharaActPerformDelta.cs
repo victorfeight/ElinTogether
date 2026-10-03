@@ -66,6 +66,8 @@ public class CharaActPerformDelta : ElinDelta
     {
         ApplyBuiltInMapping();
 
+        if (TpSpellBridge.IsManagedId(ActId)) return; // Never replay Tp effects on peers.
+
         if (ActId == 0) {
             EmpLog.Warning("ActionTrace receiving zero-ID action: origin {OriginPeer}, actor {ActorUid}, target {TargetUid}, senderType {SenderType}, zone {ZoneUid}",
                 OriginPeer, Owner.Uid, TargetCard?.Uid, DiagnosticActType ?? "unreported", ZoneUid);

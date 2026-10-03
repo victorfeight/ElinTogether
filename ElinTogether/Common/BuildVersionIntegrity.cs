@@ -68,9 +68,11 @@ public class BuildVersionIntegrity : EClass
         V31 = 31,
         // Container settings identify their owning item, never a shared UI prefab.
         V32 = 32,
+        // Host-executed TpMagicAppendix requests/results and floor outcomes.
+        V33 = 33,
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V32;
+    public const APIVersion APIVersionLatest = APIVersion.V33;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

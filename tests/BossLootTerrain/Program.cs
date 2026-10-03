@@ -67,3 +67,16 @@ Check(PathTerrainSync.Begin(out outer),"solo destruction remains native");PathTe
 var shadows=EClass._map.Shadows;var fovs=EClass._map.Fovs;
 new BossLootTileDelta{ZoneUid=7,Pos=new(){X=2,Z=2},Block=true,Material=4,Id=0,Direction=2}.Apply(client);
 Check(EClass._map.Shadows==shadows+2&&EClass._map.Fovs==fovs+1&&EClass._map.cells[2,2].blockDir==2,"authoritative terrain refreshes shadows/FOV and preserves block direction");
+
+// Tp floor mining shares the scoped native mutation capture, including nesting.
+Check(mapType.Methods.Any(m=>m.Name=="SetFloor"&&m.Parameters.Count==5),"installed floor setter matches optional spell capture");
+NetSession.Instance.Connection=host;before=host.Delta.Items.Count;
+var endSpell=PathTerrainSync.CaptureMap(EClass._map);
+EClass._map.SetFloor(2,2,6,4,3);PathTerrainSync.Floor(EClass._map,2,2);
+PathTerrainSync.Begin(out outer);PathTerrainSync.End(outer);
+PathTerrainSync.Floor(EClass._map,2,2);endSpell();
+PathTerrainSync.Floor(EClass._map,2,2);
+Check(host.Delta.Items.Count==before+2,"nested path capture restores spell capture and final scope stops publishing");
+EClass._map.SetFloor(2,2,1,1,0);
+host.Delta.Items[before].Apply(client);
+Check(EClass._map.cells[2,2]._floor==4&&EClass._map.cells[2,2]._floorMat==6&&EClass._map.cells[2,2].floorDir==3,"client applies exact floor result without mining again");

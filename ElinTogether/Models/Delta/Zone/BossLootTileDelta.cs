@@ -15,12 +15,14 @@ public class BossLootTileDelta : ElinDelta
     [Key(4)] public int Material { get; init; }
     [Key(5)] public int Value { get; init; }
     [Key(6)] public int Direction { get; init; }
+    [Key(7)] public bool Floor { get; init; }
 
     protected override void OnApply(ElinNetBase net)
     {
         if (net.IsHost || EClass._zone?.uid != ZoneUid || !Pos.IsInActiveMapBounds) return;
         Point point = Pos;
-        if (Block) EClass._map.SetBlock(point.x, point.z, Material, Id, Direction);
+        if (Floor) EClass._map.SetFloor(point.x, point.z, Material, Id, Direction);
+        else if (Block) EClass._map.SetBlock(point.x, point.z, Material, Id, Direction);
         else point.SetObj(Id, Value, Direction);
         EClass._map.RefreshShadow(point.x, point.z);
         EClass._map.RefreshShadow(point.x, point.z - 1);

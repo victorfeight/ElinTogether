@@ -2,11 +2,12 @@ using ElinTogether.Models;
 public class EClass {public static Zone _zone=new(){uid=7};public static Map _map=new();}
 public class Zone {public int uid;}
 public class Chara {public void TryDropBossLoot(){} public void DestroyPath(Point pos){}}
-public class Cell {public byte _blockMat,_block,obj,objVal;public int blockDir,objDir;}
+public class Cell {public byte _blockMat,_block,_floorMat,_floor,obj,objVal;public int blockDir,objDir,floorDir;}
 public class Map {
  public Cell[,] cells=new Cell[10,10];public int Shadows,Fovs;
  public Map(){for(int x=0;x<10;x++)for(int z=0;z<10;z++)cells[x,z]=new();}
  public void SetBlock(int x,int z,int mat,int id,int dir){new Point(x,z).SetBlock(mat,id);cells[x,z]._block=(byte)id;cells[x,z]._blockMat=(byte)mat;cells[x,z].blockDir=dir;}
+ public void SetFloor(int x,int z,int mat,int id,int dir){cells[x,z]._floor=(byte)id;cells[x,z]._floorMat=(byte)mat;cells[x,z].floorDir=dir;}
  public void SetObj(int x,int z,int mat,int id,int value,int dir,bool ignoreRandomMat=false){}
  public void RefreshShadow(int x,int z)=>Shadows++;public void RefreshFOV(int x,int z)=>Fovs++;
 }

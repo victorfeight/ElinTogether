@@ -1,3 +1,4 @@
+using System;
 using ElinTogether.Models;
 using ElinTogether.Net;
 using HarmonyLib;
@@ -10,6 +11,28 @@ namespace ElinTogether.Patches;
 internal static class PathTerrainSync
 {
     private static Map? _capturing;
+
+    // Also used by host-only mod spells. Reuse the same native mutation hooks,
+    // rather than mining again on clients or duplicating terrain capture.
+    internal static Action CaptureMap(Map map)
+    {
+        var previous = _capturing;
+        _capturing = map;
+        return () => _capturing = previous;
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(Map), nameof(Map.SetFloor), typeof(int), typeof(int), typeof(int), typeof(int), typeof(int))]
+    internal static void Floor(Map __instance, int x, int z)
+    {
+        if (_capturing != __instance || NetSession.Instance.Connection is not ElinNetHost) return;
+        var cell = __instance.cells[x, z];
+        BossLootTerrainPatch.Send(new BossLootTileDelta {
+            ZoneUid = EClass._zone.uid, Pos = new Point(x, z), Block = false, Floor = true,
+            Material = cell._floorMat, Id = cell._floor, Direction = cell.floorDir,
+        });
+    }
+
 
     [HarmonyPrefix, HarmonyPatch(typeof(Chara), nameof(Chara.DestroyPath))]
     internal static bool Begin(out Map? __state)

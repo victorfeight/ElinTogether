@@ -13,7 +13,8 @@ internal static class CharaMoveEvent
     [HarmonyPrefix]
     internal static bool OnCharaMove(Chara __instance)
     {
-        return __instance.ai is not GoalRemote && !__instance.IsActiveRemoteChara;
+        return TpSpellBridge.AllowsHostMovement ||
+               (__instance.ai is not GoalRemote && !__instance.IsActiveRemoteChara);
     }
 
     [HarmonyPostfix]
