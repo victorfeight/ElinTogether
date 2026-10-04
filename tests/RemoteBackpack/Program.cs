@@ -3,6 +3,26 @@ using ElinTogether.Net;
 using ElinTogether.Patches;
 int checks = 0;
 void Check(bool ok, string why) { if (!ok) throw new Exception(why); checks++; }
+// Exercise registration ownership as well as helpers: the old helper-only test
+// passed while Release builds never installed this correction in solo.
+RemoteBackpackCapacityPatch.Apply();
+var registrations = HarmonyLib.Harmony.Registered.ToArray();
+Check(registrations.Length == 3 && registrations.All(r => r.Owner == "test.mp.player-backpack"), "all capacity hooks have persistent ownership");
+RemoteBackpackCapacityPatch.Apply();
+Check(HarmonyLib.Harmony.Registered.Count == 3, "repeat initialization cannot double patch");
+new HarmonyLib.Harmony("test.mp").UnpatchSelf();
+Check(HarmonyLib.Harmony.Registered.Count == 3, "MP teardown retains backpack hooks");
+Check(!Attribute.IsDefined(typeof(RemoteBackpackCapacityPatch), typeof(HarmonyLib.HarmonyPatch)), "session PatchAll cannot register these hooks again");
+var freyfor = new Chara { SavedPlayer = true };
+var savedBag = new ThingContainer { owner = freyfor, GridSize = 35 };
+savedBag.AddRange(Enumerable.Range(0, 29).Select(_ => new Thing()));
+savedBag.AddRange(Enumerable.Range(0, 13).Select(_ => new Thing { isEquipped = true }));
+savedBag.AddRange(Enumerable.Range(0, 25).Select(_ => new Thing { invY = 1 }));
+bool savedFull = true;
+Check(savedBag.Count == 67 && !RemoteBackpackCapacityPatch.IsFull(savedBag, 0, ref savedFull) && !savedFull, "actual solo save: 67 entries use 29 of 35 slots");
+savedBag.AddRange(Enumerable.Range(0, 6).Select(_ => new Thing()));
+RemoteBackpackCapacityPatch.IsFull(savedBag, 0, ref savedFull);
+Check(savedFull, "solo gift capacity still rejects genuinely full 35-slot backpack");
 var host = new ElinNetHost(); NetSession.Instance.Connection = host;
 var remote = new Chara { IsPlayer = true };
 var bag = new ThingContainer { owner = remote, GridSize = 35 };
@@ -96,3 +116,19 @@ namespace ElinTogether.Net {
 namespace ElinTogether.Helper { internal class Placeholder {} }
 namespace MessagePack { public class MessagePackObjectAttribute : Attribute {} public class KeyAttribute(int n) : Attribute {} }
 namespace HarmonyLib { [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple=true)] public class HarmonyPatch : Attribute { public HarmonyPatch() {} public HarmonyPatch(Type t,string method,params Type[] args) {} } public class HarmonyPrefix : Attribute {} public class HarmonyPostfix : Attribute {} }
+
+namespace ElinTogether { internal static class ModInfo { internal const string Guid = "test.mp"; } }
+namespace HarmonyLib {
+ public class Harmony(string id) {
+  public string Id=id;
+  public static List<(string Owner, System.Reflection.MethodInfo Method)> Registered=[];
+  public static bool HasAnyPatches(string id)=>Registered.Any(r=>r.Owner==id);
+  public void Patch(System.Reflection.MethodInfo method,HarmonyMethod prefix)=>Registered.Add((Id,method));
+  public void UnpatchSelf()=>Registered.RemoveAll(r=>r.Owner==Id);
+ }
+ public class HarmonyMethod(Type type,string name) {}
+ public static class AccessTools {
+  public static System.Reflection.MethodInfo Method(Type type,string name,Type[]? args=null)=>
+   args is null ? type.GetMethod(name)! : type.GetMethod(name,args)!;
+ }
+}

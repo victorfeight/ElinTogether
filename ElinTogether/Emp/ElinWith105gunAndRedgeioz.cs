@@ -42,6 +42,7 @@ internal sealed class EmpMod : BaseUnityPlugin
         // This repair must survive the session component being destroyed while a save loads.
         RemoteCharaLifecyclePatch.Apply();
         SoloCharacterPatch.Apply();
+        RemoteBackpackCapacityPatch.Apply();
 
 #if DEBUG
         SharedHarmony.PatchAll(Assembly);
