@@ -78,9 +78,10 @@ public class BuildVersionIntegrity : EClass
         V37 = 37, // Client send-to-reserve and livestock timer result.
         V38 = 38, // Shared roster board commands and results.
         V39 = 39, // Shared resident roles and maid assignment.
+        V40 = 40, // Authoritative chest unlock and practice relock state.
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V39;
+    public const APIVersion APIVersionLatest = APIVersion.V40;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

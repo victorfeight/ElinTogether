@@ -4,5 +4,7 @@
     <Reference Include="Mono.Cecil"><HintPath>$(ElinGamePath)/BepInEx/core/Mono.Cecil.dll</HintPath></Reference>
     <Compile Include="../../ElinTogether/Models/Delta/Card/CardEnhancementDelta.cs" Link="CardEnhancementDelta.cs" />
     <Compile Include="../../ElinTogether/Patches/DeltaEvents/Card/CardEnhancementEvent.cs" Link="CardEnhancementEvent.cs" />
+    <Compile Include="../../ElinTogether/Models/Delta/Card/CardLockStateDelta.cs" Link="CardLockStateDelta.cs" />
+    <Compile Include="../../ElinTogether/Patches/DeltaEvents/Card/CardLockStateEvent.cs" Link="CardLockStateEvent.cs" />
   </ItemGroup>
 </Project>

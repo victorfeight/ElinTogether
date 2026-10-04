@@ -23,6 +23,7 @@ namespace ElinTogether.Models;
 [Union(117, typeof(CardEnhancementDelta))]
 [Union(118, typeof(BlendRequestDelta))]
 [Union(119, typeof(BlendResultDelta))]
+[Union(120, typeof(CardLockStateDelta))]
 // Chara
 [Union(200, typeof(CharaMoveDelta))]
 [Union(201, typeof(CharaTickDelta))]

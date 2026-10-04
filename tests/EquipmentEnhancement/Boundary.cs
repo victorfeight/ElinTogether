@@ -4,12 +4,19 @@ using ElinTogether.Net;
 
 public class Card
 {
+    public int c_lockLv,c_priceAdd,LV; public bool c_lockedHard,isLostProperty;
+    public Trait trait=null!;
     public int uid, encLV; public bool isDestroyed, IsEquipmentOrRangedOrAmmo = true, IsWeapon, IsAmmo;
     public Card? parent;
     public virtual void ModEncLv(int amount) { encLV += amount; }
     public void SetEncLv(int value) => ModEncLv(value - encLV);
     public Thing AddThing(Thing item, bool stack, int x, int y) { item.parent = this; CardEnhancementEvent.AfterTransfer(this, item); return item; }
 }
+public class Trait {
+    public Card owner=null!; public int UnlockCalls;
+    public void OnLockOpen(){UnlockCalls++;owner.c_lockLv=0;if(owner.c_lockedHard){owner.c_lockedHard=false;owner.c_priceAdd=0;}owner.isLostProperty=false;CardLockStateEvent.Unlocked(this);}
+}
+public class TraitChestPractice:Trait { public void OnSimulateHour(){} }
 // Native math/rendering are boundaries. The installed DLL call graph is checked
 // separately; these counters verify the MP receiver uses that native operation.
 public class Thing : Card
