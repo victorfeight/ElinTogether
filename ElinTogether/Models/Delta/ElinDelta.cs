@@ -55,6 +55,8 @@ namespace ElinTogether.Models;
 [Union(228, typeof(ReserveStateDelta))]
 [Union(229, typeof(PartyBoardCommandDelta))]
 [Union(230, typeof(PartyBoardStateDelta))]
+[Union(231, typeof(ResidentCommandDelta))]
+[Union(232, typeof(ResidentStateDelta))]
 // Thing
 [Union(300, typeof(ThingDelta))]
 [Union(301, typeof(ThingRequest))]

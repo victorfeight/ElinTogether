@@ -4,6 +4,10 @@
 <Compile Include="../../ElinTogether/Models/ReserveManagement.cs" Link="ReserveManagement.cs" />
 <Compile Include="../../ElinTogether/Models/Delta/World/ReserveStateDelta.cs" Link="ReserveStateDelta.cs" />
 <Compile Include="../../ElinTogether/Patches/Synchronization/ReserveManagementPatch.cs" Link="ReserveManagementPatch.cs" />
+<Compile Include="../../ElinTogether/Models/ResidentManagement.cs" Link="ResidentManagement.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/World/ResidentStateDelta.cs" Link="ResidentStateDelta.cs" />
+<Compile Include="../../ElinTogether/Patches/Synchronization/ResidentManagementPatch.cs" Link="ResidentManagementPatch.cs" />
+<Compile Include="../../ElinTogether/Patches/DeltaEvents/Quest/ClientQuestRerollPatch.cs" Link="ClientQuestRerollPatch.cs" />
 <Reference Include="0Harmony"><HintPath>$(ElinGamePath)/BepInEx/core/0Harmony.dll</HintPath></Reference>
 <Reference Include="MonoMod.Utils"><HintPath>$(ElinGamePath)/BepInEx/core/MonoMod.Utils.dll</HintPath></Reference>
 <Reference Include="MonoMod.RuntimeDetour"><HintPath>$(ElinGamePath)/BepInEx/core/MonoMod.RuntimeDetour.dll</HintPath></Reference>

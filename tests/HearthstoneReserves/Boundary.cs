@@ -9,12 +9,18 @@ public class EClass {
  public static Player player=new(); public static Chara pc=>player.chara;
  public static Zone _zone=new(){uid=7,IsPCFaction=true}; public static Game game=new();
  public static Faction Home=new(){uid="home"}; public static FactionBranch? Branch=>_zone.branch;
+ public static World world=new();
 }
+public class World { public Date date=new(); }
+public class Date { public int Now=20000; public bool IsExpired(int time)=>time<=Now; public int GetRaw()=>Now; }
+public static class Msg { public static string Last=""; public static void Say(string message)=>Last=message; }
+public class LayerQuestBoard {}
 public class Player { public Chara chara=null!; }
 public class Game { public Spatials spatials=new(); public Factions factions=new(); }
 public class Spatials { public Dictionary<int,Zone> zones=[]; public Zone? Find(int id)=>zones.GetValueOrDefault(id); }
 public class Factions { public Dictionary<string,Faction> dictAll=[]; }
 public class Zone {
+ public void UpdateQuests(bool force=false){}
  public int uid; public bool IsPCFaction; public FactionBranch? branch;
  public void RemoveCard(Chara c){c.parent=null;c.currentZone=null;}
  public void AddCard(Chara c,int x,int z){c.parent=this;c.currentZone=this;c.pos.Set(x,z);}
@@ -29,6 +35,8 @@ public class Faction {
 }
 public class FactionElements { public int Adds,Removes; public void OnAddMemeber(Chara c){Adds++;} public void OnRemoveMember(Chara c){Removes++;} }
 public class FactionBranch {
+ public object elements=new(); public int TypeChanges;
+ public void ChangeMemberType(Chara c,FactionMemberType type){TypeChanges++;c.ClearBed();c.memberType=type;c.c_wasInPcParty=false;RefreshEfficiency();c.RefreshWorkElements(elements);ResidentMemberTypePatch.Changed(this,c);}
  public Zone owner=null!; public List<Chara> members=[]; public int uidMaid,Recruits,Efficiency; public bool Throw;
  public void Recruit(Chara c){if(Throw)throw new InvalidOperationException();Recruits++;EClass.Home.RemoveReserve(c);members.Add(c);c.homeZone=owner;c.faction=EClass.Home;c.isRestrained=false;c.IsGlobal=true;owner.AddCard(c,5,6);}
  public void RemoveRecruit(Chara c){} public void RefreshEfficiency(){Efficiency++;}
@@ -38,6 +46,10 @@ public enum FactionMemberType { Default,Livestock }
 public enum Hostility { Enemy,Ally }
 public class Pos { public int X,Z; public void Set(int x,int z){X=x;Z=z;} }
 public class Chara {
+ public bool c_wasInPcParty; public int BedsCleared,WorkRefreshes;
+ public bool IsPCParty=>party!=null;
+ public FactionBranch? homeBranch=>homeZone?.branch;
+ public void ClearBed(){BedsCleared++;}
  public Party? party; public bool Dead,Guest; public int Timer;
  public bool IsAliveInCurrentZone=>!Dead&&IsInActiveMap;
  public bool IsGuest()=>Guest;
@@ -50,13 +62,17 @@ public class Chara {
  public bool GetBool(string key)=>Remote;
  public void OnBanish(){Banishes++;currentZone=null;parent=null;}
  public void SetFaction(Faction f){faction=f;} public void SetGlobal(){IsGlobal=true;} public void RemoveGlobal(){IsGlobal=false;}
- public void RefreshWorkElements(){}
+ public void RefreshWorkElements(object? elements=null){WorkRefreshes++;}
 }
 public class Party {public List<Chara> members=[];public void Stub_RemoveMember(Chara c){members.Remove(c);c.party=null;} }
 public class Trait { public bool CanBeBanished=true; }
 public class Live { public static implicit operator bool(Live? v)=>v!=null; }
 public class ListUI:Live { public int Refreshes; public void List(){Refreshes++;} }
-public class BaseListPeople { public LayerPeople layer=new(); public ListUI list=new(); public int TabRefreshes; public void RefreshTab(){TabRefreshes++;} public virtual void OnClick(Chara c,object i){} }
+public class BaseListPeople {
+ public LayerPeople layer=new(); public ListUI list=new(); public int TabRefreshes; public void RefreshTab(){TabRefreshes++;} public virtual void OnClick(Chara c,object i){}
+ public class ResidentClosure { public Chara c=null!; public void Maid(){EClass.Branch!.uidMaid=c.uid;} }
+ public class CooldownClosure { public ResidentClosure Outer=null!; public void Role(){Outer.c.SetInt(36,123);EClass.Branch!.ChangeMemberType(Outer.c,FactionMemberType.Livestock);} }
+}
 public class ListPeopleCallReserve:BaseListPeople { public override void OnClick(Chara c,object i){} }
 public class Multi { public List<BaseListPeople> owners=[]; }
 public class LayerPeople:Live { public Multi multi=new(); public static LayerPeople CreateReserve()=>new(); }
@@ -83,6 +99,7 @@ namespace ElinTogether.Net {
  public class NetSession { public static NetSession Instance=new(); public ElinNetBase? Connection; }
 }
 namespace ElinTogether.Models {
+ internal static class PartyMembership { internal static bool Protected(Chara c)=>c.IsPlayer||c.Remote; }
  public class RemoteCard {
   public int Uid; public Chara? Value;
   public Chara? Find()=>Value;

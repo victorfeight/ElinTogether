@@ -15,7 +15,7 @@ internal static class ReserveManagementPatch
     [HarmonyPostfix, HarmonyPatch(typeof(BaseListPeople), nameof(BaseListPeople.OnClick))]
     internal static void OpenResidentMenu(BaseListPeople __instance)
     {
-        if (NetSession.Instance.Connection is ElinNetClient) ReserveManagement.OpenResidents = new(__instance);
+        if (NetSession.Instance.Connection != null) ReserveManagement.OpenResidents = new(__instance);
     }
     [HarmonyPostfix, HarmonyPatch(typeof(LayerPeople), nameof(LayerPeople.CreateReserve))]
     internal static void Open(LayerPeople __result)
