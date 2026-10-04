@@ -70,9 +70,16 @@ public class BuildVersionIntegrity : EClass
         V32 = 32,
         // Host-executed TpMagicAppendix requests/results and floor outcomes.
         V33 = 33,
+        // Item explosion presentation independent of consumed-card replay.
+        V34 = 34,
+        // Shared resident-party commands and membership results.
+        V35 = 35,
+        V36 = 36, // Host-authoritative hearthstone reserves.
+        V37 = 37, // Client send-to-reserve and livestock timer result.
+        V38 = 38, // Shared roster board commands and results.
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V33;
+    public const APIVersion APIVersionLatest = APIVersion.V38;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

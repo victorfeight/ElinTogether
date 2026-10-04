@@ -50,6 +50,11 @@ namespace ElinTogether.Models;
 [Union(223, typeof(CharaFaithDelta))]
 [Union(224, typeof(CharaFeatPointDelta))]
 [Union(225, typeof(CharaLevelDelta))]
+[Union(226, typeof(PartyCommandDelta))]
+[Union(227, typeof(ReserveCommandDelta))]
+[Union(228, typeof(ReserveStateDelta))]
+[Union(229, typeof(PartyBoardCommandDelta))]
+[Union(230, typeof(PartyBoardStateDelta))]
 // Thing
 [Union(300, typeof(ThingDelta))]
 [Union(301, typeof(ThingRequest))]
@@ -88,6 +93,7 @@ namespace ElinTogether.Models;
 [Union(620, typeof(FaithResultDelta))]
 [Union(621, typeof(SocialTalkDelta))]
 [Union(622, typeof(SocialStateDelta))]
+[Union(623, typeof(ExplosionVisualDelta))]
 // Inv
 [Union(700, typeof(InvOwnerOnProcessDelta))]
 [Union(701, typeof(InvRerollDelta))]

@@ -17,6 +17,9 @@ public class PartyMemberDelta : ElinDelta
     [Key(2)]
     public Position? DestPos { get; set; }
 
+    [Key(3)]
+    public bool Joined { get; set; }
+
     internal Chara? CaptureSource { get; init; }
 
     protected override void OnApply(ElinNetBase net)
@@ -33,6 +36,7 @@ public class PartyMemberDelta : ElinDelta
         if (CaptureSource != null) {
             DestZoneUid = CaptureSource.currentZone?.uid ?? 0;
             DestPos = CaptureSource.pos;
+            Joined = CaptureSource.party == pc.party && pc.party.members.Contains(CaptureSource);
         }
 
         return true;
@@ -40,6 +44,9 @@ public class PartyMemberDelta : ElinDelta
 
     private void ApplyHost()
     {
+        // Membership results are host-authoritative. Legacy removal requests
+        // still originate from non-dialogue client RemoveMember callers.
+        if (Joined) return;
         if (Member.Find() is not Chara { isDead: false, IsPlayer: false } chara ||
             chara.party is not { } party || party != pc.party) {
             return;
@@ -60,11 +67,15 @@ public class PartyMemberDelta : ElinDelta
             return;
         }
 
-        if (chara.party is { } party && party.members.Contains(chara)) {
+        if (Joined) pc.party.AddMemeber(chara);
+        else if (chara.party is { } party && party == pc.party && party.members.Contains(chara)) {
             party.Stub_RemoveMember(chara);
         }
 
-        if (DestZoneUid == 0 || chara.currentZone?.uid == DestZoneUid ||
+        EmpLog.Debug("Party membership applied: member {Uid}, joined {Joined}, zone {ZoneUid}", chara.uid, Joined, DestZoneUid);
+
+        if (DestZoneUid == 0 || (chara.currentZone?.uid == DestZoneUid &&
+                (DestZoneUid != _zone.uid || chara.parent == _zone)) ||
             game.spatials.Find(DestZoneUid) is not { } dest) {
             return;
         }
@@ -73,8 +84,12 @@ public class PartyMemberDelta : ElinDelta
             _zone.RemoveCard(chara);
         }
 
-        chara.currentZone = dest;
-        if (DestPos is { } pos) {
+        if (dest == _zone && DestPos is { } activePos) {
+            dest.AddCard(chara, activePos.X, activePos.Z);
+        } else {
+            chara.currentZone = dest;
+        }
+        if (DestPos is { } pos && dest != _zone) {
             chara.pos.Set(pos.X, pos.Z);
         }
     }

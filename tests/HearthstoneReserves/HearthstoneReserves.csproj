@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+<PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+<ItemGroup>
+<Compile Include="../../ElinTogether/Models/ReserveManagement.cs" Link="ReserveManagement.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/World/ReserveStateDelta.cs" Link="ReserveStateDelta.cs" />
+<Compile Include="../../ElinTogether/Patches/Synchronization/ReserveManagementPatch.cs" Link="ReserveManagementPatch.cs" />
+<Reference Include="0Harmony"><HintPath>$(ElinGamePath)/BepInEx/core/0Harmony.dll</HintPath></Reference>
+<Reference Include="MonoMod.Utils"><HintPath>$(ElinGamePath)/BepInEx/core/MonoMod.Utils.dll</HintPath></Reference>
+<Reference Include="MonoMod.RuntimeDetour"><HintPath>$(ElinGamePath)/BepInEx/core/MonoMod.RuntimeDetour.dll</HintPath></Reference>
+<Reference Include="Mono.Cecil"><HintPath>$(ElinGamePath)/BepInEx/core/Mono.Cecil.dll</HintPath></Reference>
+</ItemGroup>
+</Project>
