@@ -80,3 +80,31 @@ Check(host.Delta.Items.Count==before+2,"nested path capture restores spell captu
 EClass._map.SetFloor(2,2,1,1,0);
 host.Delta.Items[before].Apply(client);
 Check(EClass._map.cells[2,2]._floor==4&&EClass._map.cells[2,2]._floorMat==6&&EClass._map.cells[2,2].floorDir==3,"client applies exact floor result without mining again");
+
+// Check FLAM against installed IL and exercise the production terrain wrappers.
+var damage=module.Types.Single(t=>t.Name=="ActEffect").Methods.Single(m=>m.Name=="DamageEle");
+var mining=damage.Body.Instructions.Where(i=>i.Operand is MethodReference m && m.DeclaringType.Name=="Map" && m.Name is "MineBlock" or "MineObj").Select(i=>(MethodReference)i.Operand).ToArray();
+Check(mining.Length==2 && mining.Count(m=>m.Name=="MineBlock"&&m.Parameters.Count==4)==1 && mining.Count(m=>m.Name=="MineObj"&&m.Parameters.Count==3)==1,"installed explosion mining signatures match wrappers");
+var ec=mining.Select(m=>new CodeInstruction(OpCodes.Callvirt,AccessTools.Method(typeof(Map),m.Name))).ToList();ec[0].labels.Add(label);
+var er=ExplosionTerrainPatch.RouteTerrain(ec).ToArray();
+Check(er.All(c=>c.opcode==OpCodes.Call&&((System.Reflection.MethodInfo)c.operand).DeclaringType==typeof(ExplosionTerrainPatch))&&er[0].labels.Contains(label),"explosion routes mining and preserves labels");
+failed=false;try{ExplosionTerrainPatch.RouteTerrain([]);}catch(InvalidOperationException){failed=true;}
+Check(failed,"unsupported explosion shape fails explicitly");
+NetSession.Instance.Connection=host;before=host.Delta.Items.Count;
+ExplosionTerrainPatch.MineBlock(EClass._map,chosen,false,null!,true);
+ExplosionTerrainPatch.MineObj(EClass._map,chosen,null!,null!);
+Check(host.Delta.Items.Count==before+2,"host explosion publishes block/object results without throw replay");
+var mines=EClass._map.Mines;NetSession.Instance.Connection=client;
+ExplosionTerrainPatch.MineBlock(EClass._map,chosen,false,null!,true);
+ExplosionTerrainPatch.MineObj(EClass._map,chosen,null!,null!);
+Check(EClass._map.Mines==mines,"client explosion cannot mine or create terrain drops");
+NetSession.Instance.Connection=null;ExplosionTerrainPatch.MineBlock(EClass._map,chosen,false,null!,true);
+Check(EClass._map.Mines==mines+1 && host.Delta.Items.Count==before+2,"solo retains native mining without packets");
+NetSession.Instance.Connection=host;EClass._map.FailMining=true;
+try{ExplosionTerrainPatch.MineBlock(EClass._map,chosen,false,null!,true);}catch(InvalidOperationException){}
+EClass._map.FailMining=false;before=host.Delta.Items.Count;PathTerrainSync.Block(EClass._map,2,2);
+Check(host.Delta.Items.Count==before,"exception restores explosion capture scope");
+var endOuter=PathTerrainSync.CaptureMap(EClass._map);
+ExplosionTerrainPatch.MineBlock(EClass._map,chosen,false,null!,true);
+PathTerrainSync.Object(EClass._map,2,2);endOuter();
+Check(host.Delta.Items.Count==before+2,"explosion preserves enclosing capture scope");

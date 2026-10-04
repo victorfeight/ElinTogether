@@ -3,7 +3,12 @@ public class EClass {public static Zone _zone=new(){uid=7};public static Map _ma
 public class Zone {public int uid;}
 public class Chara {public void TryDropBossLoot(){} public void DestroyPath(Point pos){}}
 public class Cell {public byte _blockMat,_block,_floorMat,_floor,obj,objVal;public int blockDir,objDir,floorDir;}
+public class ActEffect {public static void DamageEle(){}}
+public class Task {}
 public class Map {
+ public int Mines; public bool FailMining;
+ public void MineBlock(Point p,bool recoverBlock=false,Chara c=null,bool mineObj=true){Mines++;if(FailMining)throw new InvalidOperationException();SetBlock(p.x,p.z,0,0,0);ElinTogether.Patches.PathTerrainSync.Block(this,p.x,p.z);}
+ public void MineObj(Point p,Task task=null,Chara c=null){Mines++;if(FailMining)throw new InvalidOperationException();cells[p.x,p.z].obj=0;ElinTogether.Patches.PathTerrainSync.Object(this,p.x,p.z);}
  public Cell[,] cells=new Cell[10,10];public int Shadows,Fovs;
  public Map(){for(int x=0;x<10;x++)for(int z=0;z<10;z++)cells[x,z]=new();}
  public void SetBlock(int x,int z,int mat,int id,int dir){new Point(x,z).SetBlock(mat,id);cells[x,z]._block=(byte)id;cells[x,z]._blockMat=(byte)mat;cells[x,z].blockDir=dir;}
