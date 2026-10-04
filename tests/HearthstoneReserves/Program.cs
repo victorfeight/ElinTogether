@@ -164,3 +164,21 @@ Check(npc.Timer==priorTimer&&npc.memberType==priorRole&&client.Delta.Sent.Last()
 NetSession.Instance.Connection=null;
 Check(ResidentManagementPatch.Click(nested,typeof(BaseListPeople.CooldownClosure).GetMethod("Role")!),"solo resident callback untouched");
 Console.WriteLine($"{count} total reserve/resident board checks passed");
+
+var dramaType=module.Types.Single(t=>t.Name=="DramaCustomSequence");
+Check(dramaType.Methods.Where(m=>m.HasBody).Any(m=>m.Body.Instructions.Any(i=>Equals(i.Operand,"_daMakeMaid"))),"installed ally dialogue exposes the maid assignment step");
+Check(Types(dramaType).SelectMany(t=>t.Methods).Where(m=>m.HasBody).Any(m=>m.Body.Instructions.Any(i=>i.OpCode==Mono.Cecil.Cil.OpCodes.Stfld&&i.Operand is FieldReference r&&r.Name=="uidMaid")),"installed ally dialogue bypasses resident-board callback with direct maid write");
+DramaCustomSequence MaidDialogue(out DramaEventMethod action){action=new(){action=()=>throw new Exception("Unrouted native maid write")};return new(){events=[new(){step="_daMakeMaid"},action]};}
+NetSession.Instance.Connection=client;branch.uidMaid=npc.uid;
+var clientTalk=MaidDialogue(out var clientMaid);ResidentMaidDialoguePatch.After(clientTalk,npc);clientMaid.action();
+Check(client.Delta.Sent.Last() is ResidentCommandDelta{Operation:ResidentOperation.Maid,Maid:true,MemberUid:3},"ally dialogue sends explicit assign even if client already sees this maid");
+Check(branch.uidMaid==npc.uid&&clientTalk.Jump==clientTalk.StepEnd,"client dialogue avoids speculative assignment and premature success reply");
+NetSession.Instance.Connection=host;branch.uidMaid=0;npc.party=party;
+var hostTalk=MaidDialogue(out var hostMaid);ResidentMaidDialoguePatch.After(hostTalk,npc);hostMaid.action();
+Check(branch.uidMaid==npc.uid&&hostTalk.Jump=="","host ally dialogue uses shared validation and retains vanilla success reply");
+hostMaid.action();Check(branch.uidMaid==npc.uid,"repeated dialogue never toggles maid off");
+npc.Remote=true;branch.uidMaid=0;hostMaid.action();
+Check(branch.uidMaid==0&&hostTalk.Jump==hostTalk.StepEnd,"dialogue cannot assign a human player and does not claim success");npc.Remote=false;npc.party=null;
+NetSession.Instance.Connection=null;var soloTalk=MaidDialogue(out var soloMaid);var nativeCalls=0;soloMaid.action=()=>nativeCalls++;
+ResidentMaidDialoguePatch.After(soloTalk,npc);soloMaid.action();Check(nativeCalls==1,"solo maid dialogue retains its original native action");
+Console.WriteLine($"{count} total reserve/resident/dialogue checks passed");

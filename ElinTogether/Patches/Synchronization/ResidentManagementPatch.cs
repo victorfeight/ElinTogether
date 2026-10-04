@@ -70,3 +70,25 @@ internal static class ResidentMemberTypePatch
             host.Delta.AddRemote(ResidentStateDelta.Capture(__instance, c, clearBed: true));
     }
 }
+
+[HarmonyPatch(typeof(DramaCustomSequence), nameof(DramaCustomSequence.Build))]
+internal static class ResidentMaidDialoguePatch
+{
+    [HarmonyPostfix]
+    internal static void After(DramaCustomSequence __instance, Chara c)
+    {
+        if (NetSession.Instance.Connection == null) return;
+        var events = __instance.events;
+        for (var i = 0; i + 1 < events.Count; i++) {
+            if (events[i].step != "_daMakeMaid" || events[i + 1] is not DramaEventMethod method) continue;
+            method.action = () => {
+                // Dialogue means assign, never toggle. A stale/repeated choice
+                // must not dismiss the maid. Reuse board validation and results.
+                if (!ResidentManagement.Submit(c, ResidentOperation.Maid, maid: true))
+                    __instance.TempGoto(__instance.StepEnd);
+                // A successful local host action retains the native reply.
+                // Clients must not display that unconditional reply before acceptance.
+            };
+        }
+    }
+}

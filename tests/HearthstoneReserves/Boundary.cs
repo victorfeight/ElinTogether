@@ -15,6 +15,12 @@ public class World { public Date date=new(); }
 public class Date { public int Now=20000; public bool IsExpired(int time)=>time<=Now; public int GetRaw()=>Now; }
 public static class Msg { public static string Last=""; public static void Say(string message)=>Last=message; }
 public class LayerQuestBoard {}
+public class DramaEvent { public string step=""; }
+public class DramaEventMethod:DramaEvent { public Action action=()=>{}; }
+public class DramaCustomSequence {
+ public List<DramaEvent> events=[]; public string StepEnd="end",Jump="";
+ public void Build(Chara c){} public void TempGoto(string step){Jump=step;}
+}
 public class Player { public Chara chara=null!; }
 public class Game { public Spatials spatials=new(); public Factions factions=new(); }
 public class Spatials { public Dictionary<int,Zone> zones=[]; public Zone? Find(int id)=>zones.GetValueOrDefault(id); }
