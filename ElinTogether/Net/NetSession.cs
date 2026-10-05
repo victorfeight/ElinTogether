@@ -53,6 +53,7 @@ public class NetSession : EClass
         if (Connection is ElinNetHost controlHost && core.IsGameStarted) controlHost.EndLocalControl();
         if (Connection is ElinNetClient profileClient) profileClient.CheckpointPersonalProfile();
         ElinTogether.Models.WishInteraction.Clear();
+        ElinTogether.Models.QuestEventWidgetSync.Reset();
         ElinTogether.Models.GuildStateSnapshot.Reset();
         ElinTogether.Models.Investment.Reset();
         ElinTogether.Models.FaithTransactions.Reset();

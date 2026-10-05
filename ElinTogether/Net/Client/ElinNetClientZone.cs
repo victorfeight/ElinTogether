@@ -49,6 +49,7 @@ internal partial class ElinNetClient
     private void OnZoneDataResponse(ZoneDataResponse response)
     {
         ZoneTransitionPending = true;
+        QuestEventWidgetSync.Reset();
         using var _ = LogContext.PushProperty("Zone", new { response.ZoneFullName, response.ZoneUid }, true);
 
         EmpLog.Information("Received zone state");

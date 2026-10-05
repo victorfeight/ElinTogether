@@ -82,9 +82,10 @@ public class BuildVersionIntegrity : EClass
         V41 = 41, // Vanilla throw awards through owner progression; fractional raw XP.
         V42 = 42, // Shared settlement board transactions and state.
         V43 = 43, // Host-validated quest acceptance and delivery intents.
+        V44 = 44, // Authoritative quest event widget text, including timer mods.
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V43;
+    public const APIVersion APIVersionLatest = APIVersion.V44;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

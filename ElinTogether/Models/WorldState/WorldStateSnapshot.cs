@@ -46,6 +46,7 @@ public class WorldStateSnapshot : EClass
     [Key(12)] public int ZoneInvestment { get; init; }
     [Key(13)] public PersonalKarmaState[]? Karma { get; init; }
     [Key(14)] public int[]? RevealedTraps { get; init; }
+    [Key(15)] public string? QuestEventText { get; init; }
 
     [ElinPreLoad]
     private static void ClearSweepStrikes(GameIOContext context)
@@ -100,6 +101,7 @@ public class WorldStateSnapshot : EClass
             ProgressionAwards = OwnerProgressionAwards.CapturePending(),
             Karma = PersonalKarma.CaptureAll(),
             RevealedTraps = TrapDiscoverySync.Capture(),
+            QuestEventText = QuestEventWidgetSync.Capture(),
         };
     }
 
@@ -119,6 +121,7 @@ public class WorldStateSnapshot : EClass
                 MusicCollectionSync.Apply(KnownBGMs);
                 OwnerProgressionAwards.Receive(ProgressionAwards);
                 if (_zone.uid == ZoneUid) {
+                    QuestEventWidgetSync.Apply(ZoneUid, QuestEventText);
                     TrapDiscoverySync.Apply(ZoneUid, RevealedTraps);
                     _zone.influence = ZoneInfluence;
                     _zone.development = ZoneDevelopment;
