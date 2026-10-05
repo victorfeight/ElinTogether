@@ -27,13 +27,18 @@ public class ActThrowDelta : ElinDelta
             return;
         }
 
+        if (net is ElinNetHost host &&
+            (!host.ActiveRemoteCharas.TryGetValue(OriginPeer, out var actor) || actor != owner)) return;
+
         if (Thing.Find() is not Thing { isDestroyed: false } thing) {
             TaskCache.CancelClientAct(net, this, Thing);
             return;
         }
 
         var t = thing.Split(Thing.Num);
-        ActThrow.Throw(owner, Point, Target, t, Method);
+        using (HostSkillProgression.Begin(net, owner)) {
+            ActThrow.Throw(owner, Point, Target, t, Method);
+        }
 
         if (net.IsHost) {
             net.Delta.AddRemote(new ActThrowDelta {

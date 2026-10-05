@@ -18,6 +18,8 @@ public class Element {
     public void OnChangeValue() { }
 }
 public class Elements {
+    public Chara? Owner;
+    public void ModExp(int id, float amount) => Owner!.ModExp(id, amount);
     public Dictionary<int, Element> dict = [];
     public Element GetOrCreateElement(int id) {
         if (!dict.TryGetValue(id, out var e)) dict[id] = e = new() { id = id };
@@ -26,21 +28,23 @@ public class Elements {
     public void Remove(int id) => dict.Remove(id);
 }
 public class Chara : Card {
+    public Chara() { elements.Owner = this; }
     public int LV = 1, exp, feat, ModExpCalls;
     public bool IsPC => EClass.pc == this;
     public Elements elements = new();
     private readonly Dictionary<string, string?> strings = [];
     public string? GetStr(string key) => strings.GetValueOrDefault(key);
     public void SetStr(string key, string? value) => strings[key] = value;
-    public int c_invest, Money = 10000, Discount, Experience, Charges, Distance = 1;
+    public int c_invest, Money = 10000, Discount, Charges, Distance = 1;
+    public float Experience;
     public bool isDead, IsInActiveMap = true;
     public Trait trait = new();
     public int Dist(Chara c) => Distance;
     public int GetCurrency() => Money;
     public void ModCurrency(int a) { Money += a; Charges++; }
-    public void ModExp(int id, int a) {
+    public void ModExp(int id, float a) {
         ModExpCalls++; Experience += a;
-        elements.GetOrCreateElement(id).vExp += a;
+        elements.GetOrCreateElement(id).vExp += (int)a;
         elements.GetOrCreateElement(10).vExp += 3;
         LV++; exp += 4; feat++;
     }

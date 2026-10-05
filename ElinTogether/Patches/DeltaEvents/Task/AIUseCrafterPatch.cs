@@ -47,7 +47,7 @@ internal static class AIUseCrafterPatch
                     for (var i = 0; i < act.num; i++) {
                         act.owner.RemoveCondition<ConInvulnerable>();
                         EClass.player.invlunerable = false;
-                        act.owner.elements.ModExp(e.id, cost * 12f * (100f + args.Duration * 2f) / 100f);
+                        act.owner.elements.ModExp(e.id, RemoteCraft.Experience(cost, args.Duration));
                         act.owner.stamina.Mod(-cost);
                         if (act.owner.isDead) {
                             break;
@@ -370,7 +370,7 @@ internal static class AIUseCrafterPatch
                         var actor = act.owner;
                         actor.RemoveCondition<ConInvulnerable>();
                         EClass.player.invlunerable = false;
-                        actor.elements.ModExp(e.id, cost * 12f * (100f + duration * 2f) / 100f);
+                        actor.elements.ModExp(e.id, RemoteCraft.Experience(cost, duration));
                         actor.stamina.Mod(-cost);
                         if (actor.isDead) {
                             break;

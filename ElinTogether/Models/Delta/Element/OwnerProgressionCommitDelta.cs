@@ -13,7 +13,7 @@ public sealed class OwnerProgressionAward
     [Key(0)] public Guid Id { get; set; }
     [Key(1)] public int OwnerUid { get; set; }
     [Key(2)] public int Skill { get; set; }
-    [Key(3)] public int Amount { get; set; }
+    [Key(3)] public float Amount { get; set; }
     [Key(4)] public bool Offering { get; set; }
     [Key(5)] public bool Contraband { get; set; }
 }
@@ -78,7 +78,7 @@ internal sealed class OwnerProgressionAwards : EClass
     internal static void Save(Chara actor, List<OwnerProgressionAward> awards) =>
         actor.SetStr(PendingKey, awards.Count == 0 ? null : JsonConvert.SerializeObject(awards));
 
-    internal static OwnerProgressionAward Record(Chara actor, Guid id, int skill, int amount)
+    internal static OwnerProgressionAward Record(Chara actor, Guid id, int skill, float amount)
     {
         var pending = Read(actor);
         var award = new OwnerProgressionAward { Id = id, OwnerUid = actor.uid, Skill = skill, Amount = amount };
@@ -95,14 +95,17 @@ internal sealed class OwnerProgressionAwards : EClass
     {
         if (awards is null || NetSession.Instance.Connection is not ElinNetClient client || pc.isDead) return;
         foreach (var award in awards) {
-            if (award.OwnerUid != pc.uid || award.Id == Guid.Empty || award.Amount <= 0 || !Applied.Add(award.Id)) continue;
+            if (award.OwnerUid != pc.uid || award.Id == Guid.Empty || award.Amount <= 0 ||
+                float.IsNaN(award.Amount) || float.IsInfinity(award.Amount) || !Applied.Add(award.Id)) continue;
             ElementIds.UnionWith(pc.elements.dict.Keys);
             // This allows ordinary client progression hooks to run. The send
             // boundary below replaces their packets with one acknowledged state.
             using (ElinDelta.Simulate()) {
-                if (award.Offering) FaithOfferingProgression.Apply(pc, award.Amount, award.Contraband);
-                else pc.ModExp(award.Skill, award.Amount);
+                if (award.Offering) FaithOfferingProgression.Apply(pc, (int)award.Amount, award.Contraband);
+                else pc.elements.ModExp(award.Skill, award.Amount);
             }
+            EmpLog.Debug("Owner skill XP applied: actor {ActorUid}, skill {Skill}, raw {Amount}, award {AwardId}",
+                pc.uid, award.Skill, award.Amount, award.Id);
             Uncommitted.Add(award.Id);
             client.Delta.AddRemoteImmediate(new OwnerProgressionCommitDelta { Owner = pc });
         }

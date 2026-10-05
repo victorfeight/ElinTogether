@@ -205,4 +205,24 @@ Check(townDrama.LastJump == "_investZone" && EClass._zone.development == 24 && E
 secondMethod.action(); townDrama.manager.lastTalk.choices[0].onJump!();
 Check(Sent().OfType<InvestmentDelta>().Single().Kind == InvestmentKind.Shop,
     "one native dialogue patches both town and shop investment steps");
+// Throw awards use the same persisted acknowledgment channel, including fractional
+// native inputs. Existing integer JSON awards must remain readable without migration.
+OwnerProgressionAwards.Reset(); client.Delta.ClearOut();
+NetSession.Instance.Connection = host;
+OwnerProgressionAwards.Save(actor, []);
+var fractional = OwnerProgressionAwards.Record(actor, Guid.NewGuid(), 292, 2.75f);
+Check(OwnerProgressionAwards.Read(actor).Single().Amount == 2.75f,
+    "fractional native XP survives pending-award JSON persistence");
+actor.SetStr("emp_pending_progression", "[{\"Id\":\"" + Guid.NewGuid() + "\",\"OwnerUid\":719,\"Skill\":292,\"Amount\":50}]");
+Check(OwnerProgressionAwards.Read(actor).Single().Amount == 50f,
+    "legacy integer pending awards load without save migration");
+OwnerProgressionAwards.Save(actor, [fractional]);
+NetSession.Instance.Connection = client;
+var previousExperience = localActor.Experience;
+OwnerProgressionAwards.Receive([fractional]); OwnerProgressionAwards.Receive([fractional]);
+Check(localActor.Experience == previousExperience + 2.75f,
+    "fractional award enters native owner XP once without truncation");
+foreach (var value in new[] { float.NaN, float.PositiveInfinity, float.NegativeInfinity })
+    OwnerProgressionAwards.Receive([new() { Id = Guid.NewGuid(), OwnerUid = 719, Skill = 292, Amount = value }]);
+Check(localActor.Experience == previousExperience + 2.75f, "nonfinite awards cannot corrupt owner progression");
 Console.WriteLine($"{checks} checks passed");

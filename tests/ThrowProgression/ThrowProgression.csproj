@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Mono.Cecil"><HintPath>$(ElinGamePath)/BepInEx/core/Mono.Cecil.dll</HintPath></Reference>
+    <Compile Include="../../ElinTogether/Models/HostSkillProgression.cs" Link="HostSkillProgression.cs" />
+    <Compile Include="../../ElinTogether/Models/RemoteCraft.cs" Link="RemoteCraft.cs" />
+    <Compile Include="../../ElinTogether/Patches/Synchronization/HostSkillProgressionPatch.cs" Link="HostSkillProgressionPatch.cs" />
+    <Compile Include="../../ElinTogether/Patches/Remote/RemoteModExpPartyPatch.cs" Link="RemoteModExpPartyPatch.cs" />
+    <Compile Include="../../ElinTogether/Patches/DeltaEvents/Act/ActThrowEvent.cs" Link="ActThrowEvent.cs" />
+    <Compile Include="../../ElinTogether/Models/Delta/Act/ActThrowDelta.cs" Link="ActThrowDelta.cs" />
+  </ItemGroup>
+</Project>

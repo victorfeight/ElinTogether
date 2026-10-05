@@ -79,9 +79,11 @@ public class BuildVersionIntegrity : EClass
         V38 = 38, // Shared roster board commands and results.
         V39 = 39, // Shared resident roles and maid assignment.
         V40 = 40, // Authoritative chest unlock and practice relock state.
+        V41 = 41, // Vanilla throw awards through owner progression; fractional raw XP.
+        V42 = 42, // Shared settlement board transactions and state.
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V40;
+    public const APIVersion APIVersionLatest = APIVersion.V42;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

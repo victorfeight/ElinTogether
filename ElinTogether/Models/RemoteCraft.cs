@@ -11,6 +11,9 @@ internal static class RemoteCraft
 
     internal static Chara? ProductReceiver { get; set; }
 
+    // AI_UseCrafter truncates this integer expression before passing it to ModExp.
+    internal static int Experience(int cost, int duration) => cost * 12 * (100 + duration * 2) / 100;
+
     internal static void Attach(AI_UseCrafter act, AIUseCrafterArgs args)
     {
         _selections.Add(act, args);
