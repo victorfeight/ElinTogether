@@ -7,13 +7,28 @@
 - `0aff8bc`: relay host quest-event widget text, including KKQuestTimer output. Clients do not execute duplicate quest events just to display the timer.
 - `f1c463b`: confirmed resident rename/portrait/skin/PCC edits use host validation and field-level conflict checks. Human/dormant player profiles are excluded. Custom assets must exist on both machines.
 
-## Advanced building safety boundary
+## Planning and area follow-up
 
 Native `BaseTileSelector.TryProcessTiles` invokes task creation, tile processing and then `ExecuteSummary`. `HitSummary.Execute` charges currency/materials. `UndoManager.Perform` destroys tasks, and `TaskBuild.OnDestroy` returns stored resources through `Zone.AddCard`. Executing these UI operations independently on a client is unsafe even if finished terrain is later synchronized.
 
-`AdvancedBuildingPatch` therefore rejects client designation/build/blueprint/deconstruction/area-selection operations at the selector entry point, before mutation/payment. It guards undo separately and wraps native area-property menu actions before opening their mutation dialogs. Host and solo retain native behavior. Ordinary adventure-mode placement, mining, harvesting and AutoAct tasks do not use these guarded selector modes.
+The follow-up replaces part of the earlier blanket guard:
 
-This is a host-only boundary, **not full advanced-building synchronization**. It does not add shared live blueprint markers or area metadata, forward client blueprint batches, or support editor/debug terrain tools. A complete expansion needs explicit batch ownership, stale-state checks, host payment, idempotent cancellation, and read-only result rendering that cannot execute tasks or return stored items. Do not deserialize/execute cloned task resources on the client to obtain previews.
+- Host construction/task footprints and working markers are rendered on clients as data only, using native guide passes. They are generic work markers, not full furniture/recipe silhouettes. No executable tasks or stored resources are copied to create previews.
+- Area and room geometry, type, assigned-resident IDs, name, access, wall visibility, atrium, group and height settings are mirrored. Existing objects are reused by UID; geometry detaches without `Area.OnRemove` or task destruction. Room plates retain the synchronized settings/type. Local visited flags are left alone.
+- Existing world snapshots advertise a planning revision. Native mutation hooks invalidate a cached snapshot; changed results are broadcast, and joining/rejoining clients request a baseline. No new timer is added. Unchanged invalidations do not create revisions, and marker-only updates do not rebuild room geometry.
+- Client create/expand/shrink/delete area actions run on host through native area operations. Settings use the six native confirmed callbacks, field-level conflict checks, and rollback of the temporary client edit until host confirmation. Stale destructive shape edits are rejected.
+- Client queued mining/digging/cutting/harvesting uses native task validation and task lists on host. Independent additive requests are revalidated rather than rejected for unrelated plan changes. Instant mode and native forced-instant terrain operations are not silently converted into free jobs.
+- Client cancellation runs native cleanup on host. Client undo targets only that client's last pending batch (up to ten batches, current map/session), never the host's global undo stack. Completed work is not reversed. Requests are deduplicated; stale explicit cancellation is rejected.
+
+Host/solo behavior and ordinary adventure placement, mining, harvesting and AutoAct keep their existing paths.
+
+## Remaining boundaries
+
+- Client construction (including queued building), installed-object movement, deconstruction, instant terrain editing, and blueprint copy/import remain guarded. Full support still needs host recipe/material selection, native payment and placement semantics, plus result validation. This follow-up does **not** claim those gaps closed.
+- Editor/debug terrain tools are outside this integration.
+- Scripted/instance quest initiation remains host-controlled; this is not changed by planning synchronization.
+- Custom appearance files are not transferred. Both installations still need the assets.
+- Automated checks cover native IL boundaries and production transaction code with a mocked game boundary. They cannot certify Unity rendering or live paired play; use the tests below.
 
 ## In-game verification (still required)
 
@@ -22,7 +37,11 @@ This is a host-only boundary, **not full advanced-building synchronization**. It
 - Client: accept an eligible random quest, deliver to its actual recipient, confirm one consumption/reward. Scripted and instance quests stay with the host.
 - Both: enter harvest/music/defense quests with the timer mod on host; compare timer/wave text, then exit and confirm the text clears.
 - Client: rename/customize an eligible resident; confirm host view and save/reload. Try editing the same field concurrently; newer host state should win a stale request.
-- Client: attempt a queued build, cancellation, undo, area edit, and blueprint placement; expect the host-controlled message with no currency/material change or dropped resources.
+- Host: queue construction and gathering work; client should see work footprints appear, change when worked, and disappear on completion/cancellation. Rejoin and verify the current baseline, then leave the zone and check old markers clear.
+- Client: create, expand, shrink and delete an area. Compare boundaries on host. Rename it and change access/group/height/atrium/wall visibility; compare both views and save/reload. Repeat with a room plate. Simultaneously edit the same setting and confirm a stale edit cannot overwrite the newer value.
+- Client: with instant mode off, designate mining/digging/cutting/harvesting. Host should receive one batch and native workers can execute it. Queue separate batches from both sides, then client undo: only that client's latest pending work should disappear.
+- Client: cancel host-created work containing gathered materials. Confirm native refunds occur once on host and existing item synchronization shows the result. Try cancelling while the host changes the same plan; expect rejection/resync instead of removing newer work.
+- Client: attempt construction, instant terrain work, installed-item movement, deconstruction and blueprint import. Expect the host-controlled message with no payment or local mutation. These are remaining unsupported actions, not implemented client features.
 - Host: perform the same building operations and confirm native behavior. Client: verify normal held-item placement, direct mining/harvesting and AutoAct still work.
 
-Builds are staged only. No Package installation was performed during this audit. Protocol V45 requires matching builds for the newly integrated packet fields.
+Builds are staged only in `build/building-planning`. No Package installation was performed during this audit. Protocol V46 requires matching builds for the newly integrated packet fields.

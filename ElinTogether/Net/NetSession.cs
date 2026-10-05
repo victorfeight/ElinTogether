@@ -54,6 +54,8 @@ public class NetSession : EClass
         if (Connection is ElinNetClient profileClient) profileClient.CheckpointPersonalProfile();
         ElinTogether.Models.WishInteraction.Clear();
         ElinTogether.Models.QuestEventWidgetSync.Reset();
+        ElinTogether.Models.BuildingPlanning.Reset();
+        ElinTogether.Models.DesignationManagement.Reset();
         ElinTogether.Models.GuildStateSnapshot.Reset();
         ElinTogether.Models.Investment.Reset();
         ElinTogether.Models.FaithTransactions.Reset();

@@ -67,7 +67,7 @@ internal static class BranchBoardCallbackPatch
         }
     }
 
-    private static T Capture<T>(object closure, Type root)
+    internal static T Capture<T>(object closure, Type root)
     {
         IEnumerable<T> Walk(object value, HashSet<object> seen) {
             if (!seen.Add(value)) yield break;

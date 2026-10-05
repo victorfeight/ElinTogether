@@ -1,12 +1,12 @@
 using System;
-using System.Collections.Generic;
 using ElinTogether.Net;
+using ElinTogether.Models;
 using HarmonyLib;
 
 namespace ElinTogether.Patches;
 
-// These UI operations have no host transaction yet. Block before native task
-// creation/payment, not in Task.Destroy: destruction can return stored materials.
+// Supported operations are routed below; the remaining UI-only paths must stop
+// before native task creation/payment. Never guard Task.Destroy/refunds globally.
 internal static class AdvancedBuildingAccess
 {
     internal static bool IsHostControlled(ActionMode mode)
@@ -21,17 +21,50 @@ internal static class AdvancedBuildingAccess
     internal static bool Allow()
     {
         if (NetSession.Instance.Connection is not ElinNetClient) return true;
-        Msg.Say("Advanced building and area editing are currently controlled by the host.");
+        Msg.Say("Construction, instant terrain edits, blueprint imports, deconstruction and moving installed items are currently controlled by the host.");
         return false;
+    }
+}
+
+[HarmonyPatch(typeof(UndoManager), nameof(UndoManager.WriteNote))]
+internal static class AdvancedBuildingUndoNotePatch
+{
+    [HarmonyPrefix] internal static bool Before(UINote n)
+    {
+        if (!NetSession.Instance.IsClient) return true;
+        n.Clear(); n.Space(10); n.AddText("NoteText_topic", "tUndo".lang());
+        n.AddText("Cancel your last pending mining, digging, cutting or harvesting batch here. Completed work is not reversed.");
+        n.Build(); return false;
     }
 }
 
 [HarmonyPatch(typeof(BaseTileSelector), nameof(BaseTileSelector.TryProcessTiles))]
 internal static class AdvancedBuildingSelectionPatch
 {
-    [HarmonyPrefix] internal static bool Before(BaseTileSelector __instance)
+    [HarmonyPrefix] internal static bool Before(BaseTileSelector __instance, Point _end)
     {
+        if (NetSession.Instance.IsClient) {
+            if (EInput.skipFrame > 0) return false;
+            if (__instance.mode is AM_EditArea) return true;
+            if (DesignationManagement.TrySubmit(__instance.mode, __instance.start ?? _end, _end)) {
+                __instance.mode.OnSelectEnd(cancel: true);
+                __instance.start = null;
+                return false;
+            }
+            AreaCommand? command = __instance.mode switch {
+                AM_CreateArea create => new() { Operation = AreaOperation.Create, AreaType = create.area.type.id },
+                AM_ExpandArea expand => new() { Operation = expand.shrink ? AreaOperation.Shrink : AreaOperation.Expand, AreaUid = expand.area.uid },
+                _ => null,
+            };
+            if (command != null) {
+                command.Start = __instance.start ?? _end; command.End = _end;
+                AreaManagement.Submit(command);
+                __instance.start = null;
+                return false;
+            }
+        }
         if (!AdvancedBuildingAccess.IsHostControlled(__instance.mode) || AdvancedBuildingAccess.Allow()) return true;
+        if (__instance.mode is AM_Mine or AM_Dig) __instance.mode.OnSelectEnd(cancel: true);
         // End the rejected drag without invoking OnSelectEnd/ExecuteSummary.
         __instance.start = null;
         return false;
@@ -41,19 +74,10 @@ internal static class AdvancedBuildingSelectionPatch
 [HarmonyPatch(typeof(UndoManager), nameof(UndoManager.Perform))]
 internal static class AdvancedBuildingUndoPatch
 {
-    [HarmonyPrefix] internal static bool Before() => AdvancedBuildingAccess.Allow();
-}
-
-[HarmonyPatch(typeof(BaseArea), nameof(BaseArea.ListInteractions))]
-internal static class AdvancedBuildingAreaMenuPatch
-{
-    [HarmonyPostfix] internal static void After(List<BaseArea.Interaction> __result)
+    [HarmonyPrefix] internal static bool Before()
     {
-        // Keep inspection available. Check authority at click time as menus can
-        // survive a connection change. Native callbacks include delayed dialogs.
-        foreach (var entry in __result) {
-            var action = entry.action;
-            if (action != null) entry.action = () => { if (AdvancedBuildingAccess.Allow()) action(); };
-        }
+        if (!NetSession.Instance.IsClient) return true;
+        DesignationManagement.Submit(new() { Operation = DesignationOperation.Undo });
+        return false;
     }
 }

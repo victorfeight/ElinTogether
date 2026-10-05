@@ -47,6 +47,7 @@ public class WorldStateSnapshot : EClass
     [Key(13)] public PersonalKarmaState[]? Karma { get; init; }
     [Key(14)] public int[]? RevealedTraps { get; init; }
     [Key(15)] public string? QuestEventText { get; init; }
+    [Key(16)] public long BuildingRevision { get; init; }
 
     [ElinPreLoad]
     private static void ClearSweepStrikes(GameIOContext context)
@@ -102,6 +103,7 @@ public class WorldStateSnapshot : EClass
             Karma = PersonalKarma.CaptureAll(),
             RevealedTraps = TrapDiscoverySync.Capture(),
             QuestEventText = QuestEventWidgetSync.Capture(),
+            BuildingRevision = BuildingPlanning.Publish(),
         };
     }
 
@@ -122,6 +124,7 @@ public class WorldStateSnapshot : EClass
                 OwnerProgressionAwards.Receive(ProgressionAwards);
                 if (_zone.uid == ZoneUid) {
                     QuestEventWidgetSync.Apply(ZoneUid, QuestEventText);
+                    BuildingPlanning.Observe(ZoneUid, BuildingRevision);
                     TrapDiscoverySync.Apply(ZoneUid, RevealedTraps);
                     _zone.influence = ZoneInfluence;
                     _zone.development = ZoneDevelopment;

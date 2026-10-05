@@ -2,6 +2,8 @@
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
   <ItemGroup>
     <Reference Include="Mono.Cecil"><HintPath>$(ElinGamePath)/BepInEx/core/Mono.Cecil.dll</HintPath></Reference>
-    <Compile Include="../../ElinTogether/Patches/Synchronization/AdvancedBuildingPatch.cs" Link="AdvancedBuildingPatch.cs" />
+    <Compile Include="../../ElinTogether/Models/BuildingPlanning.cs" Link="BuildingPlanning.cs" />
+    <Compile Include="../../ElinTogether/Models/AreaManagement.cs" Link="AreaManagement.cs" />
+    <Compile Include="../../ElinTogether/Models/DesignationManagement.cs" Link="DesignationManagement.cs" />
   </ItemGroup>
 </Project>

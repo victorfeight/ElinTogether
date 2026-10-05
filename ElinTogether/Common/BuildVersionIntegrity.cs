@@ -84,9 +84,10 @@ public class BuildVersionIntegrity : EClass
         V43 = 43, // Host-validated quest acceptance and delivery intents.
         V44 = 44, // Authoritative quest event widget text, including timer mods.
         V45 = 45, // Validated resident name and appearance edits.
+        V46 = 46, // Read-only planning state and host-owned area transactions.
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V45;
+    public const APIVersion APIVersionLatest = APIVersion.V46;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 
