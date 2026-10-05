@@ -21,6 +21,8 @@ public sealed class DesignationCommand : ElinDelta
     [Key(5)] public Position? End { get; set; }
     [Key(6)] public int Mode { get; set; }
     [Key(7)] public int Ramp { get; set; }
+    [Key(8)] public bool Instant { get; set; }
+    [Key(9)] public bool Roof { get; set; }
     protected override void OnApply(ElinNetBase net) { if (net is ElinNetHost host) DesignationManagement.Execute(host, this); }
 }
 
@@ -30,6 +32,13 @@ internal sealed class DesignationManagement : EClass
     private static readonly Dictionary<int, List<TaskDesignation[]>> Undo = [];
     private static Map? _owner;
     internal static void Reset() { Completed.Clear(); Undo.Clear(); _owner = null; }
+    internal static void Remember(int peer, TaskDesignation[] tasks)
+    {
+        if (_owner != _map) { Reset(); _owner = _map; }
+        if (tasks.Length == 0) return;
+        if (!Undo.TryGetValue(peer, out var batches)) Undo[peer] = batches = [];
+        batches.Add(tasks); if (batches.Count > 10) batches.RemoveAt(0);
+    }
     internal static void Submit(DesignationCommand command)
     {
         if (NetSession.Instance.Connection is not ElinNetClient client) return;
@@ -39,7 +48,6 @@ internal sealed class DesignationManagement : EClass
     }
     internal static bool TrySubmit(ActionMode mode, Point start, Point end)
     {
-        if (mode is not AM_RemoveDesignation && (player.instaComplete || mode.IsRoofEditMode())) return false;
         DesignationCommand? command = mode switch {
             AM_Mine mine => new() { Operation = DesignationOperation.Mine, Mode = (int)mine.mode, Ramp = mine.ramp },
             AM_Dig dig => new() { Operation = DesignationOperation.Dig, Mode = (int)dig.mode, Ramp = dig.ramp },
@@ -49,7 +57,8 @@ internal sealed class DesignationManagement : EClass
             _ => null,
         };
         if (command == null) return false;
-        command.Start = start; command.End = end; Submit(command); return true;
+        command.Start = start; command.End = end; command.Instant = player.instaComplete;
+        command.Roof = mode.IsRoofEditMode(); Submit(command); return true;
     }
     internal static void Execute(ElinNetHost host, DesignationCommand command)
     {
@@ -85,42 +94,19 @@ internal sealed class DesignationManagement : EClass
                 (long)(Math.Abs(start.X - end.X) + 1) * (Math.Abs(start.Z - end.Z) + 1) > 4096) { Reject("Invalid work selection."); return; }
             if (command.Operation == DesignationOperation.Mine && (!Enum.IsDefined(typeof(TaskMine.Mode), command.Mode) || command.Ramp < 3 || command.Ramp > 5) ||
                 command.Operation == DesignationOperation.Dig && (!Enum.IsDefined(typeof(TaskDig.Mode), command.Mode) || command.Ramp < 3 || command.Ramp > 5)) { Reject("Invalid terrain mode."); return; }
-            var pending = new List<(TaskDesignation Task, TaskList List)>();
+            if (command.Operation != DesignationOperation.Cancel) {
+                TerrainManagement.Execute(actor, command, Reject);
+                return;
+            }
             var cancel = new HashSet<TaskDesignation>();
             for (var x = Math.Max(start.X, end.X); x >= Math.Min(start.X, end.X); x--)
                 for (var z = Math.Min(start.Z, end.Z); z <= Math.Max(start.Z, end.Z); z++) {
                     var p = new Point(x, z);
                     if (!p.cell.isSeen) continue;
-                    if (designations.mapAll.TryGetValue(p.index, out var existing)) {
-                        if (command.Operation == DesignationOperation.Cancel) cancel.Add(existing);
-                        continue;
-                    }
-                    (TaskDesignation? Task, TaskList? List) entry = command.Operation switch {
-                        DesignationOperation.Mine => (new TaskMine { mode = (TaskMine.Mode)command.Mode, ramp = command.Ramp }, designations.mine),
-                        DesignationOperation.Dig => (new TaskDig { mode = (TaskDig.Mode)command.Mode, ramp = command.Ramp }, designations.dig),
-                        DesignationOperation.Cut => (new TaskCut(), designations.cut),
-                        DesignationOperation.Harvest => (new TaskHarvest(), designations.harvest),
-                        _ => (null, null),
-                    };
-                    var (task, list) = entry;
-                    if (task == null) continue;
-                    task.pos.Set(p);
-                    if (task.GetHitResult() is not (HitResult.Valid or HitResult.Warning)) continue;
-                    // Native forced-instant terrain operations have payment and
-                    // Agent execution semantics; never silently turn them into jobs.
-                    if (task is TaskMine && p.sourceBlock.tileType.CanInstaComplete ||
-                        task is TaskDig dig && dig.mode == TaskDig.Mode.RemoveFloor && p.sourceFloor.tileType.CanInstaComplete) {
-                        Reject("Instant terrain editing is still controlled by the host."); return;
-                    }
-                    pending.Add((task, list!));
+                    if (designations.mapAll.TryGetValue(p.index, out var existing)) cancel.Add(existing);
                 }
             foreach (var task in cancel) Cancel(task);
-            var added = pending.Where(p => p.List.TryAdd(p.Task)).Select(p => p.Task).ToArray();
-            if (added.Length > 0) {
-                if (!Undo.TryGetValue(command.OriginPeer, out var batches)) Undo[command.OriginPeer] = batches = [];
-                batches.Add(added); if (batches.Count > 10) batches.RemoveAt(0);
-            }
-            EmpLog.Information("Designation command: peer {Peer}, operation {Operation}, added {Added}, cancelled {Cancelled}", command.OriginPeer, command.Operation, added.Length, cancel.Count);
+            EmpLog.Information("Designation cancellation: peer {Peer}, cancelled {Cancelled}", command.OriginPeer, cancel.Count);
         } finally {
             player.chara = previous; BuildingPlanning.Dirty(); host.Delta.AddRemote(BuildingPlanning.Capture());
         }

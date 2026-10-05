@@ -20,6 +20,15 @@ namespace ElinTogether.Net {
     public class NetSession { public static NetSession Instance = new(); public ElinNetBase? Connection; public bool IsClient => Connection is ElinNetClient; }
 }
 namespace ElinTogether.Models {
+    // The native terrain boundary is exercised separately by tests/Construction.
+    public static class TerrainManagement {
+        public static void Execute(Chara actor, DesignationCommand command, Action<string> reject) {
+            var p=(Point)command.End!;
+            if(p.sourceBlock.tileType.CanInstaComplete)return;
+            var task=new TaskMine();task.pos.Set(p);
+            if(EClass._map.tasks.designations.mine.TryAdd(task))DesignationManagement.Remember(command.OriginPeer,[task]);
+        }
+    }
     public class ElinDelta : EClass { public int OriginPeer = 1; protected virtual void OnApply(ElinTogether.Net.ElinNetBase n) { } public static IDisposable Simulate() => new ElinTogether.Patches.Scope(); }
     public class MsgSayDelta : ElinDelta { public string Text = ""; public float R,G,B,A; }
     public class Position {

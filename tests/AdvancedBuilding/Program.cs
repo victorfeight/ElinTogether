@@ -18,12 +18,27 @@ var callbacks=areaType.NestedTypes.Append(areaType).SelectMany(t=>t.Methods).Whe
     i.OpCode==OpCodes.Stfld && i.Operand is FieldReference {Name:"name",DeclaringType.Name:"AreaData"} ||
     i.Operand is MethodReference {DeclaringType.Name:"AreaData"} call && call.Name.StartsWith("set_"))).ToArray();
 Check(callbacks.Length==6,"six confirmed native area property callbacks");
+var payment=native.Types.Single(t=>t.Name=="HitSummary").Methods.Single(m=>m.Name=="Execute").Body.Instructions;
+var materialWrite=payment.Select((instruction,index)=>(instruction,index)).Single(p=>p.instruction.Operand is FieldReference {Name:"lastMats"}).index;
+Check(payment.Take(materialWrite).Any(i=>i.OpCode==OpCodes.Ldsfld&&i.Operand is FieldReference {Name:"Instance",DeclaringType.Name:"BuildMenu"})&&
+    payment.Skip(materialWrite).Any(i=>i.Operand is MethodReference {Name:"set_Item"}),"native payment has one isolated build-menu material preference assignment");
+Check(payment.Any(i=>i.Operand is MethodReference {Name:"ModCurrency"})&&payment.Any(i=>i.Operand is MethodReference {Name:"ModNum"}),"native summary owns currency and ingredient consumption");
 Check(new[]{"AM_EditArea","InspectGroupArea"}.SelectMany(name=>native.Types.Single(t=>t.Name==name).NestedTypes)
     .SelectMany(t=>t.Methods).Count(m=>m.HasBody&&m.Body.Instructions.Any(i=>i.Operand is MethodReference {Name:"RemoveArea",DeclaringType.Name:"RoomManager"}))==2,
     "both native area delete UI paths covered without patching general cleanup");
 var destroy=native.Types.Single(t=>t.Name=="TaskBuild").Methods.Single(m=>m.Name=="OnDestroy");
 Check(destroy.Body.Instructions.Any(i=>i.Operand is MethodReference {Name:"AddCard"}),"native build cancellation returns resources on host");
 Check(native.Types.Single(t=>t.Name=="Area").Methods.Single(m=>m.Name=="OnRemove").Body.Instructions.Any(i=>i.Operand is MethodReference {Name:"Destroy"}),"native area deletion destroys tasks; snapshot must not call it");
+
+var mapType=native.Types.Single(t=>t.Name=="Map");
+var setters=mapType.Methods.Where(m=>m.Name is "SetBlock" or "SetFloor" && m.Parameters.Count==5 || m.Name=="SetObj"&&m.Parameters.Count==7 || m.Name is "SetBridge" or "SetRoofBlock" or "SetDeco" or "SetLiquid").ToArray();
+Check(setters.Length==8&&setters.All(m=>m.Parameters[0].Name=="x"&&m.Parameters[1].Name=="z"),"all eight native terrain setters match capture patch signatures");
+Check(mapType.Methods.Single(m=>m.Name=="MineBlock").Body.Instructions.Any(i=>i.OpCode==OpCodes.Stfld&&i.Operand is FieldReference{Name:"_roofBlock"}),"roof mining uses direct field write requiring explicit final result");
+Check(!native.Types.Single(t=>t.Name=="TaskHarvest").Methods.Any(m=>m.Name=="OnProgressComplete")&&
+    native.Types.Single(t=>t.Name=="TaskHarvest").Methods.Any(m=>m.Name=="OnCreateProgress"),"native harvest completion is a progress callback, not instant-build completion");
+Check(native.Types.Single(t=>t.Name=="AM_MoveInstalled").Methods.Single(m=>m.Name=="TryPutAway").Body.Instructions.Any(i=>i.Operand is MethodReference{Name:"PutAway"}),"move-menu put-away shortcut needs the same host transaction");
+var buildCard=native.Types.Single(t=>t.Name=="RecipeCard").Methods.Single(m=>m.Name=="Build"&&m.Parameters.Count==7).Body.Instructions;
+Check(buildCard.Any(i=>i.Operand is MethodReference{Name:"AddCard"})&&buildCard.Any(i=>i.Operand is MethodReference{Name:"set_altitude"}),"native card construction sets final placement properties after adding item");
 
 var host=new ElinNetHost();var client=new ElinNetClient();host.ActiveRemoteCharas[1]=new();host.ActiveRemoteCharas[2]=new();
 NetSession.Instance.Connection=host;

@@ -21,7 +21,7 @@ internal static class AdvancedBuildingAccess
     internal static bool Allow()
     {
         if (NetSession.Instance.Connection is not ElinNetClient) return true;
-        Msg.Say("Construction, instant terrain edits, blueprint imports, deconstruction and moving installed items are currently controlled by the host.");
+        Msg.Say("Blueprint imports, house templates, flood fill and editor-only operations are controlled by the host.");
         return false;
     }
 }
@@ -33,7 +33,7 @@ internal static class AdvancedBuildingUndoNotePatch
     {
         if (!NetSession.Instance.IsClient) return true;
         n.Clear(); n.Space(10); n.AddText("NoteText_topic", "tUndo".lang());
-        n.AddText("Cancel your last pending mining, digging, cutting or harvesting batch here. Completed work is not reversed.");
+        n.AddText("Cancel your last pending construction or gathering batch here. Completed work is not reversed.");
         n.Build(); return false;
     }
 }
@@ -46,6 +46,15 @@ internal static class AdvancedBuildingSelectionPatch
         if (NetSession.Instance.IsClient) {
             if (EInput.skipFrame > 0) return false;
             if (__instance.mode is AM_EditArea) return true;
+            if (__instance.mode is AM_MoveInstalled { target: null }) return true; // Native target selection only.
+            if (BuildingObjectManagement.TrySubmit(__instance.mode, __instance.start ?? _end, _end)) {
+                __instance.start = null;
+                return false;
+            }
+            if (__instance.mode is AM_Build build && ConstructionManagement.TrySubmit(build, __instance.start, _end)) {
+                __instance.start = null;
+                return false;
+            }
             if (DesignationManagement.TrySubmit(__instance.mode, __instance.start ?? _end, _end)) {
                 __instance.mode.OnSelectEnd(cancel: true);
                 __instance.start = null;

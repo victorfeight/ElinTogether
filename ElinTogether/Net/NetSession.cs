@@ -56,6 +56,8 @@ public class NetSession : EClass
         ElinTogether.Models.QuestEventWidgetSync.Reset();
         ElinTogether.Models.BuildingPlanning.Reset();
         ElinTogether.Models.DesignationManagement.Reset();
+        ElinTogether.Models.ConstructionManagement.ResetNetwork();
+        ElinTogether.Models.BuildingObjectManagement.ResetNetwork();
         ElinTogether.Models.GuildStateSnapshot.Reset();
         ElinTogether.Models.Investment.Reset();
         ElinTogether.Models.FaithTransactions.Reset();

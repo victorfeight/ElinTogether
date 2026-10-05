@@ -66,6 +66,11 @@ namespace ElinTogether.Models;
 [Union(238, typeof(BuildingPlanningRequest))]
 [Union(239, typeof(AreaCommand))]
 [Union(240, typeof(DesignationCommand))]
+[Union(241, typeof(ConstructionCommand))]
+[Union(242, typeof(CardConstructionState))]
+[Union(243, typeof(ConstructionReply))]
+[Union(244, typeof(ConstructionTerrainDelta))]
+[Union(245, typeof(BuildingObjectCommand))]
 // Thing
 [Union(300, typeof(ThingDelta))]
 [Union(301, typeof(ThingRequest))]
