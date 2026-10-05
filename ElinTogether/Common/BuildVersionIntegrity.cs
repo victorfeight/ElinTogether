@@ -83,9 +83,10 @@ public class BuildVersionIntegrity : EClass
         V42 = 42, // Shared settlement board transactions and state.
         V43 = 43, // Host-validated quest acceptance and delivery intents.
         V44 = 44, // Authoritative quest event widget text, including timer mods.
+        V45 = 45, // Validated resident name and appearance edits.
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V44;
+    public const APIVersion APIVersionLatest = APIVersion.V45;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

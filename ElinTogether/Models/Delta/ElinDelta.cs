@@ -60,6 +60,8 @@ namespace ElinTogether.Models;
 [Union(232, typeof(ResidentStateDelta))]
 [Union(233, typeof(BranchBoardCommand))]
 [Union(234, typeof(BranchBoardState))]
+[Union(235, typeof(ResidentCosmeticRequest))]
+[Union(236, typeof(ResidentCosmeticState))]
 // Thing
 [Union(300, typeof(ThingDelta))]
 [Union(301, typeof(ThingRequest))]
