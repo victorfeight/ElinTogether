@@ -3,6 +3,8 @@ using ElinTogether.Patches;
 namespace ElinTogether.Helper { }
 public class Card {
     public int uid; public bool IsPC;
+    public Chara? Chara => this as Chara;
+    public Trait trait = new(); public bool IsRestrainedResident;
     public void ModExp(int ele, int a) { if (this is Chara c) c.elements.ModExp(ele, a); }
     public void ModExpParty(int ele, int a) {
         if (!RemoteModExpPartyPatch.OnModExpParty(this, ele, a) || this is not Chara c) return;
@@ -11,12 +13,17 @@ public class Card {
 }
 public class Party { public List<Chara> members = []; }
 public class Chara : Card {
+    public AIAct ai = new(); public Gauge stamina = new();
+    public AIAct SetAI(AIAct next) { if (ThrowTraining.AllowTask(next)) ai = next; return next; }
     public bool IsRemotePlayer, isDead;
     public Party? party;
     public readonly ElementContainer elements;
     public Chara() { elements = new() { Card = this }; }
 }
-public class Thing : Card { public bool isDestroyed; public Thing Split(int n) => this; }
+public class Trait { public bool CanBeDestroyed = true; }
+public class TraitTrainingDummy : Trait { }
+public class Gauge { public int value = 10; }
+public class Thing : Card { public bool isDestroyed, Returning; public bool HasElement(int id) => id == 410 && Returning; public Thing Split(int n) => this; }
 public class Element { public bool CanGainExp = true; }
 public class ElementContainer {
     public Card? Card;
@@ -26,18 +33,20 @@ public class ElementContainer {
         if (HostSkillProgressionPatch.Before(this, ele, a, chain)) Native.Add((ele, a));
     }
 }
-public class Point { }
+public class Point { public int x, z; public Point Copy() => new() { x=x, z=z }; public void Set(Point p) { x=p.x; z=p.z; } }
+public static class Act { public static Chara? CC; public static Card? TC; public static Point TP = new(); }
 public class AIAct { }
+public class AI_PracticeDummy : AIAct { public Card? target; public Thing? throwItem; }
 public class AI_UseCrafter : AIAct { }
 namespace ElinTogether.Models.AI { }
 public enum ThrowMethod { Default, Reward, Punish }
 public static class ActThrow {
     public static Action<Card>? Native;
     public static int Calls;
-    public static void Throw(Card c, Point p, Card target, Thing t, ThrowMethod method) {
-        var run = ActThrowEvent.OnClientThrow(c, p, target, t, method, out var state);
+    public static void Throw(Card c, Point p, Card? target, Thing t, ThrowMethod method) {
+        var run = ActThrowEvent.OnClientThrow(c, p, target!, t, method, out var state);
         if (run) { Calls++; Native?.Invoke(c); }
-        ActThrowEvent.OnClientThrowEnd(state);
+        ActThrowEvent.OnClientThrowEnd(c, target!, t, state);
     }
 }
 public static class EmpLog { public static void Debug(string text, params object[] args) { } }

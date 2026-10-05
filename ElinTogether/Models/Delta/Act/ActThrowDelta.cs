@@ -37,7 +37,7 @@ public class ActThrowDelta : ElinDelta
 
         var t = thing.Split(Thing.Num);
         using (HostSkillProgression.Begin(net, owner)) {
-            ActThrow.Throw(owner, Point, Target, t, Method);
+            ThrowTraining.Replay(owner, Point, Target, t, Method);
         }
 
         if (net.IsHost) {

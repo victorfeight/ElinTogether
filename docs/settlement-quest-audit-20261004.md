@@ -60,10 +60,55 @@ Host/solo adventure placement, mining, harvesting and AutoAct retain their exist
 - [ ] Both: verify normal held placement, direct harvesting/mining and AutoAct after using the build menu. These paths must remain functional.
 - Host: perform the same building operations and confirm native behavior. Client: verify normal held-item placement, direct mining/harvesting and AutoAct still work.
 
-Builds are staged only in `build/building-planning`. No Package installation was performed during this audit. Protocol V47 requires matching builds for the newly integrated packet fields.
+Installed after the audit with explicit user approval: `Package/Mod_ElinTogether/ElinTogether.dll`, SHA256 `0DA39C6E0312AE545CA5F48FC9BCB0C027460F2E5B8685A4DB011ED90DEA6E85`. Previous DLL backed up to `C:/Users/Vic/ElinTogether-backups/20261004-230050-before-8f604cb`. Protocol V47 requires matching builds on both machines.
 
 ## Automated verification
 
 - `tests/AdvancedBuilding`: installed native IL boundary checks plus production planning, area command, cancellation and per-peer undo tests with a mocked game boundary.
 - `tests/Construction`: production construction/terrain/object transactions and result application against an inert native boundary. Covers deduplication, payment ownership, invalid/stale requests, context restoration on exceptions, guarded native limitations, final properties and wrong-zone/parent rejection.
 - Release compilation uses the installed Elin assemblies. Automated tests do not exercise Unity rendering, Harmony patch execution inside the running game, worker AI scheduling, or a live host/client session. The unchecked in-game items above remain required.
+
+## Live session tracking — October 4, 2026, 23:16–23:21 local
+
+Read-only review while both users play. No gameplay/config changes or installation during the live review.
+Client lobby/session: `109775244024259428`; actor `719`; host actor `1`; active zone `432`.
+Evidence: `Player.log` and `ElinMP/Logs/Session_20261004.log`, structured UTC window `2026-10-05T06:15` through `06:21:38`.
+
+| Recent work | Live evidence / remaining verification |
+| --- | --- |
+| Owner skill awards / throwing (`4d8d06c`) | Client received 84 unique throwing awards: 41 x 2 and 43 x 3 raw XP, total 211. Logged base skill 34, stored XP 35 to 70. Host base skill 17, stored XP 371 to 419. Both are gaining; client awards are not duplicated in this interval. |
+| Throwing popups | MoreNotifications loaded its float ModExp patch successfully. Local config has Skill_Enabled=true, Skill_Threshold=5. Observed small awards/actual gains are below the notification threshold. Host config not yet inspected. |
+| Shared settlement upgrades/research/policy/hiring (`4d8d06c`) | No transaction-specific confirmation in the captured client window. Host resolution logs and paired action tests still needed. |
+| Shared quest acceptance/delivery (`78ac31c`) | Not exercised/confirmed in reviewed window. |
+| Quest-event timer relay (`0aff8bc`) | No active quest-event test confirmed. Needs visual comparison during a supported event. |
+| Resident appearance (`f1c463b`) | No confirmed cosmetic edit observed. Host transaction logs plus visible/save-reload comparison needed. |
+| Planning/area state and edits (`e601817`) | Network snapshots are flowing, but that alone does not certify area state/markers. No dedicated successful area command observed on client. |
+| Construction, terrain and object transactions (`8f604cb`) | No specific successful build/terrain transaction observed on client. Their execution logs are principally host-side. Need paired tests from checklist. |
+| Roster/reserves (`60c497d`), resident roles (`03fbba0`), maid dialogue (`7b067cd`) | Still tracked; no corresponding action verified in this review. |
+| Chest unlock/practice relock (`e9df6e7`) | Still tracked; no unlock/relock test confirmed. |
+| Profile/connection support | Joined successfully. Profile revisions 1 and 2 acknowledged with accepted=true and no pending revision. Shared sleep and condition/element updates observed. Heartbeats show connected, active receive and no profile/control block. |
+| Older food disappearance/stale-item report | OPEN, RCA unconfirmed. Tent/processed Christmas food reportedly could not be eaten and disappeared after travel/reload. Do not apply speculative food fix. Correlate exact food UID, pending split UID, inventory/held ownership, eat request, native cancellation/completion, FoodEffect consumption, final quantity/removal and UI refresh on both peers. No matching reproduction identified this session. |
+
+Four WorldStateSnapshot warnings occurred at 23:16:14 while AwaitingIntegrity; later join/profile acknowledgement succeeded. The later heartbeat fault count is the same retained startup count, not evidence of repeated disconnections. No Error/Fatal session records or managed exception/patch-failure lines found in this reviewed live window. Player startup also reports a Steam app-list HTTP 404; the game joined despite it.
+
+Vanilla reference: ActThrow special throw branches have distinct awards; normal damaging throws route through AttackProcess.ModExpAtk, which uses target level versus attacker skill, modifiers and randomness. ElementContainer.ModExp then applies potential/skill scaling and stochastic fractional rounding; Element.ExpToNext is 1000. The removed unconditional client +50 is not part of this normal-combat calculation. The absence of a notification is not evidence of absent XP.
+
+Requested evidence: host current Player.log and matching Session log in Downloads; item thrown, target and approximate time. Host logs remain useful for raw award/ack and host-only feature transactions even though the client log already proves both throwing XP values increased. No changes to notification threshold made.
+
+Training-loop exit reviewed at ~23:26: AIPracticeDummyArgs creates a DelegateProgress placeholder on host; attacks arrive through existing melee/ranged/throw requests, not a duplicate host training loop. CharaTaskCancelEvent sends mapped cancellation; CharaTaskCancelDelta resolves DelegateProgress.Represents and cancels/relays. Client heartbeat transitioned AI_PracticeDummy/Progress_Custom at 23:18:16 to NoGoal/NoGoal at 23:18:26, and again 23:25:16 to NoGoal/NoGoal at 23:25:26, remaining idle through 23:26:26. Client exit confirmed; individual host cancellation receipt still requires host log. No code changes.
+
+Follow-up: user reports occasional apparent training-exit stalls despite successful sampled exits. OPEN until a timed reproduction distinguishes input consumption from cancellation/state failure. Native AM_Adv left/right mouse-down calls TryCancelInteraction, consumes the click, and returns; the Wait action also cancels a manually cancellable AI. AI_Practice.CanManualCancel=true. Advise release held inputs, click once on the map to cancel, then separately move after acknowledgement. Prior sampled idle transitions do not rule out intermittent failures.
+
+### Throw/training restart RCA and correction
+
+Host evidence: Player (21).log covers the live lobby and shows training -> NoGoal -> training -> NoGoal at host 13:25:01/11/21/31 (client local 23:25). This proves a restart occurred, not whether it was intentional. Session_20261005 - Copy.rar contains exactly the extracted log (CRC 87F3E732), ending at UTC 06:20:21; it does not contain the later attempts. No current-session cancellation exception was recorded.
+
+Source defect: ActThrowDelta invokes static ActThrow.Throw with its explicit owner but without establishing Act.CC. Native Throw sets TC/TP, not CC; its final returning-weapon training branch calls Act.CC.SetAI(new AI_PracticeDummy). AttackProcess.CC is a separate instance field. Received throws can therefore create training on the wrong local actor. Even with correct context, a late own result can restart a cancelled loop. The XP change in 4d8d06c did not introduce the missing actor context.
+
+Implemented ThrowTraining.Replay to set and restore CC/TC/TP in finally, with a nested replay scope. The existing CharaTaskRemoteEvent prefix refuses AI_PracticeDummy assignments in that scope before task publication. Initial client training starts from its original queued throw using the native eligibility conditions (returning item, destroyable trait, dummy/restrained target, local player, stamina, not already training), through existing SetAI/task/progress replication. Host/solo native starts remain intact. No protocol fields, polling, save changes, forced-idle workaround, or cancellation-ack behavior change. Debug events identify deliberate client starts and blocked replay starts.
+
+Validation: Release build to build/throw-training, 0 warnings/errors. ThrowProgression: 57 checks, including installed native IL, built guard-before-publication IL, simulated late own/other-player results, host wrong-actor case, nested/exception context restoration, training eligibility and original XP regressions. Not a live Unity/network test. Package installation unchanged.
+
+Installed on 2026-10-05 into Package/Mod_ElinTogether after confirming Elin was closed. Installed DLL SHA256: e7464d8a6c5c3000c0d76499d9b3f770ff651e04bcae9d378a52dd99b913ed44. Prior DLL backed up under ElinTogether-backups/20261005-000053-before-throw-training.
+
+Live result: on 2026-10-05 the user confirmed that the installed fix resolved the reported training issue. Exact test steps and coverage of both timing modes were not supplied; do not infer those from the confirmation. The separate missing-task cancellation acknowledgement concern remains an unconfirmed edge case, not the established cause of this resolved report.

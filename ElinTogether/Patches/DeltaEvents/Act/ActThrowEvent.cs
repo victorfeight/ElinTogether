@@ -33,10 +33,11 @@ internal class ActThrowEvent
     }
 
     [HarmonyPostfix]
-    internal static void OnClientThrowEnd(ActThrowDelta? __state)
+    internal static void OnClientThrowEnd(Card c, Card target, Thing t, ActThrowDelta? __state)
     {
         if (__state is not null) {
             NetSession.Instance.Connection!.Delta.AddRemote(__state);
+            ThrowTraining.StartClient(c, target, t);
         }
     }
 }

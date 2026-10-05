@@ -4,7 +4,7 @@ using Mono.Cecil;
 
 int checks = 0;
 void Check(bool ok, string why) { if (!ok) throw new Exception(why); Console.WriteLine("PASS " + why); checks++; }
-using var module = ModuleDefinition.ReadModule(args.Single());
+using var module = ModuleDefinition.ReadModule(args[0]);
 MethodDefinition Method(string type, string name, int count = -1) => module.Types.Single(t => t.Name == type).Methods.Single(m =>
     m.Name == name && (count < 0 || m.Parameters.Count == count) &&
     (type != "ActThrow" || m.Parameters[2].ParameterType.Name == "Card") &&
@@ -13,6 +13,19 @@ bool Calls(MethodDefinition method, string type, string name) => method.Body.Ins
 var nativeThrow = Method("ActThrow", "Throw", 5);
 Check(Calls(nativeThrow, "Card", "ModExp"), "installed special throws use native raw XP awards");
 Check(Calls(nativeThrow, "AttackProcess", "Perform"), "installed ordinary throws use combat outcome calculation");
+Check(!nativeThrow.Body.Instructions.Any(i => i.OpCode.Code == Mono.Cecil.Cil.Code.Stsfld &&
+    i.Operand is FieldReference f && f.DeclaringType.Name == "Act" && f.Name == "CC"),
+    "installed static throw leaves global actor context to its caller");
+Check(nativeThrow.Body.Instructions.Count(i => i.Operand is MethodReference m && m.DeclaringType.Name == "Chara" && m.Name == "SetAI") == 1 &&
+    nativeThrow.Body.Instructions.Any(i => i.Operand is MethodReference m && m.DeclaringType.Name == "AI_PracticeDummy" && m.Name == ".ctor"),
+    "installed throw has one native training-start task assignment");
+if (args.Length > 1) {
+    using var mod = ModuleDefinition.ReadModule(args[1]);
+    var setAi = mod.Types.Single(t => t.Name == "CharaTaskRemoteEvent").Methods.Single(m => m.Name == "OnSetAI");
+    var callsInOrder = setAi.Body.Instructions.Where(i => i.Operand is MethodReference).Select(i => (MethodReference)i.Operand).ToList();
+    Check(callsInOrder[0].DeclaringType.Name == "ThrowTraining" && callsInOrder[0].Name == "AllowTask" &&
+        callsInOrder.Any(m => m.Name == "PublishTask"), "built SetAI patch guards replay before any task publication");
+}
 Check(Calls(Method("Card", "ModExp", 2), "ElementContainer", "ModExp"), "card XP reaches the intercepted container boundary");
 var nativeXp = Method("ElementContainer", "ModExp");
 Check(nativeXp.Parameters[1].ParameterType.FullName == "System.Single", "native XP input is float, not truncated integer");
@@ -128,4 +141,72 @@ Check(remote.elements.Native.Last() == (207, 11f), "host-controlled break-mode a
 NetSession.Instance.Connection = null;
 localHost.ModExpParty(207, 17);
 Check(localHost.elements.Native.Last() == (207, 17f) && npc.elements.Native.Last() == (207, 17f), "solo party distribution stays native");
-Console.WriteLine($"{checks} throw progression checks passed; installed native IL checked, game/network boundaries simulated.");
+// Reproduce a stale global actor and a throw arriving after cancellation. The
+// boundary calls the production guard; the built patch order is checked above.
+NetSession.Instance.Connection = client;
+item.Returning = true; target.trait = new TraitTrainingDummy();
+ActThrow.Native = _ => { };
+localClient.ai = new AIAct();
+ActThrow.Throw(localClient, new(), target, item, ThrowMethod.Default);
+Check(localClient.ai is AI_PracticeDummy p && p.target == target && p.throwItem == item,
+    "first deliberate client throw starts training without waiting for result replay");
+var training = localClient.ai;
+ActThrow.Throw(localClient, new(), target, item, ThrowMethod.Default);
+Check(ReferenceEquals(training, localClient.ai), "subsequent client training throws retain the same loop");
+localClient.ai = new AIAct(); var nextAction = localClient.ai;
+Act.CC = localClient; Act.TC = localHost; Act.TP.Set(new Point { x=17, z=19 });
+ActThrow.Native = c => {
+    Check(Act.CC == c, "received throw establishes its actual actor");
+    // Model the native SetAI branch without its eligibility checks: even an
+    // eligible result must not create a new loop or overwrite an unrelated AI.
+    localClient.SetAI(new AI_PracticeDummy());
+};
+Request(localClient).Apply(client);
+Check(ReferenceEquals(nextAction, localClient.ai), "own late result cannot restart cancelled training or replace next action");
+Request(localHost).Apply(client);
+Check(ReferenceEquals(nextAction, localClient.ai), "another player's result cannot start client training");
+Check(Act.CC == localClient && Act.TC == localHost && Act.TP.x == 17 && Act.TP.z == 19,
+    "throw result restores actor, target and point context");
+NetSession.Instance.Connection = host;
+localHost.ai = new AIAct(); var hostNext = localHost.ai; Act.CC = localHost;
+ActThrow.Native = c => {
+    Check(Act.CC == remote, "host resolves client throw with remote actor rather than host");
+    localHost.SetAI(new AI_PracticeDummy());
+};
+Request(remote).Apply(host);
+Check(ReferenceEquals(hostNext, localHost.ai) && Act.CC == localHost,
+    "client's continued throwing cannot restart host training");
+ActThrow.Native = _ => throw new InvalidOperationException("throw replay failed");
+try { Request(remote).Apply(host); } catch (InvalidOperationException) { }
+Check(Act.CC == localHost && ThrowTraining.AllowTask(new AI_PracticeDummy()),
+    "failed replay restores actor and releases training guard");
+var depth = 0;
+ActThrow.Native = c => {
+    Check(ThrowTraining.AllowTask(new AIAct()), "throw replay does not block unrelated task types");
+    if (depth++ == 0) {
+        ThrowTraining.Replay(localClient, new Point(), target, item, ThrowMethod.Default);
+        Check(Act.CC == remote && !ThrowTraining.AllowTask(new AI_PracticeDummy()),
+            "nested throw restores outer actor and keeps outer training guard");
+    }
+};
+Request(remote).Apply(host);
+Check(Act.CC == localHost && ThrowTraining.AllowTask(new AI_PracticeDummy()),
+    "nested throw releases context and guard after outer completion");
+NetSession.Instance.Connection = client;
+foreach (var reason in new[] { "ordinary item", "ordinary target", "exhausted", "indestructible" }) {
+    item.Returning = reason != "ordinary item";
+    target.trait = reason == "ordinary target" ? new Trait() : new TraitTrainingDummy();
+    localClient.stamina.value = reason == "exhausted" ? 0 : 10;
+    item.trait.CanBeDestroyed = reason != "indestructible";
+    localClient.ai = new AIAct(); var before = localClient.ai;
+    ThrowTraining.StartClient(localClient, target, item);
+    Check(ReferenceEquals(before, localClient.ai), $"vanilla training eligibility rejects {reason}");
+}
+item.Returning = true; item.trait.CanBeDestroyed = true; localClient.stamina.value = 10;
+target.trait = new Trait(); target.IsRestrainedResident = true;
+ThrowTraining.StartClient(localClient, target, item);
+Check(localClient.ai is AI_PracticeDummy, "restrained-resident training remains eligible");
+NetSession.Instance.Connection = null;
+localHost.SetAI(new AI_PracticeDummy());
+Check(localHost.ai is AI_PracticeDummy, "native solo training assignment remains allowed");
+Console.WriteLine($"{checks} throw progression/training checks passed; installed native IL checked, game/network boundaries simulated.");

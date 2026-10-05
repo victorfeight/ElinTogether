@@ -14,6 +14,13 @@ internal static class CharaTaskRemoteEvent
     [HarmonyPatch(typeof(Chara), nameof(Chara.SetAI))]
     internal static bool OnSetAI(Chara __instance, ref AIAct g)
     {
+        // Check before publishing a task: received throws cannot restart either
+        // player's cancelled training or replace a newly selected action.
+        if (!ThrowTraining.AllowTask(g)) {
+            EmpLog.Debug("Throw replay training start suppressed: actor {ActorUid}", __instance.uid);
+            return false;
+        }
+
         if (NetSession.Instance.Connection is not { } connection) {
             return true;
         }

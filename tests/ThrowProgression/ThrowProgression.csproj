@@ -3,6 +3,7 @@
   <ItemGroup>
     <Reference Include="Mono.Cecil"><HintPath>$(ElinGamePath)/BepInEx/core/Mono.Cecil.dll</HintPath></Reference>
     <Compile Include="../../ElinTogether/Models/HostSkillProgression.cs" Link="HostSkillProgression.cs" />
+    <Compile Include="../../ElinTogether/Models/ThrowTraining.cs" Link="ThrowTraining.cs" />
     <Compile Include="../../ElinTogether/Models/RemoteCraft.cs" Link="RemoteCraft.cs" />
     <Compile Include="../../ElinTogether/Patches/Synchronization/HostSkillProgressionPatch.cs" Link="HostSkillProgressionPatch.cs" />
     <Compile Include="../../ElinTogether/Patches/Remote/RemoteModExpPartyPatch.cs" Link="RemoteModExpPartyPatch.cs" />
