@@ -3,7 +3,7 @@ using MessagePack;
 
 namespace ElinTogether.Models;
 
-public enum ConstructionTerrainKind { Block, Floor, Object, Bridge, Roof, Deco, Liquid, Pillar, Rotation }
+public enum ConstructionTerrainKind { Block, Floor, Object, Bridge, Roof, Deco, Liquid, Pillar, Rotation, Elevation }
 
 [MessagePackObject]
 public sealed class ConstructionTerrainDelta : ElinDelta
@@ -33,6 +33,8 @@ public sealed class ConstructionTerrainDelta : ElinDelta
             ConstructionTerrainKind.Roof => ((int)c._roofBlockMat, (int)c._roofBlock, c._roofBlockDir % 4, c._roofBlockDir / 4),
             ConstructionTerrainKind.Deco => ((int)c._decoMat, (int)c._deco, 0, 0),
             ConstructionTerrainKind.Rotation => (0, 0, c.blockDir, (int)c._roofBlockDir),
+            // Value carries ground height; Direction carries bridge elevation.
+            ConstructionTerrainKind.Elevation => (0, 0, (int)c.bridgeHeight, (int)c.height),
             _ => (0, 0, 0, 0),
         };
         return new() { ZoneUid = _zone.uid, Pos = p, Kind = kind, Material = material, Id = id, Direction = dir, Value = value, Pillar = c.bridgePillar,
@@ -55,6 +57,11 @@ public sealed class ConstructionTerrainDelta : ElinDelta
             case ConstructionTerrainKind.Deco: _map.SetDeco(x, z, Material, Id); break;
             case ConstructionTerrainKind.Liquid: _map.SetLiquid(x, z, Effect == null ? null : new CellEffect { ints = Effect, strs = Strings! }); break;
             case ConstructionTerrainKind.Pillar: _map.cells[x, z].bridgePillar = (byte)Pillar; break;
+            case ConstructionTerrainKind.Elevation:
+                _map.cells[x, z].height = (byte)Value;
+                _map.cells[x, z].bridgeHeight = (byte)Direction;
+                _map.cells[x, z].room?.SetDirty();
+                break;
             case ConstructionTerrainKind.Rotation:
                 _map.cells[x, z].blockDir = Direction; _map.cells[x, z]._roofBlockDir = (byte)Value;
                 _map.cells[x, z].objDir = ObjectDirection; break;

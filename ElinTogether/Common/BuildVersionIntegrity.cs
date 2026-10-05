@@ -86,9 +86,10 @@ public class BuildVersionIntegrity : EClass
         V45 = 45, // Validated resident name and appearance edits.
         V46 = 46, // Read-only planning state and host-owned area transactions.
         V47 = 47, // Native construction transactions and final placement results.
+        V48 = 48, // Shared faction names and host-resolved terrain elevation brushes.
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V47;
+    public const APIVersion APIVersionLatest = APIVersion.V48;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

@@ -8,7 +8,7 @@ public class Core { public bool IsGameStarted = true; }
 public class Game { public bool isLoading; }
 public class Player { public Chara chara = new(); }
 public class Zone { public int uid = 10; public bool IsPCFaction = true; }
-public class Home { public HashSet<int> globalPolicies = []; }
+public class Home { public string name = "Home"; public HashSet<int> globalPolicies = []; }
 public class Card { public int uid; }
 public class Chara : Card {
     public bool IsInActiveMap = true, isDead, IsDisabled, HomeMember, Protected;

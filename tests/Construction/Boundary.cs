@@ -22,6 +22,7 @@ public class GameIOContext{}
 public class EClass {public static Zone _zone=new();public static Map _map=new();public static Player player=new();public static Chara pc=>player.chara;public static Scene scene=new();public static Screen screen=new();}
 public class Zone {public int uid=10;public bool IsPCFactionOrTent=true;}
 public class Map {
+    public void ForeachSphere(int x,int z,int radius,Action<Point> action) { for(var a=Math.Max(0,x-radius);a<=Math.Min(7,x+radius);a++)for(var b=Math.Max(0,z-radius);b<=Math.Min(7,z+radius);b++)if((a-x)*(a-x)+(b-z)*(b-z)<=radius*radius)action(new(a,b)); }
     public Store Stocked=new();public Tasks tasks=new();public Bounds bounds=new();public int PutAways,Setters;
     public Cell[,] cells=new Cell[8,8];public Map(){for(int x=0;x<8;x++)for(int z=0;z<8;z++)cells[x,z]=new();}
     public void PutAway(Card c){PutAways++;c.parent=EClass.pc;c.parentCard=EClass.pc;c.isRoofItem=false;c.isMasked=false;}
@@ -35,7 +36,7 @@ public class Map {
     public void RefreshNeighborTiles(int x,int z){}public void RefreshShadow(int x,int z){}public void RefreshFOV(int x,int z){}
 }
 public class Bounds {public bool Contains(Position p)=>p.IsInActiveMapBounds;}
-public class Cell {public bool isSeen=true,isModified,isHarvested;public int gatherCount;public int _blockMat,_block,blockDir,_floorMat,_floor,floorDir,objMat,obj,objDir,objVal,_bridgeMat,_bridge,bridgeHeight,_roofBlockMat,_roofBlock,_decoMat,_deco;public byte _roofBlockDir,bridgePillar;public CellEffect? effect;}
+public class Cell {public byte height; public Room? room; public bool isSeen=true,isModified,isHarvested;public int gatherCount;public int _blockMat,_block,blockDir,_floorMat,_floor,floorDir,objMat,obj,objDir,objVal,_bridgeMat,_bridge,bridgeHeight,_roofBlockMat,_roofBlock,_decoMat,_deco;public byte _roofBlockDir,bridgePillar;public CellEffect? effect;}
 public class CellEffect {public int[] ints=[];public string[] strs=[];}
 public class Tasks {public UndoManager undo=new();public Designations designations=new();}
 public class Designations {public object build=new();public MoveList moveInstalled=new();}
@@ -91,7 +92,7 @@ public class Recipe {
     public void BuildIngredientList(){ingredients.Add(new());}
 }
 public class RecipeCard:Recipe {public bool freePos;public float fx,fy;public Card? _mold;}
-public static class EmpLog {public static void Information(string s,params object[] args){}}
+public static class EmpLog {public static void Information(string s,params object[] args){} public static void Debug(string s,params object[] args){}}
 
 public class Material {public string GetSoundDead(object o)=>"sound";}
 public class Renderer {public int Refreshes;public void RefreshSprite(){Refreshes++;}}
@@ -116,3 +117,20 @@ public class AM_MoveInstalled:ActionMode {
     public override void OnProcessTiles(Point? p,int d){if(target==null)return;if(EClass.player.instaComplete)target.pos.Set(p!);else{var task=new TaskMoveInstalled{target=target};list.items.Add(task);EClass._map.tasks.undo.items.Last().list.Add(task);}target.dir=moldCard!.dir;}
 }
 public class AM_Deconstruct:ActionMode {public bool ignoreInstalled;}
+
+public class Room { public int Dirty; public void SetDirty()=>Dirty++; }
+public static class EInput { public static bool isShiftDown; }
+public class AM_Terrain {
+    public enum Mode { Flatten,Up,Down }
+    public Mode mode; public int brushRadius=4; public float timer; public Point? lastPoint;
+    public static Action<AM_Terrain,Point>? Native; public static int Calls;
+    public void OnProcessTiles(Point point,int dir) {
+        var run=ElinTogether.Patches.TerrainBrushPatch.Before(this,point,out var state);
+        try { if(run){Calls++; Native?.Invoke(this,point);} }
+        finally { ElinTogether.Patches.TerrainBrushPatch.After(state); }
+    }
+}
+namespace HarmonyLib {
+    [AttributeUsage(AttributeTargets.Class|AttributeTargets.Method)] public class HarmonyPatch:Attribute { public HarmonyPatch(Type t,string n){} }
+    public class HarmonyPrefix:Attribute{} public class HarmonyFinalizer:Attribute{}
+}

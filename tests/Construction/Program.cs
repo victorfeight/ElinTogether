@@ -102,4 +102,54 @@ new ConstructionTerrainDelta{ZoneUid=99,Pos=new(){X=1,Z=1},Kind=ConstructionTerr
 Check(EClass._map.Setters==setters,"wrong-zone result cannot change new map");
 source.effect=new(){ints=[1,2],strs=["water"]};var liquid=ConstructionTerrainDelta.Capture(new(1,1),ConstructionTerrainKind.Liquid);source.effect.ints[0]=99;liquid.Apply(peer);
 Check(source.effect!.ints[0]==1&&source.effect.strs[0]=="water","liquid snapshot owns a copy of native effect data");
+
+// Terrain brush network boundaries use the production model and patch. Native
+// terrain math is not duplicated in this harness; verify its installed IL below.
+if(args.Length>0) {
+    using var native=Mono.Cecil.ModuleDefinition.ReadModule(args[0]);
+    var terrain=native.Types.Single(t=>t.Name=="AM_Terrain");
+    var process=terrain.Methods.Single(m=>m.Name=="OnProcessTiles");
+    Check(process.Parameters.Count==2 && process.Body.Instructions.Any(i=>i.Operand is Mono.Cecil.MethodReference m&&m.Name=="ForeachSphere"),"installed terrain entry uses native circular brush");
+    var methods=terrain.NestedTypes.SelectMany(t=>t.Methods).Concat(terrain.Methods).Where(m=>m.HasBody).ToArray();
+    bool Stores(string field)=>methods.Any(m=>m.Body.Instructions.Any(i=>i.OpCode==Mono.Cecil.Cil.OpCodes.Stfld&&i.Operand is Mono.Cecil.FieldReference f&&f.DeclaringType.Name=="Cell"&&f.Name==field));
+    Check(Stores("height")&&Stores("bridgeHeight"),"native brush directly changes both ground and bridge elevations");
+    Check(methods.Any(m=>m.Body.Instructions.Any(i=>i.Operand is Mono.Cecil.FieldReference f&&f.Name=="isShiftDown")) &&
+          methods.Any(m=>m.Body.Instructions.Any(i=>i.Operand is Mono.Cecil.MethodReference r&&r.Name=="get_IsFloorWater")),"native brush retains Shift and water-boundary logic");
+}
+NetSession.Instance.Connection=peer;
+var brush=new AM_Terrain{mode=AM_Terrain.Mode.Up,brushRadius=3,timer=0.1f};
+var calls=AM_Terrain.Calls; var originalHeight=source.height;
+EInput.isShiftDown=true;
+brush.OnProcessTiles(new(1,1),0);
+var brushRequest=peer.Delta.Items.OfType<TerrainBrushCommand>().Last();
+Check(AM_Terrain.Calls==calls&&source.height==originalHeight&&brush.timer==0,"client stroke sends request without local native mutation");
+Check(brushRequest.Shift&&brushRequest.Radius==3&&brushRequest.Mode==(int)AM_Terrain.Mode.Up,"brush captures client modifier, radius and mode");
+var requests=peer.Delta.Items.Count;brush.OnProcessTiles(new(2,2),0);
+Check(peer.Delta.Items.Count==requests,"native brush cadence suppresses premature repeat");
+brush.timer=0.1f;brush.OnProcessTiles(new(2,2),0);
+Check(peer.Delta.Items.OfType<TerrainBrushCommand>().Last().Center.X==1,"held brush preserves native fixed center");
+NetSession.Instance.Connection=host;EInput.isShiftDown=false;
+source.height=10;source.bridgeHeight=15;source.room=new();
+AM_Terrain.Native=(mode,p)=>{Check(EInput.isShiftDown&&mode.brushRadius==3&&mode.mode==AM_Terrain.Mode.Up,"host native call receives client brush parameters");p.cell.height=12;p.cell.bridgeHeight=17;};
+brushRequest.Apply(host);brushRequest.Apply(host);
+Check(AM_Terrain.Calls==calls+1&&!EInput.isShiftDown,"one native execution per request and host Shift restored");
+var elevation=host.Delta.Items.OfType<ConstructionTerrainDelta>().Last(d=>d.Kind==ConstructionTerrainKind.Elevation);
+source.height=10;source.bridgeHeight=15;elevation.Apply(peer);
+Check(source.height==12&&source.bridgeHeight==17&&source.room.Dirty==1,"final elevation updates both heights and invalidates room");
+source.height=9;elevation.Apply(host);Check(source.height==9,"client elevation packet cannot mutate host");
+calls=AM_Terrain.Calls;
+foreach(var invalidBrush in new[]{new TerrainBrushCommand{Id=Guid.NewGuid(),ZoneUid=99,Center=new(){X=1,Z=1},Radius=3},new TerrainBrushCommand{Id=Guid.NewGuid(),ZoneUid=10,Center=new(){X=-1,Z=1},Radius=3},new TerrainBrushCommand{Id=Guid.NewGuid(),ZoneUid=10,Center=new(){X=1,Z=1},Radius=33},new TerrainBrushCommand{Id=Guid.NewGuid(),ZoneUid=10,Center=new(){X=1,Z=1},Radius=3,Mode=99}})invalidBrush.Apply(host);
+Check(AM_Terrain.Calls==calls,"wrong-zone, invalid center, radius and mode are rejected");
+var sent=host.Delta.Items.Count;
+AM_Terrain.Native=(mode,p)=>{};new AM_Terrain{timer=0.1f,brushRadius=1}.OnProcessTiles(new(1,1),0);
+Check(host.Delta.Items.Count==sent,"unchanged brush emits no terrain packets");
+AM_Terrain.Native=(mode,p)=>{p.cell.height=23;};new AM_Terrain{timer=0.1f,brushRadius=1}.OnProcessTiles(new(1,1),0);
+Check(host.Delta.Items.Count==sent+1,"host's own brush broadcasts changed tile through same capture");
+AM_Terrain.Native=(mode,p)=>{p.cell.height=24;throw new InvalidOperationException();};
+brushRequest.Id=Guid.NewGuid();try{brushRequest.Apply(host);}catch(InvalidOperationException){}
+Check(!EInput.isShiftDown&&host.Delta.Items.OfType<ConstructionTerrainDelta>().Last().Value==24,"exception restores modifier and publishes partial native terrain changes");
+NetSession.Instance.Connection=null;AM_Terrain.Native=(mode,p)=>{p.cell.height=25;};sent=host.Delta.Items.Count;
+new AM_Terrain{timer=0.1f}.OnProcessTiles(new(1,1),0);
+Check(source.height==25&&host.Delta.Items.Count==sent,"solo brush remains native without networking");
+
 Console.WriteLine($"{checks} checks passed");

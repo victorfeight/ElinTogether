@@ -40,6 +40,11 @@ foreach (var name in new[] { "chara_hired", "chara_hired_ticket" }) {
 Check(Calls(Type("LayerQuestBoard").Methods.Single(m => m.Name == "OnInit"), "UpdateReqruits"), "opening hiring board reaches candidate-generation gate");
 
 var host = new ElinNetHost(); var client = new ElinNetClient();
+var factionMethods = Type("TraitFactionBoard").NestedTypes.Append(Type("TraitFactionBoard")).SelectMany(t => t.Methods).Where(m => m.HasBody).ToArray();
+var renameCallbacks = factionMethods.Where(m => m.Body.Instructions.Any(i => i.OpCode == OpCodes.Stfld && i.Operand is FieldReference f && f.DeclaringType.Name == "Faction" && f.Name == "name")).ToArray();
+Check(renameCallbacks.Length == 1 && renameCallbacks[0].Parameters.Count(p => p.ParameterType.FullName == "System.String") == 1,
+    "native faction board has exactly one confirmed name-write callback with one string argument");
+Check(factionMethods.Count(m => Calls(m, "SetStringList")) == 1, "native faction name chooser has one refresh boundary");
 var hostActor = EClass.pc; var actor = new Chara { uid = 719 }; host.ActiveRemoteCharas[1] = actor;
 NetSession.Instance.Connection = host;
 var branch = EClass.Branch;
@@ -112,4 +117,25 @@ Check(host.Delta.Items.Count == pending, "zone activation does not publish parti
 ElinTogether.Patches.ZoneActivateEvent.IsHappening = false;
 BranchBoardManagement.Publish(branch);
 Check(host.Delta.Items.Count == pending + 1, "ordinary host settlement changes publish after activation");
+var rename = Request(BranchBoardOperation.RenameFaction); rename.Name = "CalmTears";
+rename.Apply(host);
+Check(EClass.Home.name == "CalmTears" && EClass.pc == hostActor && actor.Money == 88,
+    "client faction rename updates shared host name without payment or actor leakage");
+var renameState = (BranchBoardState)host.Delta.Items.Last();
+EClass.Home.name = "Home"; renameState.Apply(client);
+Check(EClass.Home.name == "CalmTears", "host-confirmed faction name replaces client's local name");
+EClass.Home.name = "Home"; EClass._zone.uid = 99; renameState.Apply(client); EClass._zone.uid = 10;
+Check(EClass.Home.name == "CalmTears", "global name arrives even after client changes zones");
+renameState.FactionName = "Forged"; renameState.Apply(host);
+Check(EClass.Home.name == "CalmTears", "client state cannot rename host faction");
+foreach (var name in new string?[] { null, "", "  ", "bad\nname", new string('x', 201) }) {
+    var invalid = Request(BranchBoardOperation.RenameFaction); invalid.Name = name; invalid.Apply(host);
+    Check(EClass.Home.name == "CalmTears", "invalid faction name rejected");
+}
+var staleRename = Request(BranchBoardOperation.RenameFaction); staleRename.Name = "Stale"; staleRename.ZoneUid = 99; staleRename.Apply(host);
+Check(EClass.Home.name == "CalmTears", "rename from stale settlement rejected");
+BranchBoardManagement.Execute(host, new() { Id = Guid.NewGuid(), ZoneUid = 10, Operation = BranchBoardOperation.RenameFaction, Name = "HostName" }, hostActor);
+Check(EClass.Home.name == "HostName" && ((BranchBoardState)host.Delta.Items.Last()).FactionName == "HostName", "host renaming also broadcasts shared name");
+rename.Apply(host);
+Check(EClass.Home.name == "HostName", "duplicate old rename cannot overwrite later host rename");
 Console.WriteLine($"{checks} settlement checks passed; native callback IL verified, gameplay/transport boundaries simulated.");

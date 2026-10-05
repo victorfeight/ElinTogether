@@ -8,7 +8,7 @@ using MessagePack;
 
 namespace ElinTogether.Models;
 
-public enum BranchBoardOperation { Refresh, Upgrade, Research, Policy, Hire, HireTicket }
+public enum BranchBoardOperation { Refresh, Upgrade, Research, Policy, Hire, HireTicket, RenameFaction }
 
 [MessagePackObject]
 public sealed class BranchBoardCommand : ElinDelta
@@ -21,6 +21,7 @@ public sealed class BranchBoardCommand : ElinDelta
     [Key(5)] public int Expected { get; set; }
     [Key(6)] public int Price { get; set; }
     [Key(7)] public bool Active { get; set; }
+    [Key(8)] public string? Name { get; set; }
     protected override void OnApply(ElinNetBase net) { if (net is ElinNetHost host) BranchBoardManagement.Execute(host, this); }
 }
 
@@ -65,6 +66,14 @@ internal sealed class BranchBoardManagement : EClass
         try {
             player.chara = actor;
             switch (request.Operation) {
+                case BranchBoardOperation.RenameFaction: {
+                    if (request.Name == null || string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 200 || request.Name.Any(char.IsControl)) {
+                        Reject("This faction name is not valid."); return;
+                    }
+                    Home.name = request.Name;
+                    EmpLog.Information("Faction renamed: actor {Actor}, name {Name}", actor.uid, Home.name);
+                    break;
+                }
                 case BranchBoardOperation.Upgrade: {
                     var e = Branch.elements.GetElement(request.Target);
                     if (e == null || e.ValueWithoutLink != request.Expected || e.ValueWithoutLink <= 0 ||
@@ -152,6 +161,7 @@ public sealed class BranchBoardState : ElinDelta
     [Key(5)] public ReserveEntry[] Candidates { get; set; } = [];
     [Key(6)] public int[] GlobalPolicies { get; set; } = [];
     [Key(7)] public int LastRecruitUpdate { get; set; }
+    [Key(8)] public string? FactionName { get; set; }
 
     internal static BranchBoardState Capture() => new() {
         ZoneUid = _zone.uid, Elements = Branch.elements.dict.Values.ToDictionary(e => e.id, e => e.vBase),
@@ -160,6 +170,7 @@ public sealed class BranchBoardState : ElinDelta
         Research = LZ4Bytes.Create(Branch.researches), Policies = LZ4Bytes.Create(Branch.policies),
         Knowledge = Branch.resources.knowledge.value, GlobalPolicies = Home.globalPolicies.ToArray(),
         LastRecruitUpdate = Branch.lastUpdateReqruit,
+        FactionName = Home.name,
         Candidates = Branch.listRecruit.Select(i => new ReserveEntry {
             Member = RemoteCard.Create(i.chara, addToCache: true, withData: true), IsNew = i.isNew, Deadline = i.deadline,
         }).ToArray(),
@@ -167,7 +178,11 @@ public sealed class BranchBoardState : ElinDelta
 
     protected override void OnApply(ElinNetBase net)
     {
-        if (net.IsHost || _zone.uid != ZoneUid || Branch == null) return;
+        if (net.IsHost) return;
+        // The faction name is global even if this settlement snapshot arrives
+        // after travel. Do not defer it behind resident resolution either.
+        if (FactionName != null) Home.name = FactionName;
+        if (_zone.uid != ZoneUid || Branch == null) return;
         var candidates = Candidates.Select(i => (Entry: i, Chara: i.Member.Find() as Chara)).ToArray();
         if (candidates.Any(i => i.Chara == null)) { net.Delta.DeferLocal(this); return; }
         var research = Research.Decompress<ResearchManager>();
