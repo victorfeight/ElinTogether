@@ -10,39 +10,21 @@ internal static class QuestCompleteEvent
     [HarmonyPrefix]
     internal static bool OnClientComplete(Quest __instance)
     {
-        if (NetSession.Instance.IsHost) {
-            return true;
-        }
-
-        if (GuildStateSnapshot.IsGuildQuest(__instance)) return false;
-
-        var game = EClass.game;
-        game.quests.Remove(__instance);
-        game.quests.completedIDs.Add(__instance.id);
-        game.quests.completedTypes.Add(__instance.GetType().ToString());
-
-        __instance.ShowCompleteText();
-
-        if (__instance.chara?.quest?.uid == __instance.uid) {
-            __instance.chara.quest = null;
-        }
-
-        __instance.ClientZone?.completedQuests.Add(__instance.uid);
-        __instance.isComplete = true;
-
-        return false;
+        return NetSession.Instance.Connection is not ElinNetClient;
     }
 
     [HarmonyPostfix]
     internal static void OnQuestComplete(Quest __instance)
     {
         if (GuildStateSnapshot.IsGuildQuest(__instance)) return;
-        if (NetSession.Instance.Connection is not { } connection || ElinDelta.IsApplying) {
+        if (NetSession.Instance.Connection is not ElinNetHost connection || ElinDelta.IsApplying || !__instance.isComplete) {
             return;
         }
 
         connection.Delta.AddRemote(new QuestCompleteDelta {
             Uid = __instance.uid,
         });
+        if (__instance.AffinityGain != 0 && __instance.DestChara is { IsAliveInCurrentZone: true } recipient)
+            connection.Delta.AddRemote(SocialStateDelta.Capture(recipient));
     }
 }

@@ -11,6 +11,9 @@ public class QuestCompleteDelta : ElinDelta
 
     protected override void OnApply(ElinNetBase net)
     {
+        // A result is not authority for a client to complete a quest. Consuming
+        // turn-ins are validated and executed through QuestDeliverDelta instead.
+        if (net.IsHost) return;
         var quest = game.quests.list.Find(q => q.uid == Uid) ??
                     game.quests.globalList.Find(q => q.uid == Uid);
         if (quest is null || quest.isComplete) {
@@ -21,14 +24,6 @@ public class QuestCompleteDelta : ElinDelta
         // from a client or a second gameplay replay on receipt.
         if (GuildStateSnapshot.IsGuildQuest(quest)) return;
 
-        if (net.IsHost) {
-            using (Simulate()) {
-                quest.Complete();
-            }
-
-            return;
-        }
-
-        quest.Complete();
+        SharedQuests.ApplyCompletion(quest);
     }
 }

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Mono.Cecil"><HintPath>$(ElinGamePath)/BepInEx/core/Mono.Cecil.dll</HintPath></Reference>
+    <Compile Include="../../ElinTogether/Models/SharedQuests.cs" Link="SharedQuests.cs" />
+    <Compile Include="../../ElinTogether/Models/Delta/Quest/QuestAcceptDelta.cs" Link="QuestAcceptDelta.cs" />
+    <Compile Include="../../ElinTogether/Models/Delta/Quest/QuestDeliverDelta.cs" Link="QuestDeliverDelta.cs" />
+    <Compile Include="../../ElinTogether/Models/Delta/Quest/QuestCompleteDelta.cs" Link="QuestCompleteDelta.cs" />
+    <Compile Include="../../ElinTogether/Patches/DeltaEvents/Quest/QuestCompleteEvent.cs" Link="QuestCompleteEvent.cs" />
+    <Compile Include="../../ElinTogether/Patches/DeltaEvents/Quest/QuestDeliverEvent.cs" Link="QuestDeliverEvent.cs" />
+  </ItemGroup>
+</Project>

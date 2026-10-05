@@ -24,13 +24,14 @@ internal class QuestStartEvent
             return false;
         }
 
-        if (q.uid < 0 || !q.IsRandomQuest || q.UseInstanceZone) {
+        if (!SharedQuests.CanClientAccept(q)) {
             EmpPop.Information("emp_ui_quest_client".lang());
             return false;
         }
 
         client.Delta.AddRemote(new QuestAcceptDelta {
             Uid = q.uid,
+            ZoneUid = EClass._zone.uid,
             Client = q.person.chara,
         });
         EmpLog.Debug("Requesting quest accept {QuestUid} {QuestId}", q.uid, q.id);

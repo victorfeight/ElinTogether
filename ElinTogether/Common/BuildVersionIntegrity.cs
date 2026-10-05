@@ -81,9 +81,10 @@ public class BuildVersionIntegrity : EClass
         V40 = 40, // Authoritative chest unlock and practice relock state.
         V41 = 41, // Vanilla throw awards through owner progression; fractional raw XP.
         V42 = 42, // Shared settlement board transactions and state.
+        V43 = 43, // Host-validated quest acceptance and delivery intents.
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V42;
+    public const APIVersion APIVersionLatest = APIVersion.V43;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 
