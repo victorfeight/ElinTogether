@@ -22,6 +22,7 @@ public class Game {
 public class Cards{public CharaList globalCharas=new();}
 public class CharaList:Dictionary<int,Chara>{public Chara? Find(int uid)=>this.GetValueOrDefault(uid);}
 public class Player{
+ public int staminaRecovery;
  public Chara chara=null!;public int uidChara,karma=30,bankMoney=900;public Zone? zone;
  public Stats stats=new();public Pref pref=new();public HotbarManager hotbars=new();
  public int totalFeat,expKnowledge,hotbarPage,safeTravel,fished,fishArtifact;
@@ -145,3 +146,5 @@ public class InvOwner {public Thing Container=new();}
 public class UIInventory {public InvOwner owner=new(); public Window window=new();}
 public class LayerInventory {public static List<LayerInventory> listInv=[]; public List<UIInventory> invs=[];}
 public static class IO {public static T DeepCopy<T>(T value)=>JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(value))!;}
+
+namespace ElinTogether.Models { public static class PlayerControl {public static bool WatchingOwnCharacter;} }

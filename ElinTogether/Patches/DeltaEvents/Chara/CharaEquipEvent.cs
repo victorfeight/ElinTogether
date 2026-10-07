@@ -68,7 +68,7 @@ internal static class CharaEquipEvent
             // AI_Equip 路径已由 CharaTaskDelta 白名单在主机重演，双通道会命中
             // vanilla Equip 的 toggle 分支反向脱装
             for (var act = owner.ai; act is not null; act = act.child) {
-                if (act is AI_Equip) {
+                if (act is AI_Equip && !RelicEquipment.Changing(owner)) {
                     return;
                 }
             }
@@ -82,6 +82,7 @@ internal static class CharaEquipEvent
             SlotIndex = slot.index,
             SlotElementId = slot.elementId,
             Equip = equip,
+            Relic = RelicEquipment.Capture(owner, thing),
         });
     }
 }

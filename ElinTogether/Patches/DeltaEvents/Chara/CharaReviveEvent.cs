@@ -9,6 +9,7 @@ namespace ElinTogether.Patches;
 internal static class CharaReviveEvent
 {
     private static string? _pendingLastWords;
+    internal static void ClearPendingLastWords() => _pendingLastWords = null;
 
     [HarmonyPrefix]
     [HarmonyPatch(typeof(Chara), nameof(Chara.MakeGrave))]
@@ -65,11 +66,16 @@ internal static class CharaReviveEvent
     [HarmonyPatch(typeof(Chara), nameof(Chara.Revive))]
     internal static void OnCharaReviveEnd(Chara __instance, bool __state)
     {
+        if (__state && !__instance.isDead) {
+            PlayerDeathRecovery.Revived(__instance);
+            PlayerDeathDialogue.Rescued(__instance);
+        }
         if (!__state || __instance.isDead || ElinDelta.IsApplying) {
             return;
         }
 
-        if (NetSession.Instance.Connection is not ElinNetHost host || !__instance.IsPlayer) {
+        if (NetSession.Instance.Connection is not ElinNetHost host ||
+            (!__instance.IsPlayer && !__instance.IsInActiveMap)) {
             return;
         }
 

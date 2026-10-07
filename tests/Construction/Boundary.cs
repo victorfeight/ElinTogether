@@ -29,14 +29,14 @@ public class Map {
     public void SetBlock(int x,int z,int mat,int id,int dir){Setters++;cells[x,z]._blockMat=mat;cells[x,z]._block=id;cells[x,z].blockDir=dir;}
     public void SetFloor(int x,int z,int mat,int id,int dir){Setters++;cells[x,z]._floorMat=mat;cells[x,z]._floor=id;cells[x,z].floorDir=dir;}
     public void SetObj(int x,int z,int mat,int id,int value,int dir,bool ignoreRandomMat){Setters++;cells[x,z].objMat=mat;cells[x,z].obj=id;cells[x,z].objVal=value;cells[x,z].objDir=dir;}
-    public void SetBridge(int x,int z,int height,int mat,int id,int dir,byte pillar){Setters++;cells[x,z]._bridgeMat=mat;cells[x,z]._bridge=id;cells[x,z].bridgeHeight=height;cells[x,z].floorDir=dir;cells[x,z].bridgePillar=pillar;}
+    public void SetBridge(int x,int z,int height,int mat,int id,int dir,int pillar,bool hidePillar){Setters++;cells[x,z]._bridgeMat=mat;cells[x,z]._bridge=id;cells[x,z].bridgeHeight=height;cells[x,z].floorDir=dir;cells[x,z].bridgePillar=pillar;cells[x,z].hidePillar=hidePillar;}
     public void SetRoofBlock(int x,int z,int mat,int id,int dir,int height){Setters++;cells[x,z]._roofBlockMat=mat;cells[x,z]._roofBlock=id;cells[x,z]._roofBlockDir=(byte)(dir+height*4);}
     public void SetDeco(int x,int z,int mat,int id){Setters++;cells[x,z]._decoMat=mat;cells[x,z]._deco=id;}
     public void SetLiquid(int x,int z,CellEffect? e){Setters++;cells[x,z].effect=e;}
     public void RefreshNeighborTiles(int x,int z){}public void RefreshShadow(int x,int z){}public void RefreshFOV(int x,int z){}
 }
 public class Bounds {public bool Contains(Position p)=>p.IsInActiveMapBounds;}
-public class Cell {public byte height; public Room? room; public bool isSeen=true,isModified,isHarvested;public int gatherCount;public int _blockMat,_block,blockDir,_floorMat,_floor,floorDir,objMat,obj,objDir,objVal,_bridgeMat,_bridge,bridgeHeight,_roofBlockMat,_roofBlock,_decoMat,_deco;public byte _roofBlockDir,bridgePillar;public CellEffect? effect;}
+public class Cell {public byte height; public Room? room; public bool isSeen=true,isModified,isHarvested;public int gatherCount;public int _blockMat,_block,blockDir,_floorMat,_floor,floorDir,objMat,obj,objDir,objVal,_bridgeMat,_bridge,bridgeHeight,_roofBlockMat,_roofBlock,_decoMat,_deco;public byte _roofBlockDir;public int bridgePillar;public bool hidePillar;public CellEffect? effect;}
 public class CellEffect {public int[] ints=[];public string[] strs=[];}
 public class Tasks {public UndoManager undo=new();public Designations designations=new();}
 public class Designations {public object build=new();public MoveList moveInstalled=new();}

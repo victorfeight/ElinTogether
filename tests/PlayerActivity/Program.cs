@@ -82,4 +82,20 @@ foreach(bool hardPause in new[]{false,true}) {
  Check(UiPauses(true)&&!UiPauses(false),"disconnected UI preserves vanilla result");
 }
 Game.isPaused=false;
+// Client tap while awaiting host: key-up cleanup must leave the command
+// independent of the active goal. Dispatch it once, then stop repetition.
+local.isDead=false;local.IsPC=true;local.ai=new NoGoal();
+AIAct? queuedStep=new GoalManualMove();
+for(int frame=0;frame<30;frame++) PlayerActivity.ClearFinishedLocalGoal(local,releaseManualMove:true);
+Check(local.HasNoGoal&&queuedStep is GoalManualMove,"released tap survives delayed host grant without starting early");
+local.ai=queuedStep!;queuedStep=null;int steps=1; // host grants the captured step
+PlayerActivity.ClearFinishedLocalGoal(local,releaseManualMove:true);
+Check(local.HasNoGoal&&queuedStep==null&&steps==1,"completed tap stops repetition after its single granted step");
+local.ai=new GoalManualMove();var heldGoal=local.ai;
+for(int frame=0;frame<30;frame++) PlayerActivity.ClearFinishedLocalGoal(local,releaseManualMove:false);
+Check(ReferenceEquals(local.ai,heldGoal),"held movement retains the same vanilla goal and running state");
+PlayerActivity.ClearFinishedLocalGoal(local,releaseManualMove:true);
+Check(local.HasNoGoal,"release stops active held movement before next readiness report");
+local.ai=new TaskHarvest();var harvest=local.ai;PlayerActivity.ClearFinishedLocalGoal(local,releaseManualMove:true);
+Check(ReferenceEquals(local.ai,harvest),"direction release does not cancel non-movement tasks");
 Console.WriteLine($"{passed} checks passed; simulated game/network boundary.");

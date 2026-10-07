@@ -200,7 +200,13 @@ public class ActionModeCombat
         // Run in both time modes, even with the game clock paused. Finishing a
         // goal must release vanilla input without consuming another character tick.
         _finishingManualStep = true;
-        try { PlayerActivity.ClearFinishedLocalGoal(EClass.pc); }
+        try {
+            var releaseManualMove = Activated && EInput.axis == Vector2.zero;
+            if (releaseManualMove && EClass.pc.ai is GoalManualMove) {
+                EClass.player.nextMove = Vector2.zero;
+            }
+            PlayerActivity.ClearFinishedLocalGoal(EClass.pc, releaseManualMove);
+        }
         finally { _finishingManualStep = false; }
         if (_applyPendingQueued && Phase == CombatPhase.Inactive) {
             _applyPendingQueued = false;
@@ -511,9 +517,10 @@ public class ActionModeCombat
 
         __instance.roundTimer = 0f;
         CompleteLocalRound(__instance.actTime);
-        // A manual step is complete; don't auto-select another step after key release.
-        // Continuing combat/path/task goals stay attached with their enumerators intact.
-        if (__instance.ai is GoalManualMove or GoalEndTurn || !__instance.ai.IsRunning) {
+        // Retain held movement exactly like vanilla; release is handled before
+        // readiness/dispatch above. Other continuing goals retain their enumerators.
+        if (__instance.ai is GoalEndTurn || !__instance.ai.IsRunning ||
+            (__instance.ai is GoalManualMove && EInput.axis == Vector2.zero)) {
             EClass.player.nextMove = Vector2.zero;
             _finishingManualStep = true;
             try { __instance.SetNoGoal(); }

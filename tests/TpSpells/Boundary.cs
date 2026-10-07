@@ -40,6 +40,15 @@ namespace ElinTogether.Net{
  public class NetSession{public static NetSession Instance=new();public ElinNetBase? Connection;}
 }
 namespace ElinTogether.Models{
+ // SharedTravel's real lifecycle is exercised by tests/SharedTravel.
+ public static class SharedTravel {
+  public class Journey { }
+  public static Journey? Current;
+  public static bool CanBegin(Chara c)=>true;
+  public static Journey Begin(Chara c)=>Current??=new();
+  public static void Adopt(Journey j) { }
+  public static void Cancel(string reason)=>Current=null;
+ }
  public abstract class ElinDelta:EClass{public int OriginPeer;public static bool IsRemoteStateLanding;public static int Depth;public void Apply(ElinNetBase n){Depth++;try{OnApply(n);}finally{Depth--;}}protected abstract void OnApply(ElinNetBase n);public static IDisposable Simulate(){var depth=Depth;Depth=0;return new Scope(()=>Depth=depth);}}
  public class Scope(Action end):IDisposable{public void Dispose()=>end();}
  public class RemoteCard{public int Uid;public static Dictionary<int,Card> Cards=[];public Card? Find()=>Cards.GetValueOrDefault(Uid);[return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull("c")]public static implicit operator RemoteCard?(Card? c){if(c is null)return null;Cards[c.uid]=c;return new(){Uid=c.uid};}}

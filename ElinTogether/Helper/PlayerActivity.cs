@@ -7,11 +7,15 @@ namespace ElinTogether.Helper;
 // A remote task is only the current replicated step, not the player's whole goal.
 internal static class PlayerActivity
 {
-    internal static void ClearFinishedLocalGoal(Chara chara)
+    internal static void ClearFinishedLocalGoal(Chara chara, bool releaseManualMove = false)
     {
         // Vanilla normally does this on the next Chara.Tick. Multiplayer may
         // already have paused the clock, while input still requires HasNoGoal.
-        if (chara.IsPC && !chara.isDead && !chara.HasNoGoal && !chara.ai.IsRunning) {
+        // A released direction stops an already-running repeat, not a queued
+        // command awaiting its first host grant. Pending input is owned by the
+        // scheduler and must survive a tap's key-up.
+        if (chara.IsPC && !chara.isDead && !chara.HasNoGoal &&
+            (!chara.ai.IsRunning || releaseManualMove && chara.ai is GoalManualMove)) {
             chara.SetNoGoal();
         }
     }

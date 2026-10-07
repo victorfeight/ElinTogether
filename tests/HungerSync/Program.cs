@@ -44,4 +44,13 @@ PlayerControl.WatchingOwnCharacter=false;actor.mana.value=5;vitals.ApplyReconcil
 Check(actor.mana.value==5,"late companion vitals cannot overwrite resumed player mana");
 mirror.mana.value=7;vitals.ApplyReconciliation(mirror);
 Check(mirror.mana.value==7,"client report cannot inject companion vitals into host");
+PlayerControl.WatchingOwnCharacter=true;
+PersonalStaminaRecovery.Store(actor,14);
+var recoverySnapshot=Snapshot(true,20);
+PersonalStaminaRecovery.Store(actor,0);EClass.player.staminaRecovery=99;
+recoverySnapshot.ApplyReconciliation();
+Check(EClass.player.staminaRecovery==14&&PersonalStaminaRecovery.Saved(actor)==14,"spectator receives host-owned recovery credit with stamina");
+PlayerControl.WatchingOwnCharacter=false;EClass.player.staminaRecovery=7;
+recoverySnapshot.ApplyReconciliation();
+Check(EClass.player.staminaRecovery==7,"late spectator credit cannot overwrite resumed human");
 Console.WriteLine($"{checks} hunger synchronization checks passed (game/transport boundary stubbed).");

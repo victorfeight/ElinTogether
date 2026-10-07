@@ -23,6 +23,13 @@ public class CharaTaskDelta : ElinDelta
             return;
         }
 
+        if (TaskArgs is AI.AIReadArgs read && (read.TravelRequest != System.Guid.Empty || SharedTravel.IsTravel(read.Target.Find()))) {
+            if (net is not ElinNetHost travelHost ||
+                !SharedTravel.Accept(travelHost, OriginPeer, chara, read.TravelRequest, read.ZoneUid) ||
+                read.Target.Find() is not Thing { Num: > 0, isDestroyed: false } scroll ||
+                !SharedTravel.IsTravel(scroll) || scroll.GetRootCard() != chara || !scroll.trait.CanRead(chara)) return;
+        }
+
         var act = TaskArgs?.CreateSubAct();
 
         if (chara.isDead) {

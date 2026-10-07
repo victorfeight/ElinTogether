@@ -24,6 +24,10 @@ public class CharaReviveDelta : ElinDelta
         }
 
         if (net is ElinNetHost host) {
+            // Client requests are crawl-home for that client's own character.
+            // Spell/scroll rescues execute through their existing host act route.
+            if (!host.AcceptsPlayerInput(OriginPeer) ||
+                !host.ActiveRemoteCharas.TryGetValue(OriginPeer, out var sender) || sender != chara) return;
             // duplicate
             if (!chara.isDead) {
                 Pos = chara.pos;

@@ -21,7 +21,7 @@ public class ZoneDataResponse
     public required LZ4Bytes Zone { get; init; }
 
     // TODO use a map surrogate for more efficient transporting
-    // TODO upcoming byte[] to int[] layout update from Elin
+    // Transfer native save files unchanged, including 23.352's int[] tile data.
     [Key(3)]
     public required Dictionary<string, LZ4Bytes> Map { get; init; }
 

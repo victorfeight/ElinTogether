@@ -13,6 +13,7 @@ public sealed class CompanionVitalsSnapshot
     [Key(4)] public int Depression { get; init; }
     [Key(5)] public int Bladder { get; init; }
     [Key(6)] public int Hygiene { get; init; }
+    [Key(7)] public int StaminaRecovery { get; init; }
 
     public static CompanionVitalsSnapshot Capture(Chara actor) => new() {
         Stamina = actor.stamina.value,
@@ -22,6 +23,7 @@ public sealed class CompanionVitalsSnapshot
         Depression = actor.depression.value,
         Bladder = actor.bladder.value,
         Hygiene = actor.hygiene.value,
+        StaminaRecovery = PersonalStaminaRecovery.Current(actor),
     };
 
     public void Apply(Chara actor)
@@ -35,5 +37,6 @@ public sealed class CompanionVitalsSnapshot
         actor.depression.value = Depression;
         actor.bladder.value = Bladder;
         actor.hygiene.value = Hygiene;
+        PersonalStaminaRecovery.Mirror(actor, StaminaRecovery);
     }
 }

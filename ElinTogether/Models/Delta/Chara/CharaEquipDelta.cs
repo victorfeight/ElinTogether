@@ -21,6 +21,8 @@ public class CharaEquipDelta : ElinDelta
     [Key(4)]
     public required bool Equip { get; init; }
 
+    [Key(5)] public RelicEquipResult? Relic { get; init; }
+
     protected override void OnApply(ElinNetBase net)
     {
         if (Owner.Find() is not Chara chara || Thing.Find() is not Thing { isDestroyed: false } thing) {
@@ -31,25 +33,29 @@ public class CharaEquipDelta : ElinDelta
 
         // client only equips self
         if (net is ElinNetHost host &&
-            (!host.ActiveRemoteCharas.TryGetValue(OriginPeer, out var sender) || sender != chara)) {
+            (!host.AcceptsPlayerInput(OriginPeer) || !host.ActiveRemoteCharas.TryGetValue(OriginPeer, out var sender) || sender != chara)) {
             EmpLog.Warning("Refusing {DeltaType} from peer {PeerIndex}, owner {OwnerUid} is not the sender",
                 nameof(CharaEquipDelta), OriginPeer, chara.uid);
             return;
         }
 
-        if (net.IsHost) {
-            net.Delta.AddRemote(this);
-        }
+        if (net.IsHost && Relic == null) net.Delta.AddRemote(this);
 
         if (chara.IsPC) {
             return;
         }
 
-        if (Equip && thing.c_equippedSlot == SlotIndex + 1) {
+        if (Relic is { } relic) {
+            if (!RelicEquipment.Valid(relic) || RelicEquipment.HasCompleted(chara, relic)) return;
+            if (net.IsHost && thing.GetRootCard() != chara) return;
+            if (relic.HasSlot) RelicEquipment.EnsureSlot(chara);
+        }
+
+        if (Relic == null && Equip && thing.c_equippedSlot == SlotIndex + 1) {
             return;
         }
 
-        if (!Equip && thing.c_equippedSlot == 0) {
+        if (Relic == null && !Equip && thing.c_equippedSlot == 0) {
             return;
         }
 
@@ -65,16 +71,30 @@ public class CharaEquipDelta : ElinDelta
                 SlotIndex, chara.uid, SlotElementId);
         }
 
+        if (!Equip && slot?.thing != thing) slot = slots.Find(s => s.thing == thing);
+
         if (slot is null) {
             EmpLog.Warning("Dropping {DeltaType}, no slot of element {ElementId} on chara {OwnerUid}",
                 nameof(CharaEquipDelta), SlotElementId, chara.uid);
             return;
         }
 
-        if (Equip) {
-            chara.body.Equip(thing, slot, false);
-        } else {
+        bool ApplyEquipment()
+        {
+            if (Equip && slot.thing == thing) return true;
+            if (Equip) return chara.body.Equip(thing, slot, false);
+            // Never unequip an adjacent item after a slot layout change.
+            if (slot.thing != thing) return false;
             chara.body.Unequip(slot);
+            return true;
         }
+
+        var success = Relic is { } result ? RelicEquipment.Replay(chara, thing, result, ApplyEquipment) : ApplyEquipment();
+        if (!success) {
+            EmpLog.Warning("Equipment replay rejected: owner {OwnerUid}, item {ThingUid}, slot {Slot}, relic {Relic}",
+                chara.uid, thing.uid, SlotElementId, Relic != null);
+            return;
+        }
+        if (net.IsHost && Relic != null) net.Delta.AddRemote(this);
     }
 }

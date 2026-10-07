@@ -39,15 +39,17 @@ internal static class CharaMoveEvent
             return;
         }
 
-        // movement could be random in certain circumstances
-        // not really a big problem if everyone is moving
-        // simply ignore and wait for reconciliation or next delta
-
+        // Vanilla may redirect a step or return an event without reaching newPoint.
+        // Replicate its result, not the original requested destination.
+        var turbo = AM_Adv.turbo > 0f ? AM_Adv.turbo : 1f;
+        CombatPresentation.Record(__instance, __instance.actTime, turbo);
         connection.Delta.AddRemote(new CharaMoveDelta {
             Owner = __instance,
-            Pos = newPoint,
+            Pos = __instance.pos,
             MoveType = type,
             ZoneUid = session.CurrentZone?.uid ?? -1,
+            ActTime = __instance.actTime,
+            Turbo = turbo,
         });
     }
 

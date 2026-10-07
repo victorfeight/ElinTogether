@@ -185,7 +185,10 @@ public class CharaStateSnapshot : EClass
                 if (dist > 2 && (dist > 10 || !CharaMoveDelta.HasRecentMove(chara))) {
                     EmpLog.Debug("Reconcile force move chara {Uid} from {@FromPos} to {@Pos}",
                         chara.uid, chara.pos.Copy(), (Point)Pos);
-                    chara.Stub_Move(Pos, Card.MoveType.Force);
+                    var from = chara.pos.Copy();
+                    if (chara.Stub_Move(Pos, Card.MoveType.Force) == Card.MoveResult.Success) {
+                        CombatPresentation.SnapCorrection(chara, from);
+                    }
                 }
             }
         }

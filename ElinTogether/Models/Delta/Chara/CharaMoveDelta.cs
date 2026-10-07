@@ -23,6 +23,10 @@ public class CharaMoveDelta : ElinDelta
     [Key(3)]
     public required int ZoneUid { get; init; }
 
+    // Presentation only; never used for authoritative turn costs.
+    [Key(4)] public float ActTime { get; init; }
+    [Key(5)] public float Turbo { get; init; }
+
     internal override bool RequiresGameStarted => false;
 
     public static implicit operator CharaMoveDelta(Chara chara)
@@ -75,6 +79,8 @@ public class CharaMoveDelta : ElinDelta
 
         var from = chara.pos.Copy();
         if (chara.pos.Equals(pos) || chara.Stub_Move(Pos, MoveType) == Card.MoveResult.Success) {
+            CombatPresentation.Record(chara, ActTime, Turbo);
+            CombatPresentation.SnapCorrection(chara, from);
             if (from.Distance(pos) > 3) {
                 EmpLog.Debug("Move delta jump chara {Uid} from {@FromPos} to {@Pos}",
                     chara.uid, from, pos);

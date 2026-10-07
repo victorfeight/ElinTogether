@@ -33,7 +33,7 @@ internal static class SoloPlayerProfile
         nameof(Player.trackedCategories), nameof(Player.trackedCards), nameof(Player.trackedElements),
         nameof(Player.partySetups), nameof(Player.returnInfo), nameof(Player.safeTravel),
         nameof(Player.fished), nameof(Player.fishArtifact), nameof(Player.dailyGacha),
-        nameof(Player.wellWished),
+        nameof(Player.wellWished), nameof(Player.staminaRecovery),
     ];
     private static readonly FieldInfo[] Fields = Names.Select(name => typeof(Player).GetField(name)
         ?? throw new MissingFieldException(typeof(Player).FullName, name)).ToArray();
@@ -43,11 +43,13 @@ internal static class SoloPlayerProfile
         if (actor != player.chara) throw new InvalidOperationException("Only the active player's profile can be captured.");
         var state = new State { LegacyHistoryMissing = actor.GetStr(SaveKey) is { Length: > 0 } && HasMissingHistory(actor) };
         foreach (var field in Fields) state.Fields[field.Name] =
-            JsonConvert.SerializeObject(field.GetValue(player), field.FieldType, GameIOContext.Settings);
+            JsonConvert.SerializeObject(field.Name == nameof(Player.returnInfo) && Net.NetSession.Instance.Connection != null
+                ? null : field.GetValue(player), field.FieldType, GameIOContext.Settings);
         state.CarriedWindows = PersonalContainerWindows.Capture(actor);
         var json = JsonConvert.SerializeObject(state);
         if (json.Length > MaxJsonLength) throw new InvalidOperationException("Player profile exceeds the supported size.");
         actor.SetStr(SaveKey, json);
+        PersonalStaminaRecovery.Store(actor, player.staminaRecovery);
     }
 
     internal static bool HasMissingHistory(Chara actor)
@@ -95,10 +97,11 @@ internal static class SoloPlayerProfile
     {
         // Validate every field before touching the saved record; never apply a
         // remote Player profile to the host's live Player singleton.
-        _ = PrepareJson(json);
+        var prepared = PrepareJson(json);
         var state = Read(json);
         state.LegacyHistoryMissing |= HasMissingHistory(actor);
         actor.SetStr(SaveKey, JsonConvert.SerializeObject(state));
+        PersonalStaminaRecovery.Store(actor, (int)prepared[RecoveryField]!);
     }
 
     // Deserialize every field before changing the active player. A broken or
@@ -106,13 +109,22 @@ internal static class SoloPlayerProfile
     internal static Dictionary<FieldInfo, object?> Prepare(Chara actor)
     {
         if (actor.GetStr(SaveKey) is not { Length: > 0 } json) return [];
-        return PrepareJson(json);
+        var prepared = PrepareJson(json);
+        // Native AI may have spent this credit since the last human checkpoint.
+        prepared[RecoveryField] = PersonalStaminaRecovery.Saved(actor, (int)prepared[RecoveryField]!);
+        return prepared;
     }
+
+    private static FieldInfo RecoveryField => Fields.Single(f => f.Name == nameof(Player.staminaRecovery));
 
     private static Dictionary<FieldInfo, object?> PrepareJson(string json)
     {
         var state = Read(json);
-        if (state.Fields.Count != Fields.Length)
+        // Pre-23.352 profiles lack only this new scalar. Keep rejecting missing
+        // historical fields and unknown world fields; never copy host recovery.
+        if (!state.Fields.ContainsKey(nameof(Player.staminaRecovery)))
+            state.Fields.Add(nameof(Player.staminaRecovery), "0");
+        if (state.Fields.Count != Fields.Length || state.Fields.Keys.Any(name => !Names.Contains(name)))
             throw new InvalidOperationException("Unexpected player profile fields.");
         var result = new Dictionary<FieldInfo, object?>();
         var defaults = new Player();
@@ -121,6 +133,8 @@ internal static class SoloPlayerProfile
                 throw new InvalidOperationException($"The saved profile is missing {field.Name}.");
             ValidateTypes(value);
             var parsed = JsonConvert.DeserializeObject(value, field.FieldType, GameIOContext.Settings);
+            if (field == RecoveryField && (parsed is not int recovery || recovery < 0))
+                throw new InvalidOperationException("Invalid stamina recovery credit.");
             if (parsed is null && field.GetValue(defaults) is not null)
                 throw new InvalidOperationException($"The saved profile has an empty {field.Name}.");
             result.Add(field, parsed);
@@ -153,7 +167,8 @@ internal static class SoloPlayerProfile
             foreach (var field in Fields) field.SetValue(player, field.GetValue(defaults));
             player.hotbars.OnCreateGame();
         } else {
-            foreach (var pair in prepared) pair.Key.SetValue(player, pair.Value);
+            foreach (var pair in prepared) pair.Key.SetValue(player,
+                pair.Key.Name == nameof(Player.returnInfo) && Net.NetSession.Instance.Connection != null ? null : pair.Value);
         }
         player.RefreshDomain();
         player.currentHotItem = new HotItemNoItem();

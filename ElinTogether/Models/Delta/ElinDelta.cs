@@ -72,6 +72,7 @@ namespace ElinTogether.Models;
 [Union(244, typeof(ConstructionTerrainDelta))]
 [Union(245, typeof(BuildingObjectCommand))]
 [Union(246, typeof(TerrainBrushCommand))]
+[Union(247, typeof(RelicStateDelta))]
 // Thing
 [Union(300, typeof(ThingDelta))]
 [Union(301, typeof(ThingRequest))]

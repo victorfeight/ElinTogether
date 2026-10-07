@@ -22,6 +22,7 @@ public sealed class ConstructionTerrainDelta : ElinDelta
     [Key(11)] public bool Modified { get; init; }
     [Key(12)] public int GatherCount { get; init; }
     [Key(13)] public bool Harvested { get; init; }
+    [Key(14)] public bool HidePillar { get; init; }
     internal static ConstructionTerrainDelta Capture(Point p, ConstructionTerrainKind kind)
     {
         var c = p.cell;
@@ -38,7 +39,7 @@ public sealed class ConstructionTerrainDelta : ElinDelta
             _ => (0, 0, 0, 0),
         };
         return new() { ZoneUid = _zone.uid, Pos = p, Kind = kind, Material = material, Id = id, Direction = dir, Value = value, Pillar = c.bridgePillar,
-            ObjectDirection = c.objDir, Modified = c.isModified, GatherCount = c.gatherCount, Harvested = c.isHarvested,
+            ObjectDirection = c.objDir, Modified = c.isModified, GatherCount = c.gatherCount, Harvested = c.isHarvested, HidePillar = c.hidePillar,
             Effect = kind == ConstructionTerrainKind.Liquid && c.effect != null ? (int[])c.effect.ints.Clone() : null,
             Strings = kind == ConstructionTerrainKind.Liquid && c.effect != null ? (string[])c.effect.strs.Clone() : null };
     }
@@ -52,11 +53,14 @@ public sealed class ConstructionTerrainDelta : ElinDelta
             case ConstructionTerrainKind.Object:
                 _map.SetObj(x, z, Material, Id, Value, Direction, ignoreRandomMat: true);
                 _map.cells[x, z].gatherCount = GatherCount; _map.cells[x, z].isHarvested = Harvested; break;
-            case ConstructionTerrainKind.Bridge: _map.SetBridge(x, z, Value, Material, Id, Direction, (byte)Pillar); break;
+            case ConstructionTerrainKind.Bridge: _map.SetBridge(x, z, Value, Material, Id, Direction, Pillar, HidePillar); break;
             case ConstructionTerrainKind.Roof: _map.SetRoofBlock(x, z, Material, Id, Direction, Value); break;
             case ConstructionTerrainKind.Deco: _map.SetDeco(x, z, Material, Id); break;
             case ConstructionTerrainKind.Liquid: _map.SetLiquid(x, z, Effect == null ? null : new CellEffect { ints = Effect, strs = Strings! }); break;
-            case ConstructionTerrainKind.Pillar: _map.cells[x, z].bridgePillar = (byte)Pillar; break;
+            case ConstructionTerrainKind.Pillar:
+                _map.cells[x, z].bridgePillar = Pillar;
+                _map.cells[x, z].hidePillar = HidePillar;
+                break;
             case ConstructionTerrainKind.Elevation:
                 _map.cells[x, z].height = (byte)Value;
                 _map.cells[x, z].bridgeHeight = (byte)Direction;

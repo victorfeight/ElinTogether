@@ -87,9 +87,15 @@ public class BuildVersionIntegrity : EClass
         V46 = 46, // Read-only planning state and host-owned area transactions.
         V47 = 47, // Native construction transactions and final placement results.
         V48 = 48, // Shared faction names and host-resolved terrain elevation brushes.
+        V49 = 49, // Elin 23.352 integer tile IDs and explicit bridge pillar visibility.
+        V50 = 50, // Personal recoverable stamina across saves and AI control.
+        V51 = 51, // Atomic relic equipment results, permanent slot and sleep locks.
+        V52 = 52, // Host-resolved resurrection and early death recovery drops.
+        V53 = 53, // Shared travel ownership and idempotent scroll/spell initiation.
+        V54 = 54, // Resolved movement presentation timing.
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V48;
+    public const APIVersion APIVersionLatest = APIVersion.V54;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

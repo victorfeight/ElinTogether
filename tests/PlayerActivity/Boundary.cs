@@ -2,6 +2,7 @@ public class AIAct {
  public bool running=true; public virtual bool IsNoGoal=>false; public bool IsRunning=>running;
 }
 public class NoGoal:AIAct {public override bool IsNoGoal=>true;}
+public class GoalManualMove:AIAct {}
 public class TaskHarvest:AIAct {}
 public class AutoAct:AIAct {}
 public class UnknownAct:AIAct {}

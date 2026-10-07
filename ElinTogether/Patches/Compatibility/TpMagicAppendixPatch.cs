@@ -33,6 +33,10 @@ internal static class TpMagicAppendixPatch
         // Keep Tp's original exclusion of AI casters. Remote humans enter here
         // only through their validated request, not arbitrary NPC spell replay.
         if (!Act.CC.IsPC && !PersonalKarma.IsHuman(Act.CC)) { __result = false; return false; }
+        if (__instance.id == TpSpellBridge.Return) {
+            if (!SharedTravel.CanBegin(Act.CC)) { __result = false; return false; }
+            SharedTravel.Begin(Act.CC);
+        }
         __state = new TpSpellBridge.Execution(__instance);
         return true;
     }
@@ -43,6 +47,10 @@ internal static class TpMagicAppendixPatch
         if (__state is null) return;
         // Restore pc/messages before publishing, even if the third-party spell throws.
         __state.Dispose();
+        if (__state.ActId == TpSpellBridge.Return && SharedTravel.Current is { } journey) {
+            SharedTravel.Adopt(journey);
+            if (__exception != null) SharedTravel.Cancel("effect failed");
+        }
         __state.Publish();
         if (__exception is not null) EmpLog.Warning(__exception, "TpSpell native execution failed");
     }

@@ -45,6 +45,7 @@ public class CharaActPerformDelta : ElinDelta
 
     // Diagnostics only. Carry the sender's runtime type when the ID cannot identify it.
     [Key(7)] public string? DiagnosticActType { get; init; }
+    [Key(8)] public Guid TravelRequest { get; init; }
 
     public static CharaActPerformDelta Create(Act act)
     {
@@ -59,6 +60,7 @@ public class CharaActPerformDelta : ElinDelta
             ZapId = act is ActZap ? Guid.NewGuid() : Guid.Empty,
             ZoneUid = EClass._zone.uid,
             DiagnosticActType = act.id == 0 ? act.GetType().FullName : null,
+            TravelRequest = SharedTravel.IsTravel(act) ? Guid.NewGuid() : Guid.Empty,
         };
     }
 
@@ -90,6 +92,9 @@ public class CharaActPerformDelta : ElinDelta
         var act = _builtInMapping.GetValueOrDefault(ActId);
         act ??= chara.elements.GetElement(ActId)?.act ?? ACT.Create(ActId);
         act.id = ActId;
+
+        if (SharedTravel.IsTravel(act) && (net is not ElinNetHost travelHost ||
+            !SharedTravel.Accept(travelHost, OriginPeer, chara, TravelRequest, ZoneUid))) return;
 
         // pos compensation if high rtt
         var target = TargetCard?.Find();

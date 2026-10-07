@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+<PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+<ItemGroup>
+<Compile Include="../../ElinTogether/Models/PlayerDeathRecovery.cs" Link="PlayerDeathRecovery.cs" />
+<Compile Include="../../ElinTogether/Patches/Synchronization/PlayerRecoveryPatch.cs" Link="PlayerRecoveryPatch.cs" />
+<Compile Include="../../ElinTogether/Patches/Synchronization/PlayerDeathDialogue.cs" Link="PlayerDeathDialogue.cs" />
+<Compile Include="../../ElinTogether/Patches/DeltaEvents/Chara/CharaReviveEvent.cs" Link="CharaReviveEvent.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Chara/CharaReviveDelta.cs" Link="CharaReviveDelta.cs" />
+<Reference Include="0Harmony"><HintPath>$(ElinGamePath)/BepInEx/core/0Harmony.dll</HintPath></Reference>
+<Reference Include="Mono.Cecil"><HintPath>$(ElinGamePath)/BepInEx/core/Mono.Cecil.dll</HintPath></Reference>
+</ItemGroup></Project>

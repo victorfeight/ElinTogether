@@ -1,0 +1,88 @@
+using ElinTogether.Models;
+using ElinTogether.Net;
+using ElinTogether.Patches;
+
+int checks=0;
+void Check(bool result,string name){if(!result)throw new Exception(name);checks++;}
+var hostActor=new Chara{uid=1};var clientActor=new Chara{uid=2};var npc=new Chara{uid=3};
+var host=new ElinNetHost();host.ActiveRemoteCharas[2]=clientActor;host.HumanPeers.Add(2);
+NetSession.Instance.Connection=host;NetSession.Instance.Player=hostActor;EClass.player.chara=hostActor;
+Check(SharedTravel.CanBegin(clientActor),"connected human may request");
+Check(!SharedTravel.CanBegin(npc),"ordinary NPC cannot request shared travel");
+var id=Guid.NewGuid();Check(SharedTravel.Accept(host,2,clientActor,id,10),"valid request");
+Check(!SharedTravel.Accept(host,2,clientActor,id,10),"duplicate rejected");
+Check(!SharedTravel.Accept(host,2,hostActor,Guid.NewGuid(),10),"wrong owner rejected");
+Check(!SharedTravel.Accept(host,2,clientActor,Guid.NewGuid(),11),"old map rejected");
+Check(!SharedTravel.Accept(host,2,clientActor,Guid.Empty,10),"missing id rejected");
+
+Check(SharedTravelPatch.Effect(EffectId.Return,clientActor,out var scope),"host executes remote return");
+Check(EClass.pc==clientActor,"native effect sees caster");
+EClass.player.returnInfo=new(){turns=15,askDest=true};SharedTravelPatch.EndEffect(scope,null);
+Check(EClass.pc==hostActor && SharedTravel.Current?.Caster==clientActor,"PC restored; caster retained");
+Check(!SharedTravel.CanBegin(hostActor),"second caster does not toggle off journey");
+var liveInfo=EClass.player.returnInfo;
+SharedTravelSavePatch.Before(out var saved);
+Check(EClass.player.returnInfo==null,"pending MP countdown excluded from world save");
+SharedTravelSavePatch.After(saved);
+Check(EClass.player.returnInfo==liveInfo,"world save restores live countdown");
+var dialog=new LayerList();int clicked=0;Action<Zone,ItemGeneral> select=(z,i)=>{clicked++;EClass.player.returnInfo=new(){turns=12,uidDest=20};};
+SharedTravelPatch.BeforeInput(out var inputState);
+SharedTravelDialogPatch.Bind(dialog,ref select);
+SharedTravelPatch.AfterInput(inputState);
+Action kill=()=>EClass.player.returnInfo=null;SharedTravelDialogClosePatch.Bind(dialog,ref kill);dialog.SetOnKill(kill);
+SharedTravel.Cancel("test");
+var newer=SharedTravel.Begin(hostActor);EClass.player.returnInfo=new(){turns=13};SharedTravel.Adopt(newer);
+select(new Zone(),new());kill();
+Check(clicked==0 && EClass.player.returnInfo?.turns==13,"old selection and close cannot mutate new journey");
+SharedTravel.Cancel("test");
+
+var j=SharedTravel.Begin(clientActor);EClass.player.returnInfo=new(){turns=1};SharedTravel.Adopt(j);
+clientActor.burden.Phase=4;SharedTravel.BeforeTick(hostActor);
+Check(SharedTravel.Current==null && EClass.player.returnInfo==null,"overweight caster cancels before departure");clientActor.burden.Phase=0;
+j=SharedTravel.Begin(clientActor);EClass.player.returnInfo=new(){turns=15};SharedTravel.Adopt(j);
+EClass.player.returnInfo=new(){turns=1,uidDest=20};clientActor.burden.Phase=4;SharedTravel.BeforeTick(hostActor);
+Check(SharedTravel.Current==null,"instant destination replacement checks current caster burden");clientActor.burden.Phase=0;
+j=SharedTravel.Begin(clientActor);EClass.player.returnInfo=new(){turns=15};SharedTravel.Adopt(j);host.Companions.Add(clientActor);
+Check(!SharedTravel.Validate() && SharedTravel.Current==null,"control handoff cancels");host.Companions.Clear();
+j=SharedTravel.Begin(clientActor);EClass.player.returnInfo=new(){turns=15};SharedTravel.Adopt(j);host.HumanPeers.Clear();
+Check(!SharedTravel.Validate(),"disconnect cancels");host.HumanPeers.Add(2);
+j=SharedTravel.Begin(clientActor);EClass.player.returnInfo=new(){turns=15};SharedTravel.Adopt(j);clientActor.isDead=true;
+Check(!SharedTravel.Validate(),"caster death cancels");clientActor.isDead=false;
+j=SharedTravel.Begin(clientActor);EClass.player.returnInfo=new(){turns=15};SharedTravel.Adopt(j);EClass.player.chara=npc;
+Check(!SharedTravel.Validate(),"driver switch cancels");EClass.player.chara=hostActor;
+j=SharedTravel.Begin(clientActor);EClass.player.returnInfo=new(){turns=15};SharedTravel.Adopt(j);EClass._zone.uid=11;
+Check(!SharedTravel.Validate(),"map switch cancels");EClass._zone.uid=10;
+
+NetSession.Instance.Connection=new ElinNetClient();
+Check(!SharedTravelPatch.Effect(EffectId.Return,clientActor,out scope)&&scope==null,"client return never starts local countdown");
+Check(!SharedTravelPatch.Read(new(){idEffect=EffectId.Evac},clientActor,out var readScope)&&readScope==null,"client skips travel scroll consumption and RNG");
+Check(SharedTravelPatch.Read(new(){idEffect=EffectId.Teleport},clientActor,out readScope),"other scrolls unchanged");
+NetSession.Instance.Connection=null;
+Check(SharedTravelPatch.Effect(EffectId.Return,hostActor,out scope)&&scope==null,"solo effect unchanged");
+Check(SharedTravelPatch.Read(new(){idEffect=EffectId.Return},hostActor,out readScope)&&readScope==null,"solo reading unchanged");
+NetSession.Instance.Connection=host;
+Check(SharedTravelPatch.Effect(EffectId.Return,npc,out scope)&&scope==null,"NPC retains native fallback");
+host.Companions.Add(hostActor);
+Check(!SharedTravelPatch.Read(new(){idEffect=EffectId.Return},hostActor,out readScope),"host AI cannot consume a scroll to initiate shared travel");
+Check(!SharedTravelPatch.Effect(EffectId.Return,hostActor,out scope),"host AI cannot start an untracked native journey");
+host.Companions.Clear();
+Check(SharedTravelPatch.Effect(EffectId.Return,clientActor,out scope),"begin exception test");
+EClass.player.returnInfo=new(){turns=10};SharedTravelPatch.EndEffect(scope,new Exception("native failure"));
+Check(EClass.pc==hostActor&&SharedTravel.Current==null&&EClass.player.returnInfo==null,"native exception restores PC and cancels journey");
+var closing=SharedTravel.Begin(clientActor);EClass.player.returnInfo=new(){turns=10};SharedTravel.Adopt(closing);
+SharedTravel.ResetNetwork();Check(SharedTravel.Current==null&&EClass.player.returnInfo==null,"session shutdown clears pending journey");
+Console.WriteLine($"SharedTravel: {checks} checks passed (simulated boundaries, not live Unity).");
+if(args.Length>0) {
+ using var game=Mono.Cecil.ModuleDefinition.ReadModule(args[0]);
+ var read=game.Types.Single(t=>t.Name=="TraitScrollStatic").Methods.Single(m=>m.Name=="OnRead").Body.Instructions;
+ var consume=read.ToList().FindIndex(i=>i.Operand is Mono.Cecil.MethodReference m&&m.Name=="ModNum");
+ var effect=read.ToList().FindIndex(i=>i.Operand is Mono.Cecil.MethodReference m&&m.Name=="ProcAt");
+ Check(consume>=0&&effect>consume,"installed vanilla consumes before effect; interception must precede OnRead");
+ var nativeEffect=game.Types.Single(t=>t.Name=="ActEffect").Methods.Single(m=>m.Name=="Proc"&&m.Parameters.Count==6);
+ Check(nativeEffect.Body.Instructions.Any(i=>i.Operand is Mono.Cecil.FieldReference f&&f.Name=="returnInfo"),"installed effect owns native return state");
+ var tick=game.Types.Single(t=>t.Name=="Chara").Methods.Single(m=>m.Name=="Tick");
+ Check(tick.Body.Instructions.Any(i=>i.Operand is string s&&s=="returnOverweight"),"installed countdown retains native overweight failure");
+ var input=game.Types.Single(t=>t.Name=="AM_Adv").Methods.Single(m=>m.Name=="_OnUpdateInput");
+ Check(input.Body.Instructions.Any(i=>i.Operand is Mono.Cecil.MethodReference m&&m.Name=="ListReturnLocations"),"native dialog still uses mod-compatible destination provider");
+ Console.WriteLine($"SharedTravel total: {checks} checks including installed native IL.");
+}

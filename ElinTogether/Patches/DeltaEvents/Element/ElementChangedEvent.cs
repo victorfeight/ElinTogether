@@ -46,6 +46,9 @@ internal class ElementChangedEvent
     [HarmonyPostfix]
     internal static void OnSyncElementChange(ElementContainer __instance, int id, Element? __result, int[]? __state)
     {
+        // Native DNA.Apply will run once with the equipment result. Publishing
+        // an absolute element update here as well can race that same mutation.
+        if (RelicEquipment.Changing(__instance.Card)) return;
         if (NetSession.Instance.Connection is not { } connection) {
             return;
         }

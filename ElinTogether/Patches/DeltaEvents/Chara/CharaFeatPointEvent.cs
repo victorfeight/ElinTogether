@@ -16,6 +16,7 @@ internal static class CharaFeatPointEvent
     [HarmonyPostfix]
     internal static void OnSetFeatEnd(Card __instance, int __state)
     {
+        if (RelicEquipment.Changing(__instance)) return; // Included in the equipment result.
         // client only
         // Host-approved replay can award real local progression; remote actors are excluded below.
         if (NetSession.Instance.Connection is not ElinNetClient client) {

@@ -12,6 +12,8 @@ namespace ElinTogether.Patches;
 internal class CharaSynchronizationContext : SynchronizationContext
 {
     private static int _PCStamina;
+    private static int _PCStaminaRecovery;
+    private static Chara? _staminaOwner;
 
     [HarmonyTranspiler]
     [HarmonyPatch(typeof(Chara), nameof(Chara._Move))]
@@ -55,13 +57,17 @@ internal class CharaSynchronizationContext : SynchronizationContext
     internal static void Update()
     {
         var stamina = pc.stamina.value;
-        if (_PCStamina != stamina) {
+        var recovery = player.staminaRecovery;
+        if (_staminaOwner != pc || _PCStamina != stamina || _PCStaminaRecovery != recovery) {
             NetSession.Instance.Connection!.Delta.AddRemote(new CharaStaminaDelta {
                 Chara = pc,
                 Stamina = stamina,
+                StaminaRecovery = recovery,
             });
         }
 
         _PCStamina = stamina;
+        _PCStaminaRecovery = recovery;
+        _staminaOwner = pc;
     }
 }

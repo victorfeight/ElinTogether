@@ -62,3 +62,5 @@ namespace ElinTogether.Models {
 }
 
 namespace ElinTogether.Models {public class CardToggleDelta:ElinDelta {public RemoteCard Card=null!;public bool IsOn,Silent;protected override void OnApply(ElinNetBase n){} }}
+
+namespace ElinTogether.Models {internal static class RelicEquipment {internal static bool Changing(Card c)=>false;}}

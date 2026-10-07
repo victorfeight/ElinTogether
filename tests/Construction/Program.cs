@@ -103,10 +103,50 @@ Check(EClass._map.Setters==setters,"wrong-zone result cannot change new map");
 source.effect=new(){ints=[1,2],strs=["water"]};var liquid=ConstructionTerrainDelta.Capture(new(1,1),ConstructionTerrainKind.Liquid);source.effect.ints[0]=99;liquid.Apply(peer);
 Check(source.effect!.ints[0]==1&&source.effect.strs[0]=="water","liquid snapshot owns a copy of native effect data");
 
+// Stable 23.352 widened tile/material/pillar IDs. Values above 255 must survive
+// the existing absolute result path without wrapping into a different tile.
+source._floor=701;source._floorMat=702;
+var floor=ConstructionTerrainDelta.Capture(new(1,1),ConstructionTerrainKind.Floor);
+source._floor=0;source._floorMat=0;floor.Apply(peer);
+Check(source._floor==701&&source._floorMat==702,"floor IDs and materials above byte range survive replay");
+source._bridge=703;source._bridgeMat=704;source.bridgePillar=705;source.hidePillar=true;
+var bridge=ConstructionTerrainDelta.Capture(new(1,1),ConstructionTerrainKind.Bridge);
+source._bridge=0;source._bridgeMat=0;source.bridgePillar=0;source.hidePillar=false;bridge.Apply(peer);
+Check(source._bridge==703&&source._bridgeMat==704&&source.bridgePillar==705&&source.hidePillar,"bridge result retains integer IDs and hidden pillar state");
+source.bridgePillar=706;source.hidePillar=false;
+var pillar=ConstructionTerrainDelta.Capture(new(1,1),ConstructionTerrainKind.Pillar);
+source.bridgePillar=0;source.hidePillar=true;pillar.Apply(peer);
+Check(source.bridgePillar==706&&!source.hidePillar,"pillar placement restores full ID and visibility");
+source.bridgePillar=0;source.hidePillar=true;
+pillar=ConstructionTerrainDelta.Capture(new(1,1),ConstructionTerrainKind.Pillar);
+source.bridgePillar=706;source.hidePillar=false;pillar.Apply(peer);
+Check(source.bridgePillar==0&&source.hidePillar,"pillar removal retains native explicit hidden flag");
+
 // Terrain brush network boundaries use the production model and patch. Native
 // terrain math is not duplicated in this harness; verify its installed IL below.
 if(args.Length>0) {
     using var native=Mono.Cecil.ModuleDefinition.ReadModule(args[0]);
+    var cell=native.Types.Single(t=>t.Name=="Cell");
+    foreach(var name in new[]{"_block","_blockMat","_floor","_floorMat","obj","objMat","_bridge","_bridgeMat","_roofBlock","_roofBlockMat","_deco","_decoMat","bridgePillar"})
+        Check(cell.Fields.Single(f=>f.Name==name).FieldType.FullName=="System.Int32",$"installed Cell.{name} is an integer ID");
+    var setBridge=native.Types.Single(t=>t.Name=="Map").Methods.Single(m=>m.Name=="SetBridge");
+    Check(setBridge.Parameters.Count==8&&setBridge.Parameters[6].ParameterType.FullName=="System.Int32"&&setBridge.Parameters[7].ParameterType.FullName=="System.Boolean","installed bridge setter takes integer pillar and explicit visibility");
+    if(args.Length>1) {
+        using var resolver=new Mono.Cecil.DefaultAssemblyResolver();
+        resolver.AddSearchDirectory(Path.GetDirectoryName(args[0]));
+        resolver.AddSearchDirectory(Path.GetDirectoryName(args[1]));
+        using var mod=Mono.Cecil.ModuleDefinition.ReadModule(args[1],new Mono.Cecil.ReaderParameters{AssemblyResolver=resolver});
+        var failures=new List<string>();var checkedMembers=0;
+        // CLR-generated multidimensional array Get/Set methods have no metadata
+        // definition; only resolve actual members declared by the game assembly.
+        foreach(var member in mod.GetMemberReferences().Where(m=>!m.DeclaringType.IsArray&&m.DeclaringType.Scope.Name==native.Assembly.Name.Name)) {
+            checkedMembers++;
+            try {
+                if(member is Mono.Cecil.FieldReference f && f.Resolve()==null || member is Mono.Cecil.MethodReference m && m.Resolve()==null) failures.Add(member.FullName);
+            } catch(Exception e) {failures.Add(member.FullName+": "+e.Message);}
+        }
+        Check(checkedMembers>100&&failures.Count==0,$"compiled game API references resolve ({checkedMembers} checked): {string.Join("; ",failures)}");
+    }
     var terrain=native.Types.Single(t=>t.Name=="AM_Terrain");
     var process=terrain.Methods.Single(m=>m.Name=="OnProcessTiles");
     Check(process.Parameters.Count==2 && process.Body.Instructions.Any(i=>i.Operand is Mono.Cecil.MethodReference m&&m.Name=="ForeachSphere"),"installed terrain entry uses native circular brush");
