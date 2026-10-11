@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Collections.Generic;
 using ElinTogether.Net;
 using MessagePack;
 
@@ -23,6 +24,7 @@ public class GuildStateSnapshot : EClass
     [Key(2)] public LZ4Bytes[] Quests { get; set; } = [];
     [Key(3)] public string[] CompletedIds { get; set; } = [];
     [Key(4)] public string[] CompletedTypes { get; set; } = [];
+    [Key(5)] public Dictionary<int, int>? ZoneInfluences { get; init; }
 
     private static GuildStateSnapshot? _cached;
     private static bool _dirty = true;
@@ -55,6 +57,9 @@ public class GuildStateSnapshot : EClass
         if (!_dirty && _cached is not null) return _cached;
         _cached = new() {
             Revision = ++_revision,
+            ZoneInfluences = game.spatials.map.Values.OfType<Zone>()
+                .Where(z => z.id == "guild_merchant" || (z.lv == -1 && z.id is "kapul" or "derphy" or "lumiest"))
+                .ToDictionary(z => z.uid, z => z.influence),
             Relations = All.Select(g => new Relation {
                 Id = g.id, Type = g.relation.type, Rank = g.relation.rank,
                 Exp = g.relation.exp, Affinity = g.relation.affinity,
@@ -82,6 +87,9 @@ public class GuildStateSnapshot : EClass
             guild.relation.rank = state.Rank;
             guild.relation.exp = state.Exp;
             guild.relation.affinity = state.Affinity;
+        }
+        if (ZoneInfluences != null) foreach (var pair in ZoneInfluences) {
+            if (game.spatials.map.TryGetValue(pair.Key, out var spatial) && spatial is Zone zone) zone.influence = pair.Value;
         }
         if (quests is null) return;
         game.quests.list.RemoveAll(q => IsGuildQuest(q) && !quests.Any(s => s.uid == q.uid));

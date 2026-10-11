@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
   <ItemGroup>
+    <Reference Include="0Harmony"><HintPath>$(ElinGamePath)/BepInEx/core/0Harmony.dll</HintPath></Reference>
+    <Compile Include="../../ElinTogether/Patches/Synchronization/QuestInstanceProgressPatch.cs" Link="QuestInstanceProgressPatch.cs" />
     <Reference Include="Mono.Cecil"><HintPath>$(ElinGamePath)/BepInEx/core/Mono.Cecil.dll</HintPath></Reference>
     <Compile Include="../../ElinTogether/Models/QuestEventWidgetSync.cs" Link="QuestEventWidgetSync.cs" />
   </ItemGroup>

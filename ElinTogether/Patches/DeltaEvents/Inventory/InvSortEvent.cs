@@ -11,11 +11,15 @@ internal static class InvSortEvent
     // A queued remote merge cannot count as progress in that synchronous loop.
     [System.ThreadStatic]
     internal static HashSet<int>? QueuedSources;
+    [System.ThreadStatic]
+    private static int _sortDepth;
+    internal static bool IsSorting => _sortDepth > 0;
 
     [HarmonyPrefix]
     internal static void Begin(out HashSet<int>? __state)
     {
         __state = QueuedSources;
+        _sortDepth++;
         if (NetSession.Instance.Connection is ElinNetClient) {
             QueuedSources ??= new HashSet<int>();
         }
@@ -25,6 +29,7 @@ internal static class InvSortEvent
     internal static void End(HashSet<int>? __state)
     {
         QueuedSources = __state;
+        _sortDepth--;
     }
 }
 

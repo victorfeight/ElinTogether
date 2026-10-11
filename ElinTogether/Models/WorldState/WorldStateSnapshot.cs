@@ -48,6 +48,8 @@ public class WorldStateSnapshot : EClass
     [Key(14)] public int[]? RevealedTraps { get; init; }
     [Key(15)] public string? QuestEventText { get; init; }
     [Key(16)] public long BuildingRevision { get; init; }
+    [Key(17)] public Dictionary<int, string>? QuestProgressText { get; init; }
+    [Key(18)] public RandomQuestStateSnapshot? RandomQuests { get; init; }
 
     [ElinPreLoad]
     private static void ClearSweepStrikes(GameIOContext context)
@@ -94,6 +96,7 @@ public class WorldStateSnapshot : EClass
             SharedSpeed = NetSession.Instance.SharedSpeed,
             Weather = WeatherStateSnapshot.Create(),
             Guilds = GuildStateSnapshot.Capture(),
+            RandomQuests = RandomQuestStateSnapshot.Capture(),
             KnownBGMs = MusicCollectionSync.Capture(),
             ZoneUid = _zone.uid,
             ZoneInfluence = _zone.influence,
@@ -103,6 +106,7 @@ public class WorldStateSnapshot : EClass
             Karma = PersonalKarma.CaptureAll(),
             RevealedTraps = TrapDiscoverySync.Capture(),
             QuestEventText = QuestEventWidgetSync.Capture(),
+            QuestProgressText = QuestEventWidgetSync.CaptureProgress(),
             BuildingRevision = BuildingPlanning.Publish(),
         };
     }
@@ -119,11 +123,12 @@ public class WorldStateSnapshot : EClass
                 WorldDateAdvanceDelta.SetClientDate([..GameDate]);
                 Weather?.Apply();
                 Guilds?.Apply();
+                RandomQuests?.Apply();
                 if (Karma is not null) foreach (var karma in Karma) PersonalKarma.Receive(karma);
                 MusicCollectionSync.Apply(KnownBGMs);
                 OwnerProgressionAwards.Receive(ProgressionAwards);
                 if (_zone.uid == ZoneUid) {
-                    QuestEventWidgetSync.Apply(ZoneUid, QuestEventText);
+                    QuestEventWidgetSync.Apply(ZoneUid, QuestEventText, QuestProgressText);
                     BuildingPlanning.Observe(ZoneUid, BuildingRevision);
                     TrapDiscoverySync.Apply(ZoneUid, RevealedTraps);
                     _zone.influence = ZoneInfluence;

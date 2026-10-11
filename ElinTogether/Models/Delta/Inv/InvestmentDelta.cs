@@ -125,6 +125,8 @@ internal sealed class Investment : EClass
                 experience = 50 + shop.c_invest * 20;
                 Guild.Merchant.AddContribution(5 + shop.c_invest);
             }
+            // The quest mod hooks the native dialogue after ModInfluence for both investments.
+            QuestExpansionCompat.OnInvest();
             result.Award = OwnerProgressionAwards.Record(actor, request.RequestId, 292, experience);
             result.Accepted = true;
             CaptureResult(result, shop);

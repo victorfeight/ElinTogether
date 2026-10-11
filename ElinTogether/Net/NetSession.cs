@@ -60,7 +60,10 @@ public class NetSession : EClass
         ElinTogether.Models.ConstructionManagement.ResetNetwork();
         ElinTogether.Models.BuildingObjectManagement.ResetNetwork();
         ElinTogether.Models.GuildStateSnapshot.Reset();
+        ElinTogether.Models.RandomQuestStateSnapshot.Reset();
+        ElinTogether.Models.QuestDeposits.Reset();
         ElinTogether.Models.Investment.Reset();
+        ElinTogether.Models.NpcNews.Reset();
         ElinTogether.Models.FaithTransactions.Reset();
         if (Connection is ElinNetHost tradeHost && core.IsGameStarted) {
             foreach (var actor in tradeHost.ActiveRemoteCharas.Values) ElinTogether.Models.ShopTrade.Release(actor);

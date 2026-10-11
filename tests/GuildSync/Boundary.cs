@@ -5,7 +5,11 @@ public class EClass {
     public static Game game = new();
     public static Chara pc = new() { uid = 1 };
 }
+public class Spatial { public int uid; public string id = ""; public int lv; }
+public class Zone : Spatial { public int influence; }
+public class Spatials { public Dictionary<int, Spatial> map = []; }
 public class Game {
+    public Spatials spatials = new();
     public QuestManager quests = new();
     public Guild[] Guilds = [new() { id = "fighter" }, new() { id = "mage" }, new() { id = "thief" }, new() { id = "merchant" }];
 }
@@ -71,6 +75,7 @@ public class Guild : Faction {
 }
 public class Card { public string id = ""; public int uid, refVal; }
 public class Chara : Card {
+    public Quest? quest;
     public bool isDead, IsInActiveMap = true;
     public bool IsPC => this == EClass.pc;
     public Trait trait = new();

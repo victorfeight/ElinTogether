@@ -86,3 +86,5 @@ namespace HarmonyLib {
     public class HarmonyPatch : Attribute { public HarmonyPatch() { } public HarmonyPatch(Type t, string n) { } }
     public class HarmonyPrefix : Attribute { } public class HarmonyPostfix : Attribute { }
 }
+
+namespace ElinTogether.Models { public static class QuestExpansionCompat { public static int QuestLimit = 5; public static int InvestmentCalls; public static void OnInvest() => InvestmentCalls++; } }

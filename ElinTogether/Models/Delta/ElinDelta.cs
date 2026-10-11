@@ -82,6 +82,8 @@ namespace ElinTogether.Models;
 [Union(401, typeof(ZoneAddCardDelta))]
 [Union(402, typeof(BossLootTileDelta))]
 [Union(403, typeof(MapBoundsDelta))]
+[Union(404, typeof(NpcNewsRequest))]
+[Union(405, typeof(NpcNewsResult))]
 // World
 [Union(500, typeof(GameDelta))]
 [Union(501, typeof(WorldDateAdvanceDelta))]
@@ -135,6 +137,7 @@ namespace ElinTogether.Models;
 [Union(806, typeof(QuestChangePhaseDelta))]
 [Union(807, typeof(GuildActionDelta))]
 [Union(808, typeof(QuestDeliverDelta))]
+[Union(809, typeof(QuestDepositDelta))]
 // Act
 [Union(900, typeof(ActThrowDelta))]
 [Union(901, typeof(AutoActStepDelta))]

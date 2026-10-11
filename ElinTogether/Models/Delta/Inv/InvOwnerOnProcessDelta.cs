@@ -138,10 +138,8 @@ public class InvOwnerOnProcessDelta : ElinDelta
                 };
                 break;
             case TraitFarmChest:
-                destInv = new InvOwnerDeliver(dest) {
-                    mode = InvOwnerDeliver.Mode.Crop,
-                };
-                break;
+                // QuestDepositDelta owns consumption; never replay it on clients.
+                return;
             case TraitTaxChest:
                 destInv = new InvOwnerDeliver(dest) {
                     mode = InvOwnerDeliver.Mode.Tax,
@@ -278,6 +276,8 @@ public class InvOwnerOnProcessDelta : ElinDelta
 
     private void ApplyGacha(ElinNetHost host, TraitGacha gacha, Thing thing)
     {
+        if (thing.Num <= 0 || thing.id != gacha.GetIdCoin()) return;
+
         using var _ = Simulate();
 
         var receiver = ResolveReceiver(host);
@@ -288,7 +288,10 @@ public class InvOwnerOnProcessDelta : ElinDelta
         ball.things.DestroyAll();
         _zone.AddCard(ball, receiver.pos);
 
-        thing.Destroy();
+        // Vanilla SingleTarget splits one coin before _OnProcess destroys it.
+        // PendingSplit resolves that selection back to its authoritative stack;
+        // consume one there, using the existing absolute-count synchronization.
+        thing.ModNum(-1);
     }
 
     private Chara ResolveReceiver(ElinNetHost host)

@@ -10,6 +10,14 @@ internal static class CardTryStackEvent
     [HarmonyPrefix]
     internal static bool OnCardTryStackTo(Card __instance, Thing to, ref bool __result)
     {
+        // Sorting must not consume or enlarge the serving referenced by AI_Eat
+        // (or another held selection). Outside sorting, native PickHeld still
+        // returns an uneaten serving to its stack when the player cancels.
+        if (NetSession.Instance.Connection is not null && InvSortEvent.IsSorting &&
+            (IsHeld(__instance) || IsHeld(to))) {
+            __result = false;
+            return false;
+        }
         if (NetSession.Instance.IsHost && RemoteCraft.ProductReceiver is { } receiver) {
             EmpLog.Debug("Remote craft stack attempt product {ProductUid} ({ProductId}) num {ProductNum}, target {TargetUid} ({TargetId}) num {TargetNum}, target root {TargetRootUid}, receiver {ReceiverUid}, compatible {CanStack}",
                 __instance.uid, __instance.id, __instance.Num, to.uid, to.id, to.Num,
@@ -59,6 +67,8 @@ internal static class CardTryStackEvent
 
         return false;
     }
+
+    private static bool IsHeld(Card card) => card.GetRootCard() is Chara owner && owner.held == card;
 
     [HarmonyPostfix]
     internal static void OnCardTryStackToEnd(Card __instance, Thing to, bool __result)

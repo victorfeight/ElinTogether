@@ -27,13 +27,45 @@ SharedTravelSavePatch.After(saved);
 Check(EClass.player.returnInfo==liveInfo,"world save restores live countdown");
 var dialog=new LayerList();int clicked=0;Action<Zone,ItemGeneral> select=(z,i)=>{clicked++;EClass.player.returnInfo=new(){turns=12,uidDest=20};};
 SharedTravelPatch.BeforeInput(out var inputState);
-SharedTravelDialogPatch.Bind(dialog,ref select);
+var moonCallback = new UIList.Callback<MapMetaData,ItemGeneral> { onClick = (m,i) => clicked++ };
+var moon = new LayerList(); moon.list.callbacks = moonCallback;
+SharedTravelDialogPatch.Bind(moon);
+Check(SharedTravel.Current!.Dialog == null && ReferenceEquals(moon.list.callbacks, moonCallback),"moongate metadata list is untouched even during Return selection");
+var callback = new UIList.Callback<Zone,ItemGeneral> { onClick = select };
+dialog.list.callbacks = callback;
+SharedTravelDialogPatch.Bind(dialog);
+select = callback.onClick;
+SharedTravelDialogPatch.Bind(dialog);
+Check(ReferenceEquals(select, callback.onClick),"repeated layout does not wrap callback twice");
+Check(!typeof(LayerList).GetMethod(nameof(LayerList.RefreshSize))!.IsGenericMethod,"dialog interception uses a non-generic method");
 SharedTravelPatch.AfterInput(inputState);
 Action kill=()=>EClass.player.returnInfo=null;SharedTravelDialogClosePatch.Bind(dialog,ref kill);dialog.SetOnKill(kill);
 SharedTravel.Cancel("test");
 var newer=SharedTravel.Begin(hostActor);EClass.player.returnInfo=new(){turns=13};SharedTravel.Adopt(newer);
 select(new Zone(),new());kill();
 Check(clicked==0 && EClass.player.returnInfo?.turns==13,"old selection and close cannot mutate new journey");
+SharedTravel.Cancel("test");
+
+var successful = SharedTravel.Begin(clientActor);
+EClass.player.returnInfo = new() { turns = 15, askDest = true };
+SharedTravel.Adopt(successful);
+var destinationDialog = new LayerList();
+destinationDialog.SetOnKill(() => { });
+Action<Zone,ItemGeneral> choose = (z,i) => {
+    EClass.player.returnInfo = new() { turns = 12, uidDest = z.uid };
+    destinationDialog.Close(); // SetList2's native callback also closes the dialog.
+};
+var destinationCallback = new UIList.Callback<Zone,ItemGeneral> { onClick = choose };
+destinationDialog.list.callbacks = destinationCallback;
+SharedTravelPatch.BeforeInput(out inputState);
+SharedTravelDialogPatch.Bind(destinationDialog);
+SharedTravelPatch.AfterInput(inputState);
+Action close = () => { }; SharedTravelDialogClosePatch.Bind(destinationDialog, ref close);
+destinationDialog.SetOnKill(close);
+destinationCallback.onClick(new Zone { uid = 30 }, new());
+Check(SharedTravel.Current == successful && successful.Native == EClass.player.returnInfo && successful.Native?.uidDest == 30,
+    "valid selection retains native destination after automatic dialog close");
+Check(successful.Dialog == null && destinationDialog.Closed, "native close clears the captured dialog");
 SharedTravel.Cancel("test");
 
 var j=SharedTravel.Begin(clientActor);EClass.player.returnInfo=new(){turns=1};SharedTravel.Adopt(j);
@@ -84,5 +116,9 @@ if(args.Length>0) {
  Check(tick.Body.Instructions.Any(i=>i.Operand is string s&&s=="returnOverweight"),"installed countdown retains native overweight failure");
  var input=game.Types.Single(t=>t.Name=="AM_Adv").Methods.Single(m=>m.Name=="_OnUpdateInput");
  Check(input.Body.Instructions.Any(i=>i.Operand is Mono.Cecil.MethodReference m&&m.Name=="ListReturnLocations"),"native dialog still uses mod-compatible destination provider");
+ var layer = game.Types.Single(t=>t.Name=="LayerList");
+ var setList = layer.Methods.Single(m=>m.Name=="SetList2");
+ Check(setList.Body.Instructions.Any(i=>i.Operand is Mono.Cecil.MethodReference m&&m.Name=="RefreshSize"),"installed list builder reaches non-generic binding boundary");
+ Check(!layer.Methods.Single(m=>m.Name=="RefreshSize").HasGenericParameters,"installed binding target is non-generic");
  Console.WriteLine($"SharedTravel total: {checks} checks including installed native IL.");
 }

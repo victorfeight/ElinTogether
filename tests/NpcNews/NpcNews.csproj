@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+<PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net11.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+<ItemGroup>
+<Compile Include="../../ElinTogether/Models/NpcNews.cs" Link="NpcNews.cs" />
+<Compile Include="../../ElinTogether/Models/Delta/Zone/SpatialGenDelta.cs" Link="SpatialGenDelta.cs" />
+<Compile Include="../../ElinTogether/Patches/Synchronization/NpcNewsDialoguePatch.cs" Link="NpcNewsDialoguePatch.cs" />
+</ItemGroup>
+</Project>

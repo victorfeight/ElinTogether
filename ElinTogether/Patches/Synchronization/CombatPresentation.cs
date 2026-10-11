@@ -27,6 +27,25 @@ internal static class CombatPresentation
         Steps.Add(chara, new Step(chara.pos, chara.currentZone, duration, turbo));
     }
 
+    // Called only after a received move succeeds. Logical moves may arrive faster
+    // than draws: finish the previous segment before vanilla targets the new tile.
+    internal static void RecordReceivedMove(Chara chara, Point from, float duration, float turbo)
+    {
+        if (from.Equals(chara.pos)) return;
+
+        if (from.Distance(chara.pos) <= 2 && chara.host is null &&
+            chara.renderer is CharaRenderer { first: false } renderer &&
+            (renderer.IsMoving || !renderer.movePoint.Equals(from))) {
+            renderer.SetFirst(false, from.PositionCenter());
+            // SetFirst takes movePoint from owner.pos, which is already the new
+            // tile. Keep the previous tile so UpdatePosition starts the new step.
+            renderer.movePoint.Set(from);
+        }
+
+        Record(chara, duration, turbo);
+        SnapCorrection(chara, from);
+    }
+
     internal readonly record struct RenderState(bool Applied, float Speed, float Delta, float ActTime);
 
     [HarmonyPrefix]

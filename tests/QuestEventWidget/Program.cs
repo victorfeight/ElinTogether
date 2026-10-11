@@ -1,4 +1,5 @@
 using ElinTogether.Models;
+using ElinTogether.Patches;
 using ElinTogether.Net;
 using Mono.Cecil;
 
@@ -14,6 +15,10 @@ foreach (var (type, field) in new[] { ("Harvest", "minElapsed"), ("Music", "minE
     var method = timer.Types.Single(t => t.Name == $"KK_ZoneEvent{type}_TextWidgetDate_Postfix").Methods.Single(m => m.Name == "TextWidgetDatePostfix");
     Check(method.Body.Instructions.Any(i => i.Operand is FieldReference f && f.Name == field), $"installed KK timer {type} reads {field}");
 }
+using var expansion = ModuleDefinition.ReadModule(args[2]);
+var monsterProgress = expansion.Types.Single(t => t.Name == "QuestMusicMonster").Methods.Single(m => m.Name == "GetTextProgress");
+Check(monsterProgress.Body.Instructions.Any(i => i.Operand is MethodReference m && m.Name == "GetEvent"), "installed monster concert progress reads the local live zone event");
+Check(monsterProgress.Body.Instructions.Any(i => i.Operand is MethodReference m && m.Name == "get_GetVoltageString"), "installed concert progress dereferences the event mood");
 var zone = EClass._zone;
 var harvest = new ZoneEventQuest { Text = " harvest <color=cyan>Time left: 120</color>" };
 var other = new ZoneEvent { Text = " weather event" };
@@ -44,11 +49,36 @@ Check(QuestEventWidgetSync.Capture() == "", "completed/removed quests skipped du
 NetSession.Instance.IsClient = false;
 QuestEventWidgetSync.Apply(zone.uid, "client injection");
 Check(QuestEventWidgetSync.ZoneText(zone) == "zone", "host ignores incoming display state");
+// Instance progress must never evaluate a missing client-side quest event.
+var concert = new Quest { uid = 42, Text = "Audience: delighted" };
+harvest.quest = concert;
+var progress = QuestEventWidgetSync.CaptureProgress();
+Check(progress[42] == concert.Text, "host captures instance progress using native/mod quest code");
+string rendered = "";
+Check(QuestInstanceProgressPatch.Before(concert, ref rendered), "host keeps native quest progress");
+NetSession.Instance.IsClient = true;
+QuestEventWidgetSync.Reset();
+Check(!QuestInstanceProgressPatch.Before(concert, ref rendered) && rendered == "", "transition before event snapshot safely renders empty progress");
+zone.events.list.Clear();
+QuestEventWidgetSync.Apply(zone.uid, " concert timer", progress);
+Check(!QuestInstanceProgressPatch.Before(concert, ref rendered) && rendered == concert.Text, "client with no live event renders host concert mood");
+Check(concert.Reads == 1, "client rendering does not invoke native event-dependent quest code");
+Check(QuestInstanceProgressPatch.Before(new Quest { UseInstanceZone = false }, ref rendered), "ordinary quests keep native progress");
+Check(QuestEventWidgetSync.ProgressText(new Quest { uid = 43 }) == "", "another quest cannot inherit concert progress");
+zone.uid++;
+Check(QuestEventWidgetSync.ProgressText(concert) == "", "leaving instance hides stale progress");
+QuestEventWidgetSync.Apply(zone.uid, "", new());
+Check(QuestEventWidgetSync.ProgressText(concert) == "", "ended instance clears progress");
+QuestEventWidgetSync.Reset();
+Check(QuestEventWidgetSync.ProgressText(concert) == "", "session reset clears progress");
 Console.WriteLine($"{checks} widget checks passed; native/mod IL checked, rendering boundaries simulated.");
 
 public class EClass { public static Zone _zone = new(); }
 public class Zone { public int uid = 10; public string TextWidgetDate => "zone"; public ZoneEventManager events = new(); }
 public class ZoneEventManager { public List<ZoneEvent> list = []; }
 public class ZoneEvent { public string Text = ""; public virtual string TextWidgetDate => Text; }
-public class ZoneEventQuest : ZoneEvent { public object? quest = new(); public override string TextWidgetDate => quest == null ? throw new InvalidOperationException() : Text; }
-namespace ElinTogether.Net { public class NetSession { public static NetSession Instance = new(); public bool IsClient; } }
+public class ZoneEventQuest : ZoneEvent { public Quest? quest = new(); public override string TextWidgetDate => quest == null ? throw new InvalidOperationException() : Text; }
+public class Quest { public int uid; public bool UseInstanceZone = true; public string Text = ""; public int Reads; public string GetTextProgress() { Reads++; return Text; } }
+namespace ElinTogether.Net { public class ElinNetClient { } public class NetSession { public static NetSession Instance = new(); public bool IsClient; public object? Connection => IsClient ? new ElinNetClient() : null; } }
+
+namespace ElinTogether.Helper { public static class OverrideMethodComparer { public static IEnumerable<System.Reflection.MethodBase> FindAllOverrides(Type type, string name) => []; } }

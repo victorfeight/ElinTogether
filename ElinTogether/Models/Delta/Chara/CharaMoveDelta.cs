@@ -79,8 +79,7 @@ public class CharaMoveDelta : ElinDelta
 
         var from = chara.pos.Copy();
         if (chara.pos.Equals(pos) || chara.Stub_Move(Pos, MoveType) == Card.MoveResult.Success) {
-            CombatPresentation.Record(chara, ActTime, Turbo);
-            CombatPresentation.SnapCorrection(chara, from);
+            CombatPresentation.RecordReceivedMove(chara, from, ActTime, Turbo);
             if (from.Distance(pos) > 3) {
                 EmpLog.Debug("Move delta jump chara {Uid} from {@FromPos} to {@Pos}",
                     chara.uid, from, pos);

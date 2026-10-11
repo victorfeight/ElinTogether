@@ -23,6 +23,7 @@ first.Apply(host); first.Apply(host); concurrent.Apply(host);
 Check(actor.Money == 9820 && actor.Charges == 1 && actor.Experience == 0 && OwnerProgressionAwards.Read(actor).Single().Amount == 70 && shop.c_invest == 1 &&
     EClass._zone.influence == 1 && Guild.Merchant.Exp == 6,
     "investment settles payment, upgrade, pending XP, influence and credit once; concurrent quote rejected");
+Check(QuestExpansionCompat.InvestmentCalls == 1, "native quest investment callback runs once despite retries and concurrent quote rejection");
 Check(hostActor.Charges == 0 && hostActor.Experience == 0, "host character receives neither charge nor investing XP");
 var stalePrice = Request(); stalePrice.QuotedPrice--;
 stalePrice.Apply(host);

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using ElinTogether.Models;
 using ElinTogether.Net;
 using HarmonyLib;
@@ -82,17 +81,20 @@ internal static class SharedTravelPatch
 
 // Keep the native Return list (and BetterReturn's list provider), guarding only
 // its deferred callbacks against a cancelled/replaced multiplayer journey.
-[HarmonyPatch]
+[HarmonyPatch(typeof(LayerList), nameof(LayerList.RefreshSize))]
 internal static class SharedTravelDialogPatch
 {
-    internal static MethodBase TargetMethod() => AccessTools.Method(typeof(LayerList), nameof(LayerList.SetList2)).MakeGenericMethod(typeof(Zone));
     [HarmonyPrefix]
-    internal static void Bind(LayerList __instance, ref Action<Zone, ItemGeneral> onClick)
+    internal static void Bind(LayerList __instance)
     {
         if (!SharedTravelPatch.Choosing || SharedTravel.Current is not { Native: { isEvac: false, uidDest: 0 }, Dialog: null } journey) return;
+        // Mono shares reference-type generic bodies. Patching SetList2<Zone>
+        // also replaced the moongate's SetList2<MapMetaData> with a Zone list.
+        // Bind the already-created callback at this non-generic UI boundary.
+        if (__instance.list.callbacks is not UIList.Callback<Zone, ItemGeneral> callback) return;
         journey.Dialog = __instance;
-        var original = onClick;
-        onClick = (zone, item) => {
+        var original = callback.onClick;
+        callback.onClick = (zone, item) => {
             if (SharedTravel.Current != journey || !SharedTravel.Validate()) return;
             original(zone, item);
             journey.Native = EClass.player.returnInfo;

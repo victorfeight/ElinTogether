@@ -56,4 +56,28 @@ foreach (var connection in new ElinNetBase?[] { null, new ElinNetBase() }) {
     inv.Sort();
     Check(inv.Items.Single(t => !t.isDestroyed).Num == 3, "solo/host vanilla sort still consolidates all stacks");
 }
+// Reproduce AI_Eat.HoldCard's provisional serving: the original count remains
+// authoritative, while a client-local split is held until progress completes.
+foreach (var connection in new ElinNetBase[] { client, new ElinNetBase() }) {
+    NetSession.Instance.Connection = connection;
+    client.Delta.Items.Clear();
+    var eater = new Chara();
+    var stack = Item(70, "potage", num: 3);
+    var serving = Item(71, "potage", host: connection != client);
+    stack.parent = serving.parent = eater;
+    eater.held = serving;
+    PendingSplit.Source = serving.uid;
+    PendingSplit.Target = stack.uid;
+    // Both list orders: sort must neither consume the serving nor add to it.
+    foreach (var items in new[] { new List<Thing> { serving, stack }, new List<Thing> { stack, serving } }) {
+        inv = new UIInventory { Items = items };
+        inv.Sort();
+        Check(eater.held == serving && !serving.isDestroyed && serving.Num == 1 && stack.Num == 3,
+            "auto-sort preserves the exact held serving in both merge directions");
+        Check(client.Delta.Items.Count == 0, "auto-sort sends no merge for a held serving");
+    }
+    Check(serving.TryStackTo(stack) && serving.isDestroyed,
+        "native PickHeld cancellation can still return the serving outside sort");
+    PendingSplit.Source = PendingSplit.Target = -1;
+}
 Console.WriteLine($"{checks} checks passed");

@@ -1,0 +1,55 @@
+using ElinTogether.Models;
+using ElinTogether.Net;
+using ElinTogether.Patches;
+int checks=0;
+void Check(bool value,string reason){if(!value)throw new Exception(reason);checks++;Console.WriteLine("PASS "+reason);}
+var host=new ElinNetHost();var client=new ElinNetClient();var original=EClass.pc;var remote=new Chara{uid=2};var npc=new Chara{uid=3};
+host.ActiveRemoteCharas[1]=remote;EClass.game.spatials.map[5]=EClass.world.region;
+NpcNewsRequest Request()=>new(){Id=Guid.NewGuid(),ZoneUid=10,Npc=npc};
+NetSession.Instance.Connection=client;
+NpcNewsResult? reply=null;
+NpcNews.Submit(npc,r=>reply=r);
+Check(EClass.world.region.Creates==0 && client.Delta.Items.Count==1,"client requests news without generating a private site");
+var request=(NpcNewsRequest)client.Delta.Items[0];request.OriginPeer=1;
+NetSession.Instance.Connection=host;request.Apply(host);
+var result=(NpcNewsResult)host.Delta.Items.Single();
+Check(result.Accepted && EClass.world.region.Creates==1,"host resolves discovery exactly once");
+Check(EClass.world.region.GenerationActor==remote && EClass.pc==original,"generation uses speaking character and restores host PC");
+Check(npc.LastNews==50000 && result.Site!.State!.Known,"host applies native cooldown and discovery flag");
+request.Apply(host);
+Check(EClass.world.region.Creates==1 && host.Delta.Items.Count==1,"duplicate request cannot generate a second site");
+var before=Msg.Lines.Count;
+// Independent client process has independent deduplication state.
+NpcNews.Reset();NetSession.Instance.Connection=client;result.Apply(client);result.Apply(client);
+var site=EClass.game.spatials.Find(result.Site!.ZoneUid)!;
+Check(site!=null && site.name=="Warded Cave" && site._dangerLv==28 && site.idPrefix==4,"client receives same site identity/name/danger");
+Check(site!.icon==12 && site.isKnown && site.isRandomSite && site.dateExpire==60080,"client retains native icon/discovery/lifetime");
+Check(Msg.Lines.Count==before+1,"duplicate result announces discovery only once");
+result.Site.Apply(client);Check(ReferenceEquals(site,EClass.game.spatials.Find(site.uid)),"deferred generation packet reuses existing site");
+NetSession.Instance.Connection=host;var denied=Request();NpcNews.Resolve(host,1,denied);
+Check(!((NpcNewsResult)host.Directed.Last()).Accepted && EClass.world.region.Creates==1,"cooldown prevents simultaneous second discovery");
+npc.LastNews=0;host.Companion=true;NpcNews.Resolve(host,1,Request());host.Companion=false;
+Check(!((NpcNewsResult)host.Directed.Last()).Accepted,"AI controlled actor cannot submit dialogue action");
+remote.Distance=20;NpcNews.Resolve(host,1,Request());remote.Distance=1;
+Check(!((NpcNewsResult)host.Directed.Last()).Accepted,"distant NPC interaction rejected");
+NpcNews.Resolve(host,1,new(){Id=Guid.NewGuid(),ZoneUid=99,Npc=npc});
+Check(!((NpcNewsResult)host.Directed.Last()).Accepted,"stale-zone request rejected");
+EClass.world.region.NoSite=true;NpcNews.Resolve(host,1,Request());
+var none=(NpcNewsResult)host.Delta.Items.Last();
+Check(none.Accepted && none.Site==null && npc.LastNews==50000,"no fitting site still consumes native information cooldown");
+npc.LastNews=0;EClass.world.region.NoSite=false;EClass.world.region.Fail=true;
+try{NpcNews.Resolve(host,1,Request());throw new Exception("expected failure");}catch(InvalidOperationException){}
+Check(EClass.pc==original,"generation failure restores host player context");EClass.world.region.Fail=false;
+// Synchronous host reply and delayed client reply use the same dialogue branch.
+NpcNews.Reset();var drama=new DramaCustomSequence();var method=new DramaEventMethod();drama.events.AddRange([new(){step="_news"},method]);LayerDrama.Instance=new(){drama=drama.manager};
+NpcNewsDialoguePatch.After(drama,npc);method.action();
+Check(drama.sequence.tempEvents.Count==1 && drama.manager.lastTalk!.text=="news1Warded Cave","host dialogue replaces waiting line with native discovery topic");
+NpcNews.Reset();npc.LastNews=0;NetSession.Instance.Connection=client;
+NpcNewsDialoguePatch.After(drama,npc);drama.sequence.tempEvents.Clear();method.action();
+var waiting=drama.manager.lastTalk;var clientRequest=(NpcNewsRequest)client.Delta.Items.Last();
+NpcNews.Receive(client,new(){Id=clientRequest.Id,ZoneUid=10,Npc=npc,Accepted=true,Site=result.Site,SiteName="Warded Cave"});
+Check(drama.sequence.tempEvents.Count==1 && drama.manager.lastTalk!=waiting && drama.manager.lastTalk!.text=="news1Warded Cave","delayed client reply replaces waiting event instead of queuing behind it");
+Check(drama.manager.lastTalk!.idJump==null,"success resumes native manager.Load step to rebuild the cooldown-sensitive menu");
+NetSession.Instance.Connection=null;var solo=new DramaCustomSequence();var nativeCalls=0;var native=new DramaEventMethod{action=()=>nativeCalls++};solo.events.AddRange([new(){step="_news"},native]);NpcNewsDialoguePatch.After(solo,npc);native.action();
+Check(nativeCalls==1,"solo native news flow untouched");
+Console.WriteLine($"{checks} news checks passed; production transaction/dialogue/state code with simulated game/network boundaries.");

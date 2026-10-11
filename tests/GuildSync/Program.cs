@@ -15,6 +15,8 @@ var thiefTrial = new QuestGuild { id = "guild_thief", uid = 100, phase = 0, task
 thiefTrial.task.SetOwner(thiefTrial);
 hostGame.quests.list.Add(thiefTrial);
 Guild.Thief.relation.affinity = 42;
+hostGame.spatials.map[70] = new Zone { uid=70, id="derphy", lv=-1, influence=9 };
+clientGame.spatials.map[70] = new Zone { uid=70, id="derphy", lv=-1, influence=1 };
 var initial = GuildStateSnapshot.Capture();
 Check(ReferenceEquals(initial, GuildStateSnapshot.Capture()), "unchanged state is cached instead of serialized every tick");
 EClass.game = clientGame;
@@ -24,6 +26,7 @@ clientGame.quests.list.Add(existing);
 var unrelated = new Quest { uid = 5, id = "random" };
 clientGame.quests.list.Add(unrelated);
 initial.Apply();
+Check(((Zone)clientGame.spatials.map[70]).influence == 9, "off-map guild influence arrives with authoritative guild state");
 Check(existing.task!.num == -2 && existing.task.owner == existing && clientGame.quests.list.Contains(existing), "replica updates trial count in place and rebinds task owner");
 Check(existing.track && clientGame.quests.list.Contains(unrelated) && Guild.Thief.relation.affinity == 42, "local tracker preference and unrelated quest survive reconciliation");
 Check(!GuildQuestProgressPatch.Before(existing) && GuildQuestProgressPatch.Before(unrelated), "client replay cannot progress shared guild trial but ordinary quests are unaffected");

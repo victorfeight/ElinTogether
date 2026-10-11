@@ -41,7 +41,7 @@ public class QuestAcceptDelta : ElinDelta
                 !quest.IsVisibleOnQuestBoard()) {
                 SharedQuests.Reject(host, OriginPeer, Uid, "This quest cannot be accepted here by a client."); return;
             }
-            if (game.quests.CountRandomQuest() >= QuestManager.MaxRandomQuest) {
+            if (game.quests.CountRandomQuest() >= QuestExpansionCompat.QuestLimit) {
                 SharedQuests.Reject(host, OriginPeer, Uid, "The shared quest list is full."); return;
             }
             game.quests.Start(quest);

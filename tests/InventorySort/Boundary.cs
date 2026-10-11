@@ -6,7 +6,7 @@ public class Card
     public string id = "money";
     public bool IsHostOwned = true, isDestroyed;
     public object? parent;
-    public Card GetRootCard() => this;
+    public Card GetRootCard() => parent is Card card ? card.GetRootCard() : this;
     public bool CanStackTo(Thing to) => this != to && !isDestroyed && !to.isDestroyed && id == to.id;
     public bool TryStackTo(Thing to)
     {
@@ -15,6 +15,7 @@ public class Card
             if (CanStackTo(to)) {
                 to.Num += Num;
                 isDestroyed = true;
+                if (GetRootCard() is Chara owner && owner.held == this) owner.held = null;
                 result = true;
             }
         }
@@ -22,8 +23,11 @@ public class Card
     }
 }
 public class Thing : Card { }
+public class Chara : Card { public Card? held; }
+public static class EClass { public static Card _zone = new() { uid = 23 }; }
 public class UIInventory
 {
+    public void CheckDirty() { }
     public List<Thing> Items = new();
     public int Visits;
     public void Sort()
@@ -80,6 +84,14 @@ namespace ElinTogether.Models {
         public required Card Card;
         public required Thing To;
         public Card? Parent;
+        public int ZoneUid;
     }
 }
 namespace ElinTogether.Patches { public static class RemoteCraft { public static Card? ProductReceiver; } }
+namespace UnityEngine {
+    public enum KeyCode { LeftShift, RightShift }
+    public static class Input {
+        public static bool GetMouseButton(int button) => false;
+        public static bool GetKey(KeyCode key) => false;
+    }
+}

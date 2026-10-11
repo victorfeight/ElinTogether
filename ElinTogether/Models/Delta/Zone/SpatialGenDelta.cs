@@ -23,6 +23,28 @@ public class SpatialGenDelta : ElinDelta
     [Key(4)]
     public int Icon { get; init; }
 
+    [Key(5)] public SiteState? State { get; init; }
+
+    [MessagePackObject]
+    public sealed class SiteState
+    {
+        [Key(0)] public string? Name { get; init; }
+        [Key(1)] public int Prefix { get; init; }
+        [Key(2)] public int Danger { get; init; }
+        [Key(3)] public bool Known { get; init; }
+        [Key(4)] public bool Random { get; init; }
+        [Key(5)] public int Expires { get; init; }
+        internal void Apply(Zone zone)
+        {
+            zone.name = Name;
+            zone.idPrefix = Prefix;
+            zone._dangerLv = Danger;
+            zone.isKnown = Known;
+            zone.isRandomSite = Random;
+            zone.dateExpire = Expires;
+        }
+    }
+
     public static SpatialGenDelta Create(Zone zone)
     {
         return new() {
@@ -31,6 +53,8 @@ public class SpatialGenDelta : ElinDelta
             Pos = new() { X = zone.x, Z = zone.y },
             ParentZoneUid = zone.parent?.uid ?? -1,
             Icon = zone.icon,
+            State = new() { Name = zone.name, Prefix = zone.idPrefix, Danger = zone._dangerLv,
+                Known = zone.isKnown, Random = zone.isRandomSite, Expires = zone.dateExpire },
         };
     }
 
@@ -43,7 +67,11 @@ public class SpatialGenDelta : ElinDelta
 
         var remoteZone = game.spatials.Find(ZoneUid);
         if (remoteZone?.ZoneFullName == ZoneFullName && remoteZone.uid == ZoneUid) {
-            // we already handled this on zone data response code
+            // Creation and discovery may arrive separately; update the existing
+            // object without generating another site or replacing UI references.
+            ApplyState(remoteZone);
+            if (remoteZone.parent is Region existingRegion)
+                existingRegion.elomap.SetZone(remoteZone.x, remoteZone.y, remoteZone, true);
             return;
         }
 
@@ -57,6 +85,7 @@ public class SpatialGenDelta : ElinDelta
 
         remoteZone.lv = zoneLv;
         remoteZone.uid = ZoneUid;
+        ApplyState(remoteZone);
 
         if (game.spatials.Find(ZoneUid) is { } exist) {
             EmpLog.Warning("Zone uid {ZoneUid} taken by local zone {LocalZoneFullName}, " +
@@ -73,5 +102,11 @@ public class SpatialGenDelta : ElinDelta
         }
 
         SpatialGenEvent.HeldRefZones[ZoneUid] = remoteZone;
+    }
+
+    private void ApplyState(Zone zone)
+    {
+        zone.icon = Icon;
+        State?.Apply(zone);
     }
 }

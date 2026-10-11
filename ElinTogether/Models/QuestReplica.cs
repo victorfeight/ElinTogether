@@ -22,7 +22,9 @@ internal static class QuestReplica
         quest.task?.SetOwner(quest);
         if (index < 0) EClass.game.quests.list.Add(quest);
         else EClass.game.quests.list[index] = quest;
-        if (quest.person?.chara is { } owner) quest.SetClient(owner, assignQuest);
+        // SetClient rewrites uidClientZone from the NPC's current location.
+        // A replica must retain the saved quest origin, even if its giver moved.
+        if (assignQuest && quest.person?.chara is { } owner) owner.quest = quest;
         return quest;
     }
 }

@@ -141,3 +141,5 @@ namespace HarmonyLib {
     public class HarmonyPostfix : Attribute { }
 }
 namespace ElinTogether.Helper { public class Marker { } }
+
+namespace ElinTogether.Models { public static class QuestExpansionCompat { public static int QuestLimit = 5; public static int InvestmentCalls; public static void OnInvest() => InvestmentCalls++; } }

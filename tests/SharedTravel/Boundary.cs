@@ -38,7 +38,14 @@ public class Layer {
  public static implicit operator bool(Layer l) => !l.Closed;
 }
 public class LayerList : Layer {
+ public UIList list = new();
+ public void RefreshSize() { }
  public void SetList2<T>(ICollection<T> list, Func<T,string> name, Action<T,ItemGeneral> onClick, Action<T,ItemGeneral> onInstantiate, bool autoClose = true) { }
+}
+public class MapMetaData { }
+public class UIList {
+ public object? callbacks;
+ public class Callback<T, U> { public Action<T,U> onClick = null!; }
 }
 public static class Msg { public static List<string> Lines = []; public static string Say(string text) { Lines.Add(text);return text; } }
 public static class EmpLog { public static void Information(string text, params object?[] args) { } }
