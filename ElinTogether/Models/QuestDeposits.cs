@@ -33,9 +33,15 @@ internal sealed class QuestDeposits : EClass
         var selected = items.ToArray();
         if (NetSession.Instance.Connection is ElinNetClient client) {
             var refs = selected.Select(PendingSplit.Split).Where(t => t != null && !PendingUid.IsPending(t.Uid)).Cast<RemoteCard>().ToArray();
-            if (refs.Length > 0) client.Delta.AddRemote(new QuestDepositDelta {
-                RequestId = Guid.NewGuid(), ZoneUid = _zone.uid, QuestUid = quest.uid, Chest = owner.owner, Items = refs,
-            });
+            if (refs.Length > 0) {
+                var request = new QuestDepositDelta {
+                    RequestId = Guid.NewGuid(), ZoneUid = _zone.uid, QuestUid = quest.uid, Chest = owner.owner, Items = refs,
+                };
+                client.Delta.AddRemote(request);
+                EmpLog.Information("Quest deposit requested {Request}: quest {Quest}, chest {Chest}, items {Items}, resumedDrag {Resumed}",
+                    request.RequestId, quest.uid, owner.owner.uid,
+                    string.Join(",", refs.Select(t => $"{t.Uid}x{t.Num}")), ThingRequest.IsReplayingIntent);
+            }
         } else {
             foreach (var item in selected) if (!item.isDestroyed && owner.ShouldShowGuide(item)) owner._OnProcess(item);
         }

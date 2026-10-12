@@ -4,7 +4,7 @@ public class EClass {
     public static Game game = new(); public static Player player = new(); public static Chara pc => player.chara;
     public static Zone _zone = new(); public static Map _map = new();
 }
-public class Player { public Chara chara = new(); }
+public class Player { public Chara chara = new(); public object? returnInfo; }
 public class Game { public QuestManager quests = new(); }
 public class Zone { public int uid = 10; public Events events = new(); public HashSet<int> completedQuests = []; public void ModInfluence(int n) { } }
 public class Map { public List<Thing> things = []; }
@@ -12,6 +12,7 @@ public class Events { public List<ZoneEvent> list = []; }
 public class ZoneEvent { public virtual void OnVisit() { } public virtual void OnLeaveZone() { } public virtual void OnCharaDie(Chara c) { } public void Tick(float dt) { } }
 public class ZoneEventQuest : ZoneEvent { public int uidQuest; public void _OnTickRound() { } }
 public class ZonePreEnterEvent { public virtual void Execute() { } }
+public class ZonePreEnterOnCompleteQuestInstance : ZonePreEnterEvent { public override void Execute() { } }
 public class QuestManager {
     public const int MaxRandomQuest = 5;
     public List<Quest> list = [], globalList = []; public HashSet<string> completedIDs = [], completedTypes = [];
@@ -77,7 +78,8 @@ namespace ElinTogether.Net {
 }
 namespace ElinTogether.Models {
     public class Scope : IDisposable { public void Dispose() { } }
-    public abstract class ElinDelta : EClass { public int OriginPeer = 1; public static bool IsApplying; protected abstract void OnApply(ElinTogether.Net.ElinNetBase net); public void Apply(ElinTogether.Net.ElinNetBase n) => OnApply(n); public static IDisposable Simulate() => new Scope(); }
+    public abstract class ElinDelta : EClass { public int OriginPeer = 1; public static bool IsApplying; public static bool IsRemoteStateLanding => IsApplying && !ThingRequest.IsReplayingIntent; protected abstract void OnApply(ElinTogether.Net.ElinNetBase net); public void Apply(ElinTogether.Net.ElinNetBase n) => OnApply(n); public static IDisposable Simulate() => new Scope(); }
+    public static class ThingRequest { public static bool IsReplayingIntent; }
     public class RemoteCard(Card c) { public int Uid = c.uid; public int Num = (c as Thing)?.Num ?? 1; public Card Find() => c; public static implicit operator RemoteCard(Card c) => new(c); }
     public static class PendingSplit { public static RemoteCard Split(Card c) => new(c); }
     public static class PendingUid { public static bool IsPending(int uid) => uid < 0; }

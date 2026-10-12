@@ -8,6 +8,21 @@ using HarmonyLib;
 
 namespace ElinTogether.Patches;
 
+[HarmonyPatch(typeof(ZonePreEnterOnCompleteQuestInstance), nameof(ZonePreEnterOnCompleteQuestInstance.Execute))]
+internal static class SharedQuestInstanceReturnPatch
+{
+    [HarmonyPrefix]
+    internal static bool Before()
+    {
+        if (NetSession.Instance.Connection is not ElinNetClient) return true;
+        // Leaving an instance queues this callback locally, even on replicas.
+        // The host may already have removed the quest and its giver reference.
+        // Retain native travel cleanup; completion/failure belongs to the host.
+        EClass.player.returnInfo = null;
+        return false;
+    }
+}
+
 [HarmonyPatch]
 internal static class SharedQuestLifecyclePatch
 {

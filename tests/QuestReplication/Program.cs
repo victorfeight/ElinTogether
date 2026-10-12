@@ -41,7 +41,15 @@ Check(!SharedQuestLifecyclePatch.Before(fresh) && !SharedQuestLifecyclePatch.Bef
 Check(SharedQuestLifecyclePatch.Before(story) && SharedQuestLifecyclePatch.Before(guild),"existing story and guild ownership paths left intact");
 Check(!SharedQuestEventAuthorityPatch.Before(new ZoneEventQuest()) && SharedQuestEventAuthorityPatch.Before(new ZoneEvent()),"only quest events blocked on replica");
 Check(!QuestExpansionPreEnterPatch.Before(),"client cannot execute expansion ambush spawn or decision callbacks");
+EClass.player.returnInfo = new object();
+Check(!SharedQuestInstanceReturnPatch.Before() && EClass.player.returnInfo == null,
+    "client instance return skips completion after quest removal while retaining native travel cleanup");
+NetSession.Instance.Connection=host;
+var returnInfo = EClass.player.returnInfo = new object();
+Check(SharedQuestInstanceReturnPatch.Before() && EClass.player.returnInfo == returnInfo,
+    "host retains native instance success/failure processing");
 NetSession.Instance.Connection=null;
+Check(SharedQuestInstanceReturnPatch.Before(), "solo instance return retains native processing");
 Check(SharedQuestLifecyclePatch.Before(fresh) && SharedQuestEventAuthorityPatch.Before(new ZoneEventQuest()) && QuestExpansionPreEnterPatch.Before(),"solo lifecycle unchanged");
 NetSession.Instance.Connection=host;
 Check(QuestExpansionCompat.QuestLimit==5,"optional expansion absent falls back to native limit");
@@ -92,6 +100,19 @@ Check(!QuestDepositPatch.Before(new(chest),clientItem) && client.Delta.Items.Cou
 ElinDelta.IsApplying=true;
 Check(!QuestDepositPatch.Before(new(chest),clientItem) && client.Delta.Items.Count==1,
     "replay cannot queue a new deposit or consume again");
+ThingRequest.IsReplayingIntent=true;
+Check(!QuestDepositPatch.Before(new(chest),clientItem) && client.Delta.Items.Count==2 && !clientItem.isDestroyed,
+    "host-confirmed player drag submits delivery during delta application without consuming locally");
+var resumedDeposit = (QuestDepositDelta)client.Delta.Items.Last();
+NetSession.Instance.Connection=host;
+var beforeDelivery=harvest.weightDelivered;
+resumedDeposit.Apply(host); resumedDeposit.Apply(host);
+Check(clientItem.isDestroyed && harvest.weightDelivered==beforeDelivery+30,
+    "resumed delivery reaches host and consumes selected stack exactly once");
+NetSession.Instance.Connection=client;
+ThingRequest.IsReplayingIntent=false;
+client.Delta.Items.RemoveAt(1);
+clientItem=Item(54);
 ElinDelta.IsApplying=false;
 var grid=new LayerDragGrid(); EClass.player.chara=remote;
 QuestBulkDepositPatch.After(grid,new InvOwnerDeliver(chest)); grid.buttonDeliver.Action!();
@@ -110,6 +131,12 @@ using var native=ModuleDefinition.ReadModule(args[0]); using var mod=ModuleDefin
 IEnumerable<TypeDefinition> All(TypeDefinition t) => new[]{t}.Concat(t.NestedTypes.SelectMany(All));
 MethodDefinition Method(ModuleDefinition m,string type,string method) => m.Types.SelectMany(All).Single(t=>t.FullName==type).Methods.Single(x=>x.Name==method);
 string[] Calls(MethodDefinition m) => m.Body.Instructions.Where(i=>i.Operand is MethodReference).Select(i=>((MethodReference)i.Operand).Name).ToArray();
+Check(Calls(Method(native,"ZoneInstanceRandomQuest","OnLeaveZone")).Contains("AddPreEnter"),
+    "installed vanilla instance exit queues the completion callback");
+var instanceReturn = Method(native,"ZonePreEnterOnCompleteQuestInstance","Execute");
+Check(Calls(instanceReturn).Contains("Complete") && Calls(instanceReturn).Contains("Fail") &&
+    instanceReturn.Body.Instructions.Any(i => i.OpCode.Code == Mono.Cecil.Cil.Code.Stfld && i.Operand is FieldReference {Name:"returnInfo"}),
+    "installed completion callback owns success/failure and returnInfo cleanup");
 Check(Calls(Method(mod,"RandomQuestExpantion.Patch.DramaPatch","HandleOnInvestShopEvent")).Contains("ForeachReverse"),"installed mod has its native investment dispatch callback");
 Check(Method(mod,"RandomQuestExpantion.Config.ModConfig","get_MaxQuestLimit").ReturnType.FullName=="System.Int32","installed quest limit adapter has correct signature");
 Check(Calls(Method(mod,"RandomQuestExpantion.ModQuests.Common.QuestRiskyDeliver","ShouldOverrideEncounter")).Count(n=>n=="ListDestThing")==1,"risky delivery has one inventory query; native probability retained");

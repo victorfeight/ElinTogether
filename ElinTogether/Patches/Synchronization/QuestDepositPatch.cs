@@ -12,7 +12,9 @@ internal static class QuestDepositPatch
     internal static bool Before(InvOwnerDeliver __instance, Thing t)
     {
         if (__instance.mode != InvOwnerDeliver.Mode.Crop || NetSession.Instance.Connection is not ElinNetClient) return true;
-        if (!ElinDelta.IsApplying) QuestDeposits.Submit(__instance, [t]);
+        // A ThingRequest response resumes the player's original transaction
+        // inside delta application. It is input, not a replayed host outcome.
+        if (!ElinDelta.IsRemoteStateLanding) QuestDeposits.Submit(__instance, [t]);
         return false;
     }
     [HarmonyPostfix]
