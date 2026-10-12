@@ -26,7 +26,10 @@ public abstract partial class ElinNetBase : EMono
 
 #if !DEBUG
         if (!HarmonyLib.Harmony.HasAnyPatches(ModInfo.Guid)) {
+            var patchTimer = System.Diagnostics.Stopwatch.StartNew();
+            EmpLog.Information("Installing multiplayer Harmony patches before connection startup");
             EmpMod.SharedHarmony.PatchAll(EmpMod.Assembly);
+            EmpLog.Information("Multiplayer Harmony patches ready after {ElapsedMs} ms", patchTimer.ElapsedMilliseconds);
         }
 #endif
     }

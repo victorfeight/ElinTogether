@@ -11,10 +11,10 @@ namespace ElinTogether.Models;
 // Optional adapter: no hard dependency on the quest mod, no copies of its rules.
 internal static class QuestExpansionCompat
 {
-    internal static Assembly? Assembly => AppDomain.CurrentDomain.GetAssemblies()
+    internal static readonly Assembly? Assembly = AppDomain.CurrentDomain.GetAssemblies()
         .FirstOrDefault(a => a.GetName().Name == "RandomQuestExpantion");
-    internal static IEnumerable<Type> Types => typeof(Quest).Assembly.GetTypes()
-        .Concat(Assembly?.GetTypes() ?? []);
+    internal static readonly Type[] Types = typeof(Quest).Assembly.GetTypes()
+        .Concat(Assembly?.GetTypes() ?? []).ToArray();
     internal static MethodInfo? Method(string type, string name) =>
         Assembly?.GetType("RandomQuestExpantion." + type) is { } t ? AccessTools.Method(t, name) : null;
     internal static bool IsQuestEvent(ZoneEvent evt) => evt is ZoneEventQuest ||

@@ -10,7 +10,9 @@ namespace ElinTogether.Net;
 
 internal partial class ElinNetClient : ElinNetBase
 {
-    private DateTime _lastTimeout = DateTime.Now;
+    // Awake installs Harmony patches synchronously. Start the network wait
+    // budget only when this component can actually process Steam callbacks.
+    private DateTime? _lastTimeout;
     private bool _reportedReceiveStall;
 
     public override bool IsHost => false;
@@ -19,6 +21,7 @@ internal partial class ElinNetClient : ElinNetBase
 
     protected override void Update()
     {
+        _lastTimeout ??= DateTime.Now;
         base.Update();
 
         if (IsConnected) {
@@ -47,7 +50,7 @@ internal partial class ElinNetClient : ElinNetBase
         }
 
 #if !DEBUG
-        var elapsed = DateTime.Now - _lastTimeout;
+        var elapsed = DateTime.Now - _lastTimeout.Value;
         if (elapsed.TotalSeconds > EmpConfig.Policy.Timeout.Value) {
             EmpPop.Information("emp_ui_timeout".lang());
             Session.ResetSession();

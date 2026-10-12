@@ -1,0 +1,21 @@
+using Mono.Cecil;
+using Mono.Cecil.Cil;
+using var module=ModuleDefinition.ReadModule(args.Single());
+int checks=0;
+void Check(bool ok,string why) { if(!ok) throw new Exception(why); Console.WriteLine("PASS "+why); checks++; }
+var client=module.Types.Single(t=>t.Name=="ElinNetClient");
+var clock=client.Fields.Single(f=>f.Name=="_lastTimeout");
+Check(clock.FieldType is GenericInstanceType {ElementType.Name:"Nullable`1"},"timeout clock is initially unarmed");
+Check(!client.Methods.Where(m=>m.IsConstructor).SelectMany(m=>m.Body.Instructions).Any(i=>i.Operand is FieldReference f && f.Name==clock.Name),"constructing component cannot spend timeout budget during synchronous Awake patching");
+var update=client.Methods.Single(m=>m.Name=="Update").Body.Instructions;
+var baseUpdate=update.Single(i=>i.Operand is MethodReference {Name:"Update",DeclaringType.Name:"ElinNetBase"});
+var initialWrite=update.First(i=>i.OpCode==OpCodes.Stfld && i.Operand is FieldReference {Name:"_lastTimeout"});
+Check(initialWrite.Offset<baseUpdate.Offset,"first Update arms timeout before polling and timeout evaluation");
+Check(update.TakeWhile(i=>i!=initialWrite).Any(i=>i.Operand is MethodReference {Name:"get_HasValue"}),"subsequent updates do not continually restart the timeout");
+var join=client.Methods.Single(m=>m.Name=="TryJoinCurrentLobbyGame");
+Check(join.Body.Instructions.Any(i=>i.OpCode==OpCodes.Stfld && i.Operand is FieldReference {Name:"_lastTimeout"}),"explicit join still grants a fresh network wait budget");
+Check(update.Any(i=>i.Operand is MethodReference {Name:"ResetSession"}),"real connection timeouts remain enforced");
+var compat=module.Types.Single(t=>t.Name=="QuestExpansionCompat");
+Check(compat.Fields.Single(f=>f.Name=="Assembly").IsInitOnly && compat.Fields.Single(f=>f.Name=="Types").IsInitOnly,"optional mod assembly and type discovery cached once");
+Check(compat.Methods.Where(m=>!m.IsConstructor && m.HasBody).All(m=>!m.Body.Instructions.Any(i=>i.Operand is MethodReference {Name:"GetAssemblies" or "GetTypes"})),"quest patch filtering and runtime callbacks do not repeat assembly scans");
+Console.WriteLine($"{checks} compiled startup boundary checks passed; live Steam retry still required.");
