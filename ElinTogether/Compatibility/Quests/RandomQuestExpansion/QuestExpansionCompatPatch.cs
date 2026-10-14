@@ -66,18 +66,3 @@ internal static class QuestExpansionPreEnterPatch
     [HarmonyPostfix]
     internal static void After() => RandomQuestStateSnapshot.MarkDirty();
 }
-
-[HarmonyPatch]
-internal static class QuestExpansionThiefRewardPatch
-{
-    internal static IEnumerable<MethodBase> TargetMethods()
-    {
-        if (QuestExpansionCompat.Method("ModQuests.ThiefGuild.QuestTGRiskyEscort", "OnDropReward") is { } method) yield return method;
-    }
-    // Correct the mod's mistaken destination, preserving its native reward flow.
-    [HarmonyTranspiler]
-    internal static IEnumerable<CodeInstruction> Transpile(IEnumerable<CodeInstruction> instructions) =>
-        Transpilers.MethodReplacer(instructions,
-            QuestExpansionCompat.Method("General.General", "get_MerchantGuildZone"),
-            QuestExpansionCompat.Method("General.General", "get_ThiefGuildZone"));
-}

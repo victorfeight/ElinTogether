@@ -9,11 +9,13 @@
     <Compile Include="../../ElinTogether/Patches/Synchronization/QuestDepositPatch.cs" Link="QuestDepositPatch.cs" />
     <Compile Include="../../ElinTogether/Models/QuestDeposits.cs" Link="QuestDeposits.cs" />
     <Compile Include="../../ElinTogether/Models/QuestAbandonment.cs" Link="QuestAbandonment.cs" />
-    <Compile Include="../../ElinTogether/Models/QuestSkillOwner.cs" Link="QuestSkillOwner.cs" />
-    <Compile Include="../../ElinTogether/Patches/Synchronization/QuestBoardCompatPatch.cs" Link="QuestBoardCompatPatch.cs" />
+    <Compile Include="../../ElinTogether/Compatibility/Quests/QuestBoardExpansion/QuestSkillOwner.cs" Link="QuestSkillOwner.cs" />
+    <Compile Include="../../ElinTogether/Compatibility/Quests/QuestBoardExpansion/QuestBoardCompatPatch.cs" Link="QuestBoardCompatPatch.cs" />
     <Compile Include="../../ElinTogether/Helper/OverrideMethodComparer.cs" Link="OverrideMethodComparer.cs" />
-    <Compile Include="../../ElinTogether/Models/QuestExpansionCompat.cs" Link="QuestExpansionCompat.cs" />
+    <Compile Include="../../ElinTogether/Compatibility/Quests/QuestExpansionCompat.cs" Link="QuestExpansionCompat.cs" />
     <Compile Include="../../ElinTogether/Patches/Synchronization/SharedQuestLifecyclePatch.cs" Link="SharedQuestLifecyclePatch.cs" />
-    <Compile Include="../../ElinTogether/Patches/Synchronization/QuestExpansionCompatPatch.cs" Link="QuestExpansionCompatPatch.cs" />
+    <Compile Include="../../ElinTogether/Compatibility/Quests/RandomQuestExpansion/QuestExpansionCompatPatch.cs" Link="QuestExpansionCompatPatch.cs" />
+    <Compile Include="../../ElinTogether/Compatibility/Quests/QuestExpansionWorldMutationPatch.cs" Link="QuestExpansionWorldMutationPatch.cs" />
+    <Compile Include="../../ElinTogether/Compatibility/Quests/RandomQuestExpansion/QuestExpansionThiefRewardPatch.cs" Link="QuestExpansionThiefRewardPatch.cs" />
   </ItemGroup>
 </Project>
