@@ -50,7 +50,7 @@ It's intended. Only the host player can change maps.
 
 ### Client players can't advance some quests.
 
-It's intended. You may get errors as a client player. Only the host player can actually advance quests.
+In this fork, supported client quest actions are requests to the host, which owns the shared quest state. This includes supported quest-board and expansion actions; it does not make every custom quest script safe to execute on a client. See the compatibility index below for the adapter boundaries.
 
 ### Client players may see ghost items that can't be interacted with.
 
@@ -62,7 +62,27 @@ Restart the game to clean up the Steam connections.
 
 ### Is this compatible with X mod?
 
-We are not providing mod compatibility support right now. If issues occur, try removing the mod in question first.
+This fork includes the optional integrations below. They cover specific actions, not blanket compatibility with every version or feature of a mod. Both peers should use matching game, EMP, and gameplay-mod builds.
+
+#### Compatibility source index
+
+| Mod / integration | Entry points | Scope and boundary |
+| --- | --- | --- |
+| AutoAct | [Adapters](ElinTogether/Compatibility/AutoAct), [custom-step requests](ElinTogether/Models/Delta/Act/AutoActStepDelta.cs), [pour-water serializer](ElinTogether/Models/Delta/Task/TaskPourWaterArgs.cs) | Client action selection uses existing host-authoritative task execution. Custom cleaning, watering, refill, disarm and chat steps have validated requests; building waits for the host result. Mod-specific pour-water depth stays in its task serializer. |
+| AutoAct Ally Expansion | [Assignment guard](ElinTogether/Compatibility/AutoActAllyExpansion/AutoActAllyGuard.cs) | Only the host assigns ally AI. Connected human players are excluded unless companion control is active. This is separate from a client's own AutoAct controller. |
+| RandomQuest & GuildQuest Expansion Pack (`RandomQuestExpantion`) | [Adapters](ElinTogether/Compatibility/Quests/RandomQuestExpansion) | Host-owned quest callbacks and synchronized results. Includes an isolated thief-reward correction for the supported mod implementation. |
+| Quest Board Expansion (`QuestPack`) | [Adapters](ElinTogether/Compatibility/Quests/QuestBoardExpansion) | Host-owned callbacks, shared quest results and persisted timed-skill participant ownership. |
+| Both quest expansions | [Shared compatibility checks](ElinTogether/Compatibility/Quests/QuestExpansionCompat.cs), [world mutations](ElinTogether/Compatibility/Quests/QuestExpansionWorldMutationPatch.cs) | Shared adapter plumbing; ordinary quest replication remains in core. Custom drama and instance execution still belong to the host. |
+| TpMagicAppendix | [Cast interception](ElinTogether/Patches/Compatibility/TpMagicAppendixPatch.cs), [spell bridge](ElinTogether/Models/TpSpellBridge.cs) | Explicit spell ID/alias allowlist. Executes native effects on the host and publishes results; unrelated spells are not automatically covered. |
+| Quest timer UI | [Quest widget synchronization](ElinTogether/Models/QuestEventWidgetSync.cs) | Replicates host quest-event presentation rather than running the host's quest events on the client. |
+| More Notifications / affinity UI | [Social notification hook](ElinTogether/Models/SocialNotifications.cs) | Emits confirmed client affinity changes for an optional UI subscriber. The subscriber lives outside EMP; initial loading does not emit affinity gains. |
+| TpHugeShippingContainer | [Separate compatibility rebuild](compat/TpHugeShippingContainer/README.md) | Standalone mod correction, not automatically installed or enabled by EMP. Its own README records its target version. |
+
+YKFramework is a required dependency, not an optional adapter. General inventory, terrain, container and quest synchronization stays in core even where a third-party mod exposed the original problem. Such fixes are not a promise of complete support for every mod that uses those systems.
+
+AutoAct adapter checks live in [AutoActSolo](tests/AutoActSolo) and [AutoActSteps](tests/AutoActSteps); quest adapter checks live in [QuestReplication](tests/QuestReplication). These regression checks complement in-game host/client testing; they do not certify future third-party updates.
+
+For maintenance, keep optional hooks under `Compatibility/<mod>` as they are organized, keep shared authority and packet schemas in core, and retain existing type identities when moving files. The TpMagicAppendix paths above still use the older layout. Avoid duplicating generic synchronization inside individual adapters.
 
 ## Report Bugs & Feature Requests
 

@@ -3,9 +3,9 @@
 <ItemGroup>
 <Compile Include="../../ElinTogether/Models/SocialNotifications.cs" Link="SocialNotifications.cs" />
 <Compile Include="../../ElinTogether/Models/Delta/Act/AutoActStepDelta.cs" Link="AutoActStepDelta.cs" />
-<Compile Include="../../ElinTogether/Patches/DeltaEvents/Chara/AutoActAllyGuard.cs" Link="AutoActAllyGuard.cs" />
+<Compile Include="../../ElinTogether/Compatibility/AutoActAllyExpansion/AutoActAllyGuard.cs" Link="AutoActAllyGuard.cs" />
 <Compile Include="../../ElinTogether/Models/Delta/Task/TaskPourWaterArgs.cs" Link="TaskPourWaterArgs.cs" />
-<Compile Include="../../ElinTogether/Patches/Compatibility/AutoActCustomActions.cs" Link="AutoActCustomActions.cs" />
+<Compile Include="../../ElinTogether/Compatibility/AutoAct/AutoActCustomActions.cs" Link="AutoActCustomActions.cs" />
 <Compile Include="../../ElinTogether/Models/Delta/Task/TaskDigArgs.cs" Link="TaskDigArgs.cs" />
 <Compile Include="../../ElinTogether/Models/Delta/Task/TaskPlowArgs.cs" Link="TaskPlowArgs.cs" />
 <Compile Include="../../ElinTogether/Models/Delta/Task/TaskDrawWaterArgs.cs" Link="TaskDrawWaterArgs.cs" />

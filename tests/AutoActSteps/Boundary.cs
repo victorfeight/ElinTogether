@@ -106,3 +106,9 @@ namespace ElinTogether.Models {internal static class SocialInteractions {
   finally{EClass.game.player.chara=pc;Affinity.CC=affinity;}
  }
 }}
+
+// This suite exercises ordinary reading; travel authorization is covered by
+// tests/SharedTravel. Keep the unrelated travel boundary out of AutoAct tests.
+namespace ElinTogether.Models {internal static class SharedTravel {
+ internal static bool IsTravel(Card? target) => false;
+}}
