@@ -138,6 +138,7 @@ namespace ElinTogether.Models;
 [Union(807, typeof(GuildActionDelta))]
 [Union(808, typeof(QuestDeliverDelta))]
 [Union(809, typeof(QuestDepositDelta))]
+[Union(810, typeof(QuestAbandonDelta))]
 // Act
 [Union(900, typeof(ActThrowDelta))]
 [Union(901, typeof(AutoActStepDelta))]

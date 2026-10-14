@@ -4,8 +4,9 @@ public class EClass {
     public static Game game = new(); public static Player player = new(); public static Chara pc => player.chara;
     public static Zone _zone = new(); public static Map _map = new();
 }
-public class Player { public Chara chara = new(); public object? returnInfo; }
-public class Game { public QuestManager quests = new(); }
+public class Player { public Chara chara = new(); public object? returnInfo; public Dictionary<string,int> dialogFlags = []; }
+public class Game { public QuestManager quests = new(); public Cards cards = new(); }
+public class Cards : Dictionary<int,Chara> { public Chara? Find(int uid) => this.GetValueOrDefault(uid); }
 public class Zone { public int uid = 10; public Events events = new(); public HashSet<int> completedQuests = []; public void ModInfluence(int n) { } }
 public class Map { public List<Thing> things = []; }
 public class Events { public List<ZoneEvent> list = []; }
@@ -26,10 +27,10 @@ public class Quest {
     [JsonProperty] public int counter;
     [JsonProperty] public bool track, isNew;
     [JsonProperty] public QuestTask? task;
-    public bool IsRandomQuest = true, Guild;
+    public bool IsRandomQuest = true, Guild; public bool CanAbandon = true, UseInstanceZone; public int Failures; public string GetTitle() => "quest";
     public Person person = new(); public Chara? chara => person.chara; public Zone? ClientZone;
     public void SetClient(Chara c, bool assign) { person.chara = c; if(assign) c.quest = this; }
-    public void Fail() { } public void CompleteTask() { } public virtual void OnEnterZone() { } public virtual void OnStart() { }
+    public void Start() { } public void Complete() { } public void Fail() { Failures++; EClass.game.quests.Remove(this); } public void CompleteTask() { } public virtual void OnEnterZone() { } public virtual void OnStart() { }
 }
 public class QuestHarvest : Quest { public int weightDelivered; }
 public class QuestDeliver : Quest {
@@ -83,7 +84,7 @@ namespace ElinTogether.Models {
     public class RemoteCard(Card c) { public int Uid = c.uid; public int Num = (c as Thing)?.Num ?? 1; public Card Find() => c; public static implicit operator RemoteCard(Card c) => new(c); }
     public static class PendingSplit { public static RemoteCard Split(Card c) => new(c); }
     public static class PendingUid { public static bool IsPending(int uid) => uid < 0; }
-    public static class SharedQuests { public static Chara? Actor(ElinTogether.Net.ElinNetHost h,int peer,int zone) => h.Accept && zone == EClass._zone.uid ? h.ActiveRemoteCharas.GetValueOrDefault(peer) : null; }
+    public static class SharedQuests { public static void Reject(ElinTogether.Net.ElinNetHost h,int p,int q,string reason) { } public static Chara? Actor(ElinTogether.Net.ElinNetHost h,int peer,int zone) => h.Accept && zone == EClass._zone.uid ? h.ActiveRemoteCharas.GetValueOrDefault(peer) : null; }
     public static class GuildStateSnapshot { public static bool IsGuildQuest(Quest q) => q.Guild; public static void MarkDirty() { } }
     public class LZ4Bytes {
         private object? data; public static int Captures;
@@ -92,3 +93,14 @@ namespace ElinTogether.Models {
     }
 }
 namespace ElinTogether.Patches { public static class MsgRelayContext { public static IDisposable RedirectTo(Chara c) => new Scope(); } }
+
+namespace ElinTogether.Models { public static class PersonalKarma { public static IDisposable For(Chara c) => new Scope(); } }
+namespace EModding.Helper { public static class DerivedExtensions { public static IEnumerable<Type> OfDerived(this IEnumerable<Type> ts, Type type) => ts.Where(type.IsAssignableFrom); } }
+namespace EModding.Helper.Runtime {
+ public static class TypeQualifier { public static Type[] Declared = []; }
+ public static class ReflectionExtensions { public static bool IsDeclaredMember(this System.Reflection.MethodInfo method) => method.DeclaringType == method.ReflectedType; }
+}
+
+public static class EmpPop { public static void Information(string text) { } }
+public static class TextExt { public static string lang(this string text) => text; }
+public static class Msg { public static void Say(string text,string title) { } }

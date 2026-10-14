@@ -33,7 +33,7 @@ internal static class SharedQuestLifecyclePatch
         .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly))
         .Where(m => !m.IsAbstract && !m.ContainsGenericParameters &&
             (m.Name is "Fail" or "CompleteTask" or "OnEnterZone" or "OnFail" or "OnComplete" or "OnCompleteTask" or "OnKillChara" or "OnGiveItem" or "OnModKarma" or "OnStart" or "OnChangePhase" ||
-             (m.DeclaringType?.Assembly == QuestExpansionCompat.Assembly && m.Name.StartsWith("On", StringComparison.Ordinal) && m.Name != "OnInit" && m.Name != "OnGetDetail")))
+             (QuestExpansionCompat.IsExpansion(m.DeclaringType?.Assembly) && m.Name.StartsWith("On", StringComparison.Ordinal) && m.Name != "OnInit" && m.Name != "OnGetDetail")))
         .Distinct();
 
     [HarmonyPrefix]
@@ -63,7 +63,7 @@ internal static class SharedQuestEventAuthorityPatch
 {
     internal static IEnumerable<MethodBase> TargetMethods() => QuestExpansionCompat.Types
         .Where(t => t == typeof(ZoneEvent) || typeof(ZoneEventQuest).IsAssignableFrom(t) ||
-            (t.Assembly == QuestExpansionCompat.Assembly && typeof(ZoneEvent).IsAssignableFrom(t)))
+            (QuestExpansionCompat.IsExpansion(t.Assembly) && typeof(ZoneEvent).IsAssignableFrom(t)))
         .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly))
         .Where(m => !m.IsAbstract && m.Name is "Tick" or "OnVisit" or "OnLeaveZone" or "OnCharaDie" or "OnTickRound" or "_OnTickRound" or "OnFirstTick" or "OnKill")
         .Distinct();

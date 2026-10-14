@@ -13,12 +13,18 @@ internal static class QuestExpansionCompat
 {
     internal static readonly Assembly? Assembly = AppDomain.CurrentDomain.GetAssemblies()
         .FirstOrDefault(a => a.GetName().Name == "RandomQuestExpantion");
+    internal static readonly Assembly? BoardAssembly = AppDomain.CurrentDomain.GetAssemblies()
+        .FirstOrDefault(a => a.GetName().Name == "QuestPack");
+    internal static bool IsExpansion(Assembly? assembly) => assembly != null &&
+        (assembly == Assembly || assembly == BoardAssembly);
     internal static readonly Type[] Types = typeof(Quest).Assembly.GetTypes()
-        .Concat(Assembly?.GetTypes() ?? []).ToArray();
+        .Concat(Assembly?.GetTypes() ?? []).Concat(BoardAssembly?.GetTypes() ?? []).ToArray();
+    internal static MethodInfo? BoardMethod(string type, string name) =>
+        BoardAssembly?.GetType("QuestPack." + type) is { } t ? AccessTools.Method(t, name) : null;
     internal static MethodInfo? Method(string type, string name) =>
         Assembly?.GetType("RandomQuestExpantion." + type) is { } t ? AccessTools.Method(t, name) : null;
     internal static bool IsQuestEvent(ZoneEvent evt) => evt is ZoneEventQuest ||
-        (evt.GetType().Assembly == Assembly && evt.GetType().Namespace == "RandomQuestExpantion.ModQuestEvent");
+        IsExpansion(evt.GetType().Assembly);
     internal static int QuestLimit => Method("Config.ModConfig", "get_MaxQuestLimit")?.Invoke(null, null) is int limit
         ? limit : QuestManager.MaxRandomQuest;
     internal static void OnInvest() => Method("Patch.DramaPatch", "HandleOnInvestShopEvent")?.Invoke(null, null);

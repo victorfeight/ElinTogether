@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Collections.Generic;
 using ElinTogether.Net;
 using MessagePack;
 
@@ -14,6 +15,8 @@ public class RandomQuestStateSnapshot : EClass
     [Key(2)] public string[] CompletedIds { get; set; } = [];
     [Key(3)] public string[] CompletedTypes { get; set; } = [];
     [Key(4)] public int[] AssignedQuestUids { get; set; } = [];
+
+    [Key(5)] public Dictionary<int, int> SkillOwners { get; set; } = [];
 
     private static RandomQuestStateSnapshot? _cached;
     private static bool _dirty = true;
@@ -32,6 +35,7 @@ public class RandomQuestStateSnapshot : EClass
         if (!_dirty && _cached is not null) return _cached;
         _cached = new() {
             Revision = ++_revision,
+            SkillOwners = QuestSkillOwner.Capture(),
             Quests = game.quests.list.Where(Includes).Select(LZ4Bytes.Create).ToArray(),
             AssignedQuestUids = game.quests.list.Where(q => Includes(q) && q.person?.chara?.quest == q).Select(q => q.uid).ToArray(),
             CompletedIds = game.quests.completedIDs.ToArray(),
@@ -44,6 +48,7 @@ public class RandomQuestStateSnapshot : EClass
     {
         if (NetSession.Instance.Connection is not ElinNetClient || Revision <= _applied) return;
         var incoming = Quests.Select(q => q.Decompress<Quest>()).Where(Includes).ToArray();
+        QuestSkillOwner.Apply(SkillOwners);
         var active = incoming.Select(q => q.uid).ToHashSet();
         // Failure/removal is bookkeeping on replicas: no fame, karma, release,
         // confiscation or rewards are executed a second time here.

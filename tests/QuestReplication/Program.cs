@@ -6,9 +6,58 @@ using Mono.Cecil;
 using System.Reflection.Emit;
 int checks=0;
 void Check(bool ok,string why) { if(!ok) throw new Exception(why); Console.WriteLine("PASS "+why); checks++; }
+// Load a separate optional mod assembly before the production adapter initializes.
+var boardModule = System.Reflection.Emit.AssemblyBuilder.DefineDynamicAssembly(new System.Reflection.AssemblyName("QuestPack"), System.Reflection.Emit.AssemblyBuilderAccess.Run).DefineDynamicModule("QuestPack");
+var timedBuilder = boardModule.DefineType("QuestPack.Quests.QuestTimedSkill", System.Reflection.TypeAttributes.Public, typeof(Quest));
+foreach (var name in new[] { "OnAdvanceHour", "CheckQuestStatus" }) {
+    var method = timedBuilder.DefineMethod(name, System.Reflection.MethodAttributes.Public, typeof(void), Type.EmptyTypes);
+    method.GetILGenerator().Emit(OpCodes.Ret);
+}
+var timedType = timedBuilder.CreateType()!;
+var skillQuest = (Quest)Activator.CreateInstance(timedType)!; skillQuest.uid = 987;
 var host = new ElinNetHost(); var client = new ElinNetClient();
 NetSession.Instance.Connection = host;
 var local = EClass.pc; local.uid=1; var remote = new Chara { uid=2 }; host.ActiveRemoteCharas[1]=remote;
+EClass.game.cards[remote.uid] = remote;
+EClass.player.chara = remote;
+QuestSkillOwner.Bind(skillQuest);
+EClass.player.chara = local;
+Check(QuestSkillOwner.Actor(skillQuest) == remote, "timed quest keeps accepting character after host actor is restored");
+EClass.game.quests.list.Add(skillQuest);
+var savedOwners = QuestSkillOwner.Capture();
+Check(savedOwners[987] == 2, "timed participant is captured from native saved world flags");
+EClass.player.dialogFlags.Clear(); QuestSkillOwner.Apply(savedOwners);
+Check(QuestSkillOwner.Actor(skillQuest) == remote, "participant survives snapshot restoration independently of current PC");
+Check(QuestSkillOwner.Enter(skillQuest, out var skillScope) && EClass.pc == remote, "timed completion runs as participant");
+try { throw new InvalidOperationException(); } catch (InvalidOperationException) { QuestSkillExecutionPatch.Finalizer(skillScope); }
+Check(EClass.pc == local, "actor context restored through finalizer after exception");
+EClass.game.cards.Clear();
+Check(!QuestSkillOwner.Enter(skillQuest, out _) && EClass.pc == local, "missing participant never redirects XP or cleanup to host");
+EClass.game.cards[remote.uid] = remote;
+NetSession.Instance.Connection = client;
+Check(!QuestSkillOwner.Enter(skillQuest, out _), "client cannot execute timed completion");
+Check(!QuestExpansionWorldMutationPatch.Before(), "client cannot run mod hourly or guild world setup callbacks");
+NetSession.Instance.Connection = host;
+Check(QuestExpansionWorldMutationPatch.Before(), "host retains expansion world setup");
+Check(SharedQuestLifecyclePatch.TargetMethods().Any(m => m.DeclaringType == timedType && m.Name == "OnAdvanceHour"), "second mod hourly lifecycle method included in existing guard");
+var module2 = System.Reflection.Emit.AssemblyBuilder.DefineDynamicAssembly(new System.Reflection.AssemblyName("OtherQuestMod"), System.Reflection.Emit.AssemblyBuilderAccess.Run).DefineDynamicModule("OtherQuestMod");
+var type2 = module2.DefineType("OtherTimedQuest", System.Reflection.TypeAttributes.Public, typeof(Quest));
+var method2 = type2.DefineMethod("OnAdvanceHour", System.Reflection.MethodAttributes.Public, typeof(void), Type.EmptyTypes); method2.GetILGenerator().Emit(OpCodes.Ret);
+var otherType = type2.CreateType()!;
+var m1 = timedType.GetMethod("OnAdvanceHour")!; var m2 = otherType.GetMethod("OnAdvanceHour")!;
+Check(m1.MetadataToken == m2.MetadataToken && !ElinTogether.Helper.OverrideMethodComparer.Default.Equals(m1,m2), "equal metadata tokens in different mod DLLs remain distinct");
+EClass.game.quests.list.Clear();
+var abandoned = new Quest { uid = 812 }; EClass.game.quests.list.Add(abandoned);
+var abandonRequest = new QuestAbandonDelta { QuestUid = 812, ZoneUid = EClass._zone.uid };
+abandonRequest.Apply(host); abandonRequest.Apply(host);
+Check(abandoned.Failures == 1 && EClass.pc == local, "abandonment executes native failure exactly once and restores host actor");
+var cannotAbandon = new Quest { uid = 813, UseInstanceZone = true }; EClass.game.quests.list.Add(cannotAbandon);
+new QuestAbandonDelta { QuestUid = 813, ZoneUid = EClass._zone.uid }.Apply(host);
+Check(cannotAbandon.Failures == 0, "client abandonment cannot bypass instance travel ownership");
+cannotAbandon.UseInstanceZone = false;
+new QuestAbandonDelta { QuestUid = 813, ZoneUid = -1 }.Apply(host);
+Check(cannotAbandon.Failures == 0, "stale-zone abandonment cannot mutate shared quest");
+EClass.game.quests.list.Clear();
 var originOwner = new Chara { uid=123 };
 var originQuest = new Quest { uid=1234, person=new() { chara=originOwner } };
 QuestReplica.Apply(originQuest, true);
@@ -150,4 +199,18 @@ Check(Calls(Method(native,"InvOwnerDeliver","_OnProcess")).Contains("Destroy"),"
 var bulkCallback=native.Types.Single(t=>t.Name=="LayerDragGrid").NestedTypes.SelectMany(All).SelectMany(t=>t.Methods).Where(m=>m.HasBody).Any(m=>m.Body.Instructions.Any(i=>i.Operand is FieldReference {Name:"weightDelivered"}));
 Check(bulkCallback,"native bulk UI directly writes progress and needs the unified transaction adapter");
 Check(Calls(Method(mod,"RandomQuestExpantion.General.DramaWrapper","Release")).Contains("CleanArgumentsAndResults"),"drama release is a stable completion boundary for direct rescue callback fields");
+if (args.Length > 2) {
+    using var board = ModuleDefinition.ReadModule(args[2]);
+    Check(Calls(Method(board,"QuestPack.Quests.QuestTimedSkill","get_Chara")).Contains("get_pc"), "installed timed quest resolves actor through the adapter's single getter");
+    Check(Calls(Method(board,"QuestPack.Quests.QuestTimedSkill","CheckQuestStatus")).Contains("Complete") &&
+          Calls(Method(board,"QuestPack.Quests.QuestTimedSkill","CheckQuestStatus")).Contains("Fail"), "installed timed status reaches scoped native completion/failure");
+    Check(Calls(Method(board,"QuestPack.Quests.QuestSkillWeightlifting","Cleanup")).Contains("get_Item") &&
+          Calls(Method(board,"QuestPack.Quests.QuestSkillWeightlifting","get_Item")).Contains("get_Chara"), "weight cleanup uses the same saved participant as XP");
+    Check(Calls(Method(board,"QuestPack.Patches.GameDatePatch","Postfix")).Contains("ForeachReverse"), "installed board mod hourly dispatch has the guarded callback");
+    var fields = board.Types.Where(t=>t.Namespace is "QuestPack.Quests" or "QuestPack.QuestTasks")
+        .SelectMany(t=>t.Fields).Where(f=>f.IsPublic && !f.IsStatic).ToArray();
+    Check(fields.Length > 15 && fields.All(f=>f.CustomAttributes.Any(a=>a.AttributeType.Name=="JsonPropertyAttribute")), "all public quest/task progress fields in installed board mod participate in existing snapshot serialization");
+    Check(Calls(Method(board,"QuestPack.Quests.QuestSearchZoneOutlaws","OnEnterZone")).Contains("CreateEnemy"), "outlaw spawning lives inside a guarded lifecycle callback");
+    Check(Calls(Method(mod,"RandomQuestExpantion.Patch.PlayerPatch","FriendlyGuildPatch")).Contains("TryInstallQuestEquipment"), "RQX guild setup guard covers its world-object creation callback");
+}
 Console.WriteLine($"{checks} quest replication checks passed");

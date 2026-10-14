@@ -14,12 +14,12 @@ public struct OverrideMethodComparer : IEqualityComparer<MethodBase>
 
     public bool Equals(MethodBase? lhs, MethodBase? rhs)
     {
-        return ReferenceEquals(lhs, rhs) || lhs?.MetadataToken == rhs?.MetadataToken;
+        return ReferenceEquals(lhs, rhs) || lhs is not null && rhs is not null && lhs.Module == rhs.Module && lhs.MetadataToken == rhs.MetadataToken;
     }
 
     public int GetHashCode(MethodBase mi)
     {
-        return mi.MetadataToken;
+        return HashCode.Combine(mi.Module, mi.MetadataToken);
     }
 
     public static IEnumerable<MethodBase> FindAllOverrides(Type type, string methodName, params Type[] parameterTypes)
@@ -28,6 +28,7 @@ public struct OverrideMethodComparer : IEqualityComparer<MethodBase>
             .Concat(TypeQualifier.Declared)
             .OfDerived(type)
             .Select(t => t.GetRuntimeMethod(methodName, parameterTypes))
+            .OfType<MethodInfo>()
             .Where(mi => !mi.ContainsGenericParameters && mi.IsDeclaredMember())
             .Distinct(Default);
     }
