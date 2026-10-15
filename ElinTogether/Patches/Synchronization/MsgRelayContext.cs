@@ -13,6 +13,7 @@ internal static class MsgRelayContext
     private static Card? _speaker;
 
     internal static bool IsRedirecting => _mode == Mode.Redirect;
+    internal static bool IsSuppressing => _mode == Mode.Suppress;
 
     internal static ScopeExit RedirectTo(Chara receiver)
     {
@@ -67,6 +68,10 @@ internal static class MsgRelayContext
     [HarmonyPatch(typeof(Msg), nameof(Msg.SayRaw))]
     internal static bool OnSayRaw(string text, ref string __result)
     {
+        // Combat has its own completed, recipient-relative presentation batch.
+        // A surrounding personal action must not also forward its raw fragments.
+        if (_mode == Mode.Redirect && CombatNarration.Current is not null &&
+            CombatNarrationMessagePatch.Pending is not null) return true;
         if (_mode == Mode.None || Msg.ignoreAll || NetSession.Instance.Connection is not ElinNetHost host) {
             return true;
         }

@@ -47,12 +47,17 @@ public class CardDamageHpDelta : ElinDelta
         }
 
         var previousReplay = FighterBountyReplayPatch.ReplayingClientDamage;
+        // Reverse-patched DamageHP bypasses ordinary Harmony prefixes/finalizers.
+        var narration = CombatNarration.Begin();
         try {
             FighterBountyReplayPatch.ReplayingClientDamage = previousReplay || !net.IsHost;
             using (Simulate(net.IsHost)) {
                 card.Stub_DamageHP(Dmg, Ele, EleP, AttackSource, Origin, ShowEffect, Weapon, OriginalTarget, ResistPenetrationLevel);
             }
-        } finally { FighterBountyReplayPatch.ReplayingClientDamage = previousReplay; }
+        } finally {
+            FighterBountyReplayPatch.ReplayingClientDamage = previousReplay;
+            CombatNarration.End(narration);
+        }
 
         if (!net.IsHost && HpAfter is { } hpAfter && card is not Chara { isDead: true }) {
             card.hp = hpAfter;

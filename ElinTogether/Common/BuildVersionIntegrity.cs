@@ -93,9 +93,10 @@ public class BuildVersionIntegrity : EClass
         V52 = 52, // Host-resolved resurrection and early death recovery drops.
         V53 = 53, // Shared travel ownership and idempotent scroll/spell initiation.
         V54 = 54, // Resolved movement presentation timing.
+        V55 = 55, // Atomic host-confirmed combat narration with recipient-relative formatting.
     }
 
-    public const APIVersion APIVersionLatest = APIVersion.V54;
+    public const APIVersion APIVersionLatest = APIVersion.V55;
 
     public static string GameVersion => $"{core.version.major}.{core.version.minor}.{core.version.batch}.{core.version.fix}";
 

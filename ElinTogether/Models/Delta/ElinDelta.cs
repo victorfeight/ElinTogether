@@ -114,6 +114,7 @@ namespace ElinTogether.Models;
 [Union(621, typeof(SocialTalkDelta))]
 [Union(622, typeof(SocialStateDelta))]
 [Union(623, typeof(ExplosionVisualDelta))]
+[Union(624, typeof(CombatNarrationDelta))]
 // Inv
 [Union(700, typeof(InvOwnerOnProcessDelta))]
 [Union(701, typeof(InvRerollDelta))]

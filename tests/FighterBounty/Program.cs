@@ -44,6 +44,7 @@ Check(!FighterBountyReplayPatch.ReplayingClientDamage && victim.hp==5,"productio
 DamageReplayBoundary.Replay=()=>throw new InvalidOperationException("replay failure");
 try {damage.Apply(client);} catch(InvalidOperationException) {}
 Check(!FighterBountyReplayPatch.ReplayingClientDamage,"production replay restores scope after exception");
+Check(CombatNarration.Depth==0,"damage replay restores narration scope after exception");
 FighterBountyReplayPatch.ReplayingClientDamage=true;
 DamageReplayBoundary.Replay=()=>{}; damage.Apply(client);
 Check(FighterBountyReplayPatch.ReplayingClientDamage,"nested production replay preserves outer scope");
@@ -55,7 +56,7 @@ DamageReplayBoundary.Replay=null;
 // Inspect and transform the REAL installed vanilla IL, without launching Unity.
 var game = @"C:\Program Files (x86)\Steam\steamapps\common\Elin";
 var repo = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
-var build = Path.Combine(repo, "build/guild-bounty");
+var build = args.Length > 0 ? Path.GetFullPath(args[0]) : Path.Combine(repo, "build/guild-bounty");
 var roots = new[] { build, Path.Combine(game,"Elin_Data/Managed"), Path.Combine(game,"BepInEx/core"),
     Path.Combine(game,"Package/Mod_ElinTogether"), Path.Combine(game,"Package/_ModdingKit"), Path.Combine(game,"Package/Mod_ElinModdingKit") };
 AssemblyLoadContext.Default.Resolving += (context, name) => {
